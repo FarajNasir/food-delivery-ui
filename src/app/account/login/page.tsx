@@ -46,6 +46,15 @@ export default function AccountLoginPage() {
           <CardDescription>Please enter your credentials below</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Demo Credentials */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Credentials</h3>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p><strong>Email:</strong> demo@test.com | <strong>Password:</strong> 123456</p>
+              <p><strong>Email:</strong> john1@gmail.com | <strong>Password:</strong> 123456</p>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-red-600 text-sm">{error}</p>}
             {success && <p className="text-green-600 text-sm">Login successful!</p>}
