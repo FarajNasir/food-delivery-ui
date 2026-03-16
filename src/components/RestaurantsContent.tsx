@@ -2,18 +2,31 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { restaurants } from "@/constants/restaurants";
-import { Clock, MapPin, ChevronRight } from "lucide-react";
+import { Clock, MapPin, ChevronRight, Search } from "lucide-react";
 
 export default function RestaurantsContent() {
   const searchParams = useSearchParams();
   const location = searchParams.get('location');
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredRestaurants = location
-    ? restaurants.filter(r => r.location.toLowerCase().includes(location.toLowerCase()))
-    : restaurants;
+  const filteredRestaurants = useMemo(() => {
+    let filtered = location
+      ? restaurants.filter(r => r.location.toLowerCase().includes(location.toLowerCase()))
+      : restaurants;
+
+    if (searchTerm) {
+      filtered = filtered.filter(r =>
+        r.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [location, searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,6 +38,19 @@ export default function RestaurantsContent() {
           <p className="text-gray-600">
             {location ? `Showing restaurants near ${location}` : 'Choose from our selection of amazing restaurants'}
           </p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              placeholder="Search restaurants..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, MapPin, Search, ShoppingCart, ArrowLeft } from "lucide-react";
 import React from "react";
 
@@ -18,7 +19,7 @@ export default function RestaurantPage({ params }: PageProps) {
   const { id } = React.use(params);
   const restaurant = restaurants.find((r) => r.id === id);
   const [searchQuery, setSearchQuery] = useState("");
-  const [cartItems, setCartItems] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<Record<string, number>>({});
 
   if (!restaurant) {
     return (
@@ -33,12 +34,24 @@ export default function RestaurantPage({ params }: PageProps) {
     );
   }
 
-  const filteredMenu = restaurant.menu.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const handleAddToCart = (itemId: string) => {
-    setCartItems([...cartItems, itemId]);
+    setCartItems(prev => ({
+      ...prev,
+      [itemId]: (prev[itemId] || 0) + 1
+    }));
+  };
+
+  const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      const newCart = { ...cartItems };
+      delete newCart[itemId];
+      setCartItems(newCart);
+    } else {
+      setCartItems(prev => ({
+        ...prev,
+        [itemId]: newQuantity
+      }));
+    }
   };
 
   return (
@@ -84,43 +97,74 @@ export default function RestaurantPage({ params }: PageProps) {
               </div>
               {searchQuery && (
                 <p className="text-sm text-gray-600 mt-2">
-                  Found {filteredMenu.length} item{filteredMenu.length !== 1 ? 's' : ''}
+                  Found {restaurant.categories.reduce((total, category) => 
+                    total + category.items.filter(item => 
+                      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length, 0
+                  )} item{restaurant.categories.reduce((total, category) => 
+                    total + category.items.filter(item => 
+                      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length, 0
+                  ) !== 1 ? 's' : ''} matching "{searchQuery}"
                 </p>
               )}
             </div>
 
-            {/* Menu Items */}
+            {/* Menu Items by Category */}
             <div className="space-y-4">
               <h2 className="text-2xl font-bold text-gray-900">Menu</h2>
-              {filteredMenu.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No items found</p>
-              ) : (
-                filteredMenu.map((item) => (
-                  <Card key={item.id} className="hover:shadow-md transition">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-lg text-gray-900">{item.name}</h3>
-                          {item.description && (
-                            <p className="text-gray-600 text-sm mt-1">{item.description}</p>
-                          )}
-                          <div className="mt-3 flex items-center gap-2">
-                            <Badge variant="secondary" className="text-lg font-bold">
-                              ${item.price.toFixed(2)}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleAddToCart(item.id)}
-                          className="bg-orange-600 hover:bg-orange-700"
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+              
+              <Tabs defaultValue={restaurant.categories[0]?.name || "all"} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 mb-6">
+                  {restaurant.categories.map((category) => (
+                    <TabsTrigger key={category.name} value={category.name} className="text-xs md:text-sm">
+                      {category.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {restaurant.categories.map((category) => (
+                  <TabsContent key={category.name} value={category.name} className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-800">{category.name}</h3>
+                    {category.items.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No items in this category</p>
+                    ) : (
+                      category.items
+                        .filter((item) =>
+                          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                        .map((item) => (
+                          <Card key={item.id} className="hover:shadow-md transition">
+                            <CardContent className="pt-6">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <h3 className="font-bold text-lg text-gray-900">{item.name}</h3>
+                                  {item.description && (
+                                    <p className="text-gray-600 text-sm mt-1">{item.description}</p>
+                                  )}
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <Badge variant="secondary" className="text-lg font-bold">
+                                      ${item.price.toFixed(2)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={() => handleAddToCart(item.id)}
+                                  className="bg-orange-600 hover:bg-orange-700"
+                                >
+                                  Add
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
             </div>
           </div>
 
@@ -135,19 +179,37 @@ export default function RestaurantPage({ params }: PageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                {cartItems.length === 0 ? (
+                {Object.keys(cartItems).length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <p>Your cart is empty</p>
                   </div>
                 ) : (
                   <div>
-                    <div className="space-y-2 mb-4">
-                      {cartItems.map((itemId, index) => {
+                    <div className="space-y-3 mb-4">
+                      {Object.entries(cartItems).map(([itemId, quantity]) => {
                         const item = restaurant.menu.find((m) => m.id === itemId);
+                        if (!item) return null;
                         return (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span className="text-gray-700">{item?.name}</span>
-                            <span className="font-medium">${item?.price.toFixed(2)}</span>
+                          <div key={itemId} className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <span className="text-gray-700 text-sm">{item.name}</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                <button
+                                  onClick={() => handleUpdateQuantity(itemId, quantity - 1)}
+                                  className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-xs font-bold"
+                                >
+                                  -
+                                </button>
+                                <span className="text-xs font-medium min-w-[20px] text-center">{quantity}x</span>
+                                <button
+                                  onClick={() => handleUpdateQuantity(itemId, quantity + 1)}
+                                  className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-xs font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                            <span className="font-medium text-sm">${(item.price * quantity).toFixed(2)}</span>
                           </div>
                         );
                       })}
@@ -157,10 +219,10 @@ export default function RestaurantPage({ params }: PageProps) {
                         <span>Total:</span>
                         <span className="text-orange-600">
                           $
-                          {cartItems
-                            .reduce((sum, itemId) => {
+                          {Object.entries(cartItems)
+                            .reduce((sum, [itemId, quantity]) => {
                               const item = restaurant.menu.find((m) => m.id === itemId);
-                              return sum + (item?.price || 0);
+                              return sum + (item?.price || 0) * quantity;
                             }, 0)
                             .toFixed(2)}
                         </span>

@@ -3,6 +3,12 @@ export interface MenuItem {
   name: string;
   price: number;
   description?: string;
+  category: string;
+}
+
+export interface MenuCategory {
+  name: string;
+  items: MenuItem[];
 }
 
 export interface Restaurant {
@@ -12,6 +18,7 @@ export interface Restaurant {
   opening: string;
   closing: string;
   menu: MenuItem[];
+  categories: MenuCategory[];
 }
 
 export interface User {

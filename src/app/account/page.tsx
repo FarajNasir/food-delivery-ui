@@ -101,7 +101,7 @@ export default function AccountPage() {
                 </div>
                 <Button
                   variant="destructive"
-                  className="w-full flex items-center justify-center gap-2"
+                  className="flex items-center justify-center gap-2 mx-auto px-4 py-2 text-sm cursor-pointer"
                   onClick={handleLogout}
                 >
                   <LogOut className="w-4 h-4" />
@@ -113,11 +113,11 @@ export default function AccountPage() {
 
           {/* Main Content */}
           <div className="md:col-span-2">
-            <Tabs defaultValue="orders" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="orders">My Orders</TabsTrigger>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="password">Password</TabsTrigger>
+            <Tabs defaultValue="orders" className="space-y-6 ">
+              <TabsList className="grid w-full grid-cols-3 ">
+                <TabsTrigger value="orders" className="cursor-pointer">My Orders</TabsTrigger>
+                <TabsTrigger value="details" className="cursor-pointer">Details</TabsTrigger>
+                <TabsTrigger value="password" className="cursor-pointer">Password</TabsTrigger>
               </TabsList>
 
               {/* My Orders Tab */}
@@ -136,7 +136,7 @@ export default function AccountPage() {
                       <p className="text-gray-500 mb-4">No orders yet</p>
                       <Button
                         onClick={() => router.push("/restaurants")}
-                        className="bg-orange-600 hover:bg-orange-700"
+                        className="bg-orange-600 hover:bg-orange-700 cursor-pointer"
                       >
                         Start Ordering
                       </Button>
@@ -271,7 +271,7 @@ export default function AccountPage() {
                     <Button
                       onClick={handleSaveDetails}
                       size="sm"
-                      className="bg-orange-600 hover:bg-orange-700"
+                      className="bg-orange-600 hover:bg-orange-700 cursor-pointer"
                     >
                       Save Changes
                     </Button>
@@ -318,7 +318,7 @@ export default function AccountPage() {
                       <Input type="password" placeholder="Confirm new password" />
                     </div>
 
-                    <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+                    <Button size="sm" className="bg-orange-600 hover:bg-orange-700 cursor-pointer">
                       Update Password
                     </Button>
                   </CardContent>
