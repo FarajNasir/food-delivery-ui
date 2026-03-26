@@ -1,16 +1,24 @@
-import { 
-  AuthSuccessResponse, 
-  ErrorResponse, 
-  MessageResponse, 
-  UserResponse 
+import {
+  AuthSuccessResponse,
+  ErrorResponse,
+  MessageResponse,
+  UserResponse
 } from "../types/auth";
+import {
+  Restaurant,
+  RestaurantWithMenu,
+  MenuCategory,
+  MenuItem,
+  MenuItemCreate,
+  Owner
+} from "../types/restaurant";
 
 export const authService = {
   async signUp(
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     confirmPassword: string,
-    role: string, 
+    role: string,
     firstName: string,
     lastName: string,
     mobile: string,
@@ -129,5 +137,162 @@ export const authService = {
       throw new Error((data as ErrorResponse).error || 'Verification failed');
     }
     return data as AuthSuccessResponse;
+  },
+};
+
+export const restaurantService = {
+  // --- Admin ---
+  async getOwners(): Promise<Owner[]> {
+    const response = await fetch('/api/admin/owners');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch owners');
+    return data.owners;
+  },
+
+  async getUsers(): Promise<any[]> {
+    const response = await fetch('/api/admin/users');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
+    return data.users;
+  },
+
+  async updateUserRole(id: string, role: string, details?: any): Promise<MessageResponse> {
+    const response = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, role, ...details }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update user');
+    return data;
+  },
+
+  async createRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant> {
+    const response = await fetch('/api/admin/restaurants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(restaurant),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create restaurant');
+    return data.restaurant;
+  },
+
+  async deleteRestaurant(id: string): Promise<MessageResponse> {
+    const response = await fetch(`/api/admin/restaurants?id=${id}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete restaurant');
+    return data;
+  },
+
+  async createCategory(name: string, restaurantId: string): Promise<MenuCategory> {
+    const response = await fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, restaurant_id: restaurantId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create category');
+    return data.category;
+  },
+
+  async createMenuItem(item: MenuItemCreate): Promise<MenuItem> {
+    const response = await fetch('/api/admin/menu-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(item),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create menu item');
+    return data.menuItem;
+  },
+
+  async deleteMenuItem(id: string): Promise<MessageResponse> {
+    const response = await fetch(`/api/admin/menu-items?id=${id}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete menu item');
+    return data;
+  },
+
+  // --- Owner ---
+  async updateRestaurantByOwner(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
+    const response = await fetch(`/api/owner/restaurants/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(restaurant),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update restaurant');
+    return data.restaurant;
+  },
+
+  async updateMenuItemByOwner(id: string, item: Partial<MenuItem>): Promise<MenuItem> {
+    const response = await fetch(`/api/owner/menu-items/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update menu item');
+    return data.menuItem;
+  },
+
+  async createCategoryByOwner(name: string, restaurantId: string): Promise<MenuCategory> {
+    const response = await fetch('/api/owner/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, restaurant_id: restaurantId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create category');
+    return data.category;
+  },
+
+  async createMenuItemByOwner(item: MenuItemCreate): Promise<MenuItem> {
+    const response = await fetch('/api/owner/menu-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create menu item');
+    return data.menuItem;
+  },
+
+  // --- Public ---
+  async getPublicRestaurants(): Promise<Restaurant[]> {
+    const response = await fetch('/api/public/restaurants');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch restaurants');
+    return data.restaurants;
+  },
+
+  async getPublicRestaurantById(id: string): Promise<RestaurantWithMenu> {
+    const response = await fetch(`/api/public/restaurants?id=${id}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch restaurant');
+    return data.restaurant;
+  },
+
+  // --- Helpers ---
+  async getCategories(restaurantId?: string): Promise<MenuCategory[]> {
+    const url = restaurantId ? `/api/public/categories?restaurant_id=${restaurantId}` : '/api/public/categories';
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch categories');
+    return data.categories;
+  },
+
+  async getMenuItems(restaurantId?: string): Promise<MenuItem[]> {
+    const url = restaurantId ? `/api/public/menu-items?restaurantId=${restaurantId}` : '/api/public/menu-items';
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch menu items');
+    return data.menuItems;
   },
 };

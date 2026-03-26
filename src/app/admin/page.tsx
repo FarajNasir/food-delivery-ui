@@ -2,8 +2,9 @@
 
 import { useAuth } from "@/components/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Store, ShoppingBag, ShieldAlert } from "lucide-react";
+import { Users, Store, ShoppingBag, ShieldAlert, ArrowRight, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function AdminDashboard() {
   const { user, role } = useAuth();
@@ -49,13 +50,28 @@ export default function AdminDashboard() {
               <CardTitle>Platform Overview</CardTitle>
               <CardDescription>Manage global settings and user roles</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Use the administrative tools to monitor platform health, manage restaurant approvals, and resolve user issues.
-              </p>
-              <div className="flex gap-4">
-                <Button className="bg-orange-600 hover:bg-orange-700">Manage Users</Button>
-                <Button variant="outline">System Logs</Button>
+            <CardContent className="p-6 pt-0 space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                 <Link href="/admin/restaurants" className="group/btn">
+                    <div className="p-6 rounded-3xl bg-slate-50 border-2 border-transparent hover:border-orange-500/20 hover:bg-orange-50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <Store className="w-6 h-6 text-orange-600" />
+                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-orange-600 transform group-hover:translate-x-1 transition-all" />
+                      </div>
+                      <h4 className="font-black text-slate-900">Manage Restaurants</h4>
+                      <p className="text-sm text-slate-500 mt-1">Configure stores, locations, and hierarchical menu data.</p>
+                    </div>
+                 </Link>
+                 <Link href="/admin/users" className="group/btn">
+                    <div className="p-6 rounded-3xl bg-slate-50 border-2 border-transparent hover:border-blue-500/20 hover:bg-blue-50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <Users className="w-6 h-6 text-blue-600" />
+                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
+                      </div>
+                      <h4 className="font-black text-slate-900">Manage Users</h4>
+                      <p className="text-sm text-slate-500 mt-1">Review profiles and manage system-wide role permissions.</p>
+                    </div>
+                 </Link>
               </div>
             </CardContent>
           </Card>

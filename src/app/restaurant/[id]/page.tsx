@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { restaurants } from "@/constants/restaurants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, MapPin, Search, ShoppingCart, ArrowLeft } from "lucide-react";
+import { Clock, MapPin, Search, ShoppingCart, ArrowLeft, Loader2, ChevronRight } from "lucide-react";
 import React from "react";
+import { restaurantService } from "@/services/api";
+import { RestaurantWithMenu, MenuItem } from "@/types/restaurant";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,235 +18,235 @@ interface PageProps {
 
 export default function RestaurantPage({ params }: PageProps) {
   const { id } = React.use(params);
-  const restaurant = restaurants.find((r) => r.id === id);
+  const [restaurant, setRestaurant] = useState<RestaurantWithMenu | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [cartItems, setCartItems] = useState<Record<string, number>>({});
 
-  if (!restaurant) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Restaurant not found</h1>
-          <Link href="/restaurants">
-            <Button>Back to Restaurants</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const fetchRestaurant = async () => {
+      try {
+        setLoading(true);
+        const data = await restaurantService.getPublicRestaurantById(id);
+        setRestaurant(data);
+      } catch (err: any) {
+        setError(err.message || "Failed to load restaurant");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRestaurant();
+  }, [id]);
 
   const handleAddToCart = (itemId: string) => {
-    setCartItems(prev => ({
+    setCartItems((prev) => ({
       ...prev,
-      [itemId]: (prev[itemId] || 0) + 1
+      [itemId]: (prev[itemId] || 0) + 1,
     }));
   };
 
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      const newCart = { ...cartItems };
-      delete newCart[itemId];
-      setCartItems(newCart);
+      const { [itemId]: _, ...rest } = cartItems;
+      setCartItems(rest);
     } else {
-      setCartItems(prev => ({
+      setCartItems((prev) => ({
         ...prev,
-        [itemId]: newQuantity
+        [itemId]: newQuantity,
       }));
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <Link href="/restaurants" className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 mb-8">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Restaurants
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+      <Loader2 className="w-10 h-10 animate-spin text-orange-600" />
+    </div>
+  );
+
+  if (error || !restaurant) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+      <Card className="max-w-md w-full p-8 text-center rounded-[2.5rem] border-none shadow-2xl">
+        <h1 className="text-3xl font-black text-slate-900 mb-4">{error || "Restaurant not found"}</h1>
+        <Link href="/restaurants">
+          <Button className="bg-orange-600 hover:bg-orange-700 rounded-2xl h-14 px-8 font-black">
+            Back to Restaurants
+          </Button>
         </Link>
+      </Card>
+    </div>
+  );
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* Main Menu Section */}
-          <div className="md:col-span-2">
-            {/* Restaurant Info */}
-            <div className="bg-white rounded-lg p-6 mb-8 border">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">{restaurant.name}</h1>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin className="w-5 h-5" />
-                  <span>{restaurant.location}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Clock className="w-5 h-5" />
-                  <span>
-                    {restaurant.opening} - {restaurant.closing}
-                  </span>
-                </div>
+  const filteredItemsCount = (restaurant.menu_items || []).filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  ).length;
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] pb-20">
+      {/* Premium Hero Section */}
+      <div className="bg-slate-900 pt-16 pb-32 px-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-3xl -mr-64 -mt-64"></div>
+        <div className="max-w-7xl mx-auto relative z-10 space-y-8">
+           <Link href="/restaurants" className="inline-flex items-center gap-2 text-orange-400 font-bold hover:text-orange-300 transition-colors bg-white/5 px-4 py-2 rounded-xl backdrop-blur-md">
+              <ArrowLeft className="w-4 h-4" /> All Restaurants
+           </Link>
+           
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+              <div className="space-y-4">
+                 <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight">{restaurant.name}</h1>
+                 <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex items-center gap-2 text-slate-400 font-bold">
+                       <MapPin className="w-5 h-5 text-orange-500" /> {restaurant.location}
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 font-bold">
+                       <Clock className="w-5 h-5 text-orange-500" /> {restaurant.opening_time || '09:00'} - {restaurant.closing_time || '22:00'}
+                    </div>
+                 </div>
               </div>
-            </div>
+              <div className="flex gap-2">
+                 {(restaurant.categories || []).slice(0, 3).map(c => (
+                   <Badge key={c.id} className="bg-white/10 text-white border-none px-4 py-2 rounded-xl backdrop-blur-md font-bold uppercase tracking-widest text-[10px]">
+                      {c.name}
+                   </Badge>
+                 ))}
+              </div>
+           </div>
+        </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-8 -mt-16 relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Main Menu Section */}
+          <div className="lg:col-span-3 space-y-8">
             {/* Search Bar */}
-            <div className="mb-8">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search Menu Items</label>
-              <div className="relative flex items-center">
-                <Search className="absolute left-4 w-5 h-5 text-gray-400 pointer-events-none" />
+            <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-2">
+              <div className="relative">
+                <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-slate-300 w-5 h-5" />
                 <Input
-                  placeholder="Search by name, e.g. 'pizza', 'burger', 'sushi'..."
-                  className="pl-12 py-2.5 text-base"
+                  className="w-full border-none h-16 pl-14 text-lg font-bold placeholder:text-slate-300 focus-visible:ring-0 rounded-[2rem]"
+                  placeholder="Search in menu..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              {searchQuery && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Found {restaurant.categories.reduce((total, category) => 
-                    total + category.items.filter(item => 
-                      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                    ).length, 0
-                  )} item{restaurant.categories.reduce((total, category) => 
-                    total + category.items.filter(item => 
-                      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                    ).length, 0
-                  ) !== 1 ? 's' : ''} matching "{searchQuery}"
-                </p>
-              )}
-            </div>
+            </Card>
 
-            {/* Menu Items by Category */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-gray-900">Menu</h2>
-              
-              <Tabs defaultValue={restaurant.categories[0]?.name || "all"} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 mb-6">
-                  {restaurant.categories.map((category) => (
-                    <TabsTrigger key={category.name} value={category.name} className="text-xs md:text-sm">
+            <div className="space-y-12">
+              <Tabs defaultValue={restaurant.categories?.[0]?.name || "all"} className="w-full">
+                <TabsList className="bg-slate-200/50 p-1.5 rounded-2xl mb-8 w-full md:w-auto h-auto flex flex-wrap gap-2 overflow-x-auto">
+                  {restaurant.categories?.map((category) => (
+                    <TabsTrigger 
+                      key={category.id} 
+                      value={category.name} 
+                      className="rounded-xl font-bold py-3 px-6 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all"
+                    >
                       {category.name}
                     </TabsTrigger>
                   ))}
                 </TabsList>
-
-                {restaurant.categories.map((category) => (
-                  <TabsContent key={category.name} value={category.name} className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">{category.name}</h3>
-                    {category.items.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">No items in this category</p>
-                    ) : (
-                      category.items
-                        .filter((item) =>
-                          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                        )
-                        .map((item) => (
-                          <Card key={item.id} className="hover:shadow-md transition">
-                            <CardContent className="pt-6">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <h3 className="font-bold text-lg text-gray-900">{item.name}</h3>
-                                  {item.description && (
-                                    <p className="text-gray-600 text-sm mt-1">{item.description}</p>
-                                  )}
-                                  <div className="mt-3 flex items-center gap-2">
-                                    <Badge variant="secondary" className="text-lg font-bold">
-                                      ${item.price.toFixed(2)}
-                                    </Badge>
+                
+                {restaurant.categories?.map((category) => (
+                  <TabsContent key={category.id} value={category.name} className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {restaurant.menu_items?.filter(m => m.category_id === category.id)
+                        .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map(item => (
+                        <Card key={item.id} className="rounded-[2rem] border-none shadow-xl bg-white hover:shadow-2xl transition-all group overflow-hidden">
+                          <CardContent className="p-0">
+                            <div className="p-6 flex flex-col justify-between h-full space-y-4">
+                               <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                     <h3 className="font-black text-xl text-slate-900 group-hover:text-orange-600 transition-colors">{item.name}</h3>
+                                     {!item.is_available && <Badge variant="secondary" className="bg-slate-100 text-slate-400">Sold Out</Badge>}
                                   </div>
-                                </div>
-                                <Button
-                                  onClick={() => handleAddToCart(item.id)}
-                                  className="bg-orange-600 hover:bg-orange-700"
-                                >
-                                  Add
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                    )}
+                                  <p className="text-slate-500 text-sm font-medium line-clamp-2">{item.description || "Freshly prepared with premium ingredients."}</p>
+                               </div>
+                               <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                                  <span className="text-2xl font-black text-slate-900">${item.price.toFixed(2)}</span>
+                                  <Button 
+                                    onClick={() => handleAddToCart(item.id)}
+                                    disabled={!item.is_available}
+                                    className="bg-orange-600 hover:bg-orange-700 rounded-xl h-12 px-6 font-bold shadow-lg shadow-orange-100 transition-all active:scale-95"
+                                  >
+                                    Add to Bag
+                                  </Button>
+                               </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </TabsContent>
                 ))}
               </Tabs>
             </div>
           </div>
 
-          {/* Sidebar - Cart Section */}
-          <div className="md:col-span-1">
-            {/* Your Order Card */}
-            <Card className="sticky top-24 border-2 border-orange-200">
-              <CardHeader className="bg-orange-50">
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5" />
-                  Your Order
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {Object.keys(cartItems).length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>Your cart is empty</p>
+          {/* Checkout / Bag Section */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-8 rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden">
+               <div className="bg-slate-900 p-8 text-white">
+                  <div className="flex items-center justify-between mb-2">
+                     <h3 className="text-2xl font-black uppercase tracking-tight">Your Bag</h3>
+                     <div className="bg-orange-600 w-8 h-8 rounded-xl flex items-center justify-center font-black">
+                        {Object.values(cartItems).reduce((a, b) => a + b, 0)}
+                     </div>
                   </div>
-                ) : (
-                  <div>
-                    <div className="space-y-3 mb-4">
-                      {Object.entries(cartItems).map(([itemId, quantity]) => {
-                        const item = restaurant.menu.find((m) => m.id === itemId);
-                        if (!item) return null;
-                        return (
-                          <div key={itemId} className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <span className="text-gray-700 text-sm">{item.name}</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                <button
-                                  onClick={() => handleUpdateQuantity(itemId, quantity - 1)}
-                                  className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-xs font-bold"
-                                >
-                                  -
-                                </button>
-                                <span className="text-xs font-medium min-w-[20px] text-center">{quantity}x</span>
-                                <button
-                                  onClick={() => handleUpdateQuantity(itemId, quantity + 1)}
-                                  className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-xs font-bold"
-                                >
-                                  +
-                                </button>
-                              </div>
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Selected Delicacies</p>
+               </div>
+               
+               <CardContent className="p-8 space-y-6">
+                  {Object.keys(cartItems).length === 0 ? (
+                    <div className="text-center py-12 space-y-4">
+                       <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200">
+                          <ShoppingCart className="w-8 h-8" />
+                       </div>
+                       <p className="text-slate-400 font-bold">Your bag is currently empty.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        {Object.entries(cartItems).map(([itemId, quantity]) => {
+                          const item = restaurant.menu_items?.find(m => m.id === itemId);
+                          if (!item) return null;
+                          return (
+                            <div key={itemId} className="flex items-center justify-between group">
+                               <div className="flex-1 min-w-0 pr-4">
+                                  <p className="font-black text-slate-900 truncate">{item.name}</p>
+                                  <p className="text-slate-400 text-xs font-bold leading-none mt-1">${item.price.toFixed(2)}</p>
+                               </div>
+                               <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl">
+                                  <button onClick={() => handleUpdateQuantity(itemId, quantity - 1)} className="w-6 h-6 rounded-lg bg-white flex items-center justify-center font-black text-slate-400 hover:text-orange-600 shadow-sm">-</button>
+                                  <span className="font-black text-slate-900 text-sm min-w-[20px] text-center">{quantity}</span>
+                                  <button onClick={() => handleUpdateQuantity(itemId, quantity + 1)} className="w-6 h-6 rounded-lg bg-white flex items-center justify-center font-black text-slate-400 hover:text-orange-600 shadow-sm">+</button>
+                               </div>
                             </div>
-                            <span className="font-medium text-sm">${(item.price * quantity).toFixed(2)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="border-t pt-4 mb-4">
-                      <div className="flex justify-between font-bold text-lg">
-                        <span>Total:</span>
-                        <span className="text-orange-600">
-                          $
-                          {Object.entries(cartItems)
-                            .reduce((sum, [itemId, quantity]) => {
-                              const item = restaurant.menu.find((m) => m.id === itemId);
-                              return sum + (item?.price || 0) * quantity;
-                            }, 0)
-                            .toFixed(2)}
-                        </span>
+                          );
+                        })}
                       </div>
-                    </div>
-                    <Button className="w-full bg-orange-600 hover:bg-orange-700">
-                      Checkout
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
+                      
+                      <div className="border-t border-slate-100 pt-6 space-y-4">
+                         <div className="flex items-center justify-between">
+                            <span className="text-slate-400 font-bold uppercase tracking-widest text-xs">Total Amount</span>
+                            <span className="text-3xl font-black text-slate-900">
+                               ${Object.entries(cartItems).reduce((sum, [id, qty]) => {
+                                 const item = restaurant.menu_items?.find(m => m.id === id);
+                                 return sum + (item?.price || 0) * qty;
+                               }, 0).toFixed(2)}
+                            </span>
+                         </div>
+                         <Button className="w-full bg-orange-600 hover:bg-orange-700 h-16 rounded-[1.5rem] font-black text-lg shadow-xl shadow-orange-100 transition-all active:scale-95 group">
+                            Secure Checkout <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                         </Button>
+                      </div>
+                    </>
+                  )}
+               </CardContent>
             </Card>
-
-            {/* Change Restaurant Button */}
-            <Link href="/restaurants" className="block mt-4">
-              <Button variant="outline" className="w-full">
-                Change Restaurant
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
