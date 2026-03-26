@@ -3,16 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { authService } from "@/services/api";
 import { User } from "@supabase/supabase-js";
-
-type Role = "customer" | "owner" | "admin" | null;
-
-interface UserDetails {
-  id: string;
-  first_name: string;
-  last_name: string;
-  mobile: string;
-  postcode: string;
-}
+import { Role, UserDetails } from "@/types/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -27,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   userDetails: null,
   loading: true,
-  refreshUser: async () => {},
+  refreshUser: async () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {

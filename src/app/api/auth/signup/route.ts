@@ -73,5 +73,5 @@ export async function POST(request: Request) {
   // dont want auto login after signup so sign out
   await supabase.auth.signOut()
 
-  return NextResponse.json({ user: authData.user })
+  return NextResponse.json({ user: authData.user, role })
 }

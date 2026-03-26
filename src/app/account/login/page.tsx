@@ -45,8 +45,9 @@ export default function AccountLoginPage() {
         }
       }, 1000);
 
-    } catch (err: any) {
-      toast.error(err?.message || "Invalid email or password ❌");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Invalid email or password ❌";
+      toast.error(message);
     }
   };
 
@@ -131,9 +132,9 @@ export default function AccountLoginPage() {
           </p>
 
           <div className="flex justify-between mt-4 text-sm">
-            <a href="#" className="text-orange-600 hover:underline">
+            <Link href="/account/forgot-password" data-testid="forgot-password-link" className="text-orange-600 hover:underline">
               Forgot Password?
-            </a>
+            </Link>
             <Link href="/account/register" className="text-orange-600 hover:underline">
               Create an account
             </Link>

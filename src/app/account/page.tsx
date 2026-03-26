@@ -26,7 +26,14 @@ export default function AccountPage() {
     prefText: false,
   });
 
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
   const [saving, setSaving] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -69,10 +76,45 @@ export default function AccountPage() {
       });
       await refreshUser();
       toast.success("Profile updated successfully");
-    } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error("Please fill in both new password fields");
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      await authService.updatePassword(passwordData.newPassword);
+
+      toast.success("Password updated successfully");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update password";
+      toast.error(message);
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -111,10 +153,10 @@ export default function AccountPage() {
                   <p className="font-medium text-gray-900">{user.email}</p>
                   <p className="text-sm text-gray-500">Active Member</p>
                 </div>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col items-center gap-3">
                   {(role === 'owner' || role === 'admin') && (
                     <Button
-                      className="bg-orange-600 hover:bg-orange-700 flex items-center justify-center gap-2 px-4 py-2 text-sm cursor-pointer"
+                      className="bg-orange-600 hover:bg-orange-700 flex items-center justify-center gap-2 px-3 py-1.5 text-sm w-fit cursor-pointer"
                       onClick={() => router.push(role === 'admin' ? '/admin' : '/restaurant')}
                     >
                       Go to {role === 'admin' ? 'Admin Panel' : 'Restaurant Dashboard'}
@@ -122,7 +164,7 @@ export default function AccountPage() {
                   )}
                   <Button
                     variant="destructive"
-                    className="flex items-center justify-center gap-2 px-4 py-2 text-sm cursor-pointer"
+                    className="flex items-center justify-center gap-2 px-3 py-1.5 text-sm w-fit cursor-pointer"
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4" />
@@ -315,36 +357,37 @@ export default function AccountPage() {
                     <CardDescription>Update your password to keep your account secure</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <AlertCircle className="w-5 h-5 text-yellow-700 flex-shrink-0" />
-                      <p className="text-sm text-yellow-700">
-                        This is a demo application. Password changes are simulated.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Current Password
-                      </label>
-                      <Input type="password" placeholder="Enter current password" />
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         New Password
                       </label>
-                      <Input type="password" placeholder="Enter new password" />
+                      <Input
+                        type="password"
+                        placeholder="Enter new password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Confirm Password
                       </label>
-                      <Input type="password" placeholder="Confirm new password" />
+                      <Input
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      />
                     </div>
 
-                    <Button size="sm" className="bg-orange-600 hover:bg-orange-700 cursor-pointer">
-                      Update Password
+                    <Button
+                      size="sm"
+                      className="bg-orange-600 hover:bg-orange-700 cursor-pointer"
+                      onClick={handleUpdatePassword}
+                      disabled={updatingPassword}
+                    >
+                      {updatingPassword ? "Updating..." : "Update Password"}
                     </Button>
                   </CardContent>
                 </Card>

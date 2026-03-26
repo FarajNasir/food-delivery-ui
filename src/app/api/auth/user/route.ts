@@ -55,5 +55,26 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ details: data })
+    return NextResponse.json({ success: true, details: data })
+}
+
+export async function PUT(request: Request) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { password } = await request.json()
+
+    const { error } = await supabase.auth.updateUser({
+        password: password
+    })
+
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, message: 'Password updated successfully' })
 }

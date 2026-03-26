@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   // Protection logic
-  if (!user && (url.pathname.startsWith('/admin') || url.pathname.startsWith('/restaurant') || (url.pathname.startsWith('/account') && url.pathname !== '/account/login' && url.pathname !== '/account/register'))) {
+  if (!user && (url.pathname.startsWith('/admin') || url.pathname.startsWith('/restaurant') || (url.pathname.startsWith('/account') && !['/account/login', '/account/register', '/account/forgot-password', '/account/update-password'].includes(url.pathname)))) {
     url.pathname = '/account/login'
     return NextResponse.redirect(url)
   }
