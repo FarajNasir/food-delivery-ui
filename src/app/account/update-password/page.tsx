@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,10 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Lock } from "lucide-react";
 
 /**
- * Update Password Page.
- * Performs "invisible" verification during form submission to establish a session
- * before updating the password, which fixes the "Unauthorized" error.
+ * Inner component that uses searchParams.
+ * Needs to be wrapped in Suspense for Next.js build to succeed.
  */
-export default function UpdatePasswordPage() {
+function UpdatePasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
@@ -38,14 +37,11 @@ export default function UpdatePasswordPage() {
     setLoading(true);
 
     try {
-      // Step 1: "Invisible" verification. 
-      // We use the token/code from the email URL to log the user in just before updating.
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
       const code = searchParams.get("code");
 
       if (tokenHash || code) {
-        console.log('Verifying token/code for session...');
         await authService.verifyOtp({
           token_hash: tokenHash || undefined,
           code: code || undefined,
@@ -53,12 +49,9 @@ export default function UpdatePasswordPage() {
         });
       }
 
-      // Step 2: Now that we have a session, update the password.
       await authService.updatePassword(password);
 
       toast.success("Password updated successfully!");
-
-      // Clear session after password update to force re-login
       await authService.signOut();
 
       setTimeout(() => {
@@ -67,7 +60,6 @@ export default function UpdatePasswordPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update password. Your link may have expired.";
       toast.error(message);
-      // If it fails, they might need a new link
       if (message.toLowerCase().includes("session") || message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("expired")) {
         setTimeout(() => router.push("/account/forgot-password"), 3000);
       }
@@ -143,5 +135,17 @@ export default function UpdatePasswordPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function UpdatePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+      </div>
+    }>
+      <UpdatePasswordForm />
+    </Suspense>
   );
 }
