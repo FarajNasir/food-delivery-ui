@@ -28,7 +28,7 @@ export default function AccountLoginPage() {
     setError("");
 
     try {
-      const data = await authService.signIn(email, password);
+      const data = await authService.signIn(email, password, remember);
       await refreshUser();
 
       toast.success("Login successful");

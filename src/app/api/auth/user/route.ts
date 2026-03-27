@@ -10,11 +10,21 @@ export async function GET() {
         return NextResponse.json({ user: null, role: null, details: null })
     }
 
-    const { data: roleData } = await supabase
+    // Try 'user_id' first, follow by 'id' fallback
+    let { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('id', user.id)
-        .single()
+        .eq('user_id', user.id)
+        .maybeSingle()
+    
+    if (!roleData) {
+        const { data: fallback } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle()
+        roleData = fallback
+    }
 
     const { data: detailsData } = await supabase
         .from('user_details')
@@ -66,10 +76,25 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { password } = await request.json()
+    const { password: newPassword, currentPassword } = await request.json()
 
+    if (!currentPassword) {
+        return NextResponse.json({ error: 'Current password is required' }, { status: 400 })
+    }
+
+    // 1. Verify current password
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: currentPassword,
+    })
+
+    if (verifyError) {
+        return NextResponse.json({ error: 'Invalid current password' }, { status: 401 })
+    }
+
+    // 2. Update password
     const { error } = await supabase.auth.updateUser({
-        password: password
+        password: newPassword
     })
 
     if (error) {

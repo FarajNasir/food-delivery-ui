@@ -2,9 +2,18 @@ import { createClient } from '@/lib/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
-  const { email, password, confirmPassword, role, first_name, last_name, mobile, postcode } = await request.json()
+  const {
+    email,
+    password,
+    confirmPassword,
+    role,
+    first_name,
+    last_name,
+    mobile,
+    postcode
+  } = await request.json()
 
-  // 1. Validate
+  // Validation
   if (password !== confirmPassword) {
     return NextResponse.json({ error: 'Passwords do not match' }, { status: 400 })
   }
@@ -13,21 +22,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Admin registration is not allowed' }, { status: 403 })
   }
 
-  if (role !== 'customer' && role !== 'owner') {
+  if (!['customer', 'owner'].includes(role)) {
     return NextResponse.json({ error: 'Invalid role selected' }, { status: 400 })
   }
 
   const supabase = await createClient()
 
-  // 2. Create user (Sign up)
+  // Create user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: {
-        first_name,
-        last_name,
-      },
+      data: { first_name, last_name },
     },
   })
 
@@ -41,20 +47,7 @@ export async function POST(request: Request) {
 
   const userId = authData.user.id
 
-  // 3. Insert into user_roles
-  const { error: roleError } = await supabase
-    .from('user_roles')
-    .insert({
-      id: userId,
-      role: role,
-    })
-
-  if (roleError) {
-    console.error('Role insertion failed:', roleError)
-    return NextResponse.json({ error: 'Account created but role assignment failed.' }, { status: 500 })
-  }
-
-  // 4. Insert into user_details
+  // ✅ Insert into user_details FIRST
   const { error: detailsError } = await supabase
     .from('user_details')
     .insert({
@@ -67,11 +60,32 @@ export async function POST(request: Request) {
 
   if (detailsError) {
     console.error('Details insertion failed:', detailsError)
-    return NextResponse.json({ error: 'Account created but profile details failed to save.' }, { status: 500 })
+    return NextResponse.json({ error: 'Profile details failed to save' }, { status: 500 })
   }
 
-  // dont want auto login after signup so sign out
+  // ✅ Insert into user_roles AFTER
+  const { data: roleSuccessData, error: roleError } = await supabase
+    .from('user_roles')
+    .insert({
+      id: userId,        // Primary Key/FK to auth.users
+      user_id: userId,   // User's custom column
+      role: role,
+    })
+    .select()
+    .single()
+
+  if (roleError) {
+    console.error('Role insertion failed:', { error: roleError, userId })
+    return NextResponse.json({ error: 'Role assignment failed', debug: roleError }, { status: 500 })
+  }
+
+  console.log('Signup successful for user:', userId, 'Role:', role)
+
   await supabase.auth.signOut()
 
-  return NextResponse.json({ user: authData.user, role })
+  return NextResponse.json({
+    message: 'Signup successful',
+    user: authData.user,
+    role
+  })
 }
