@@ -97,7 +97,7 @@ export default function RestaurantsContent() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredRestaurants.map((restaurant) => (
-            <Link key={restaurant.id} href={`/restaurant/${restaurant.id}`} className="group">
+            <Link key={restaurant.id} href={`/restaurants/${restaurant.id}`} className="group">
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden transition-all group-hover:-translate-y-2 group-hover:shadow-2xl">
                 <div className="h-48 bg-slate-100 relative overflow-hidden">
                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent"></div>

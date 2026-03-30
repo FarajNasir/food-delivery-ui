@@ -45,6 +45,7 @@ export interface Restaurant {
   opening_time?: string;
   closing_time?: string;
   owner_id?: string;
+  image_url?: string;
   created_at?: string;
 }
 

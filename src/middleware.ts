@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   // Protection logic
-  if (!user && (url.pathname.startsWith('/admin') || url.pathname.startsWith('/restaurant') || (url.pathname.startsWith('/account') && !['/account/login', '/account/register', '/account/forgot-password', '/account/update-password'].includes(url.pathname)))) {
+  if (!user && (url.pathname.startsWith('/admin') || url.pathname.startsWith('/restaurant') || url.pathname.startsWith('/dashboard') || (url.pathname.startsWith('/account') && !['/account/login', '/account/register', '/account/forgot-password', '/account/update-password'].includes(url.pathname)))) {
     url.pathname = '/account/login'
     return NextResponse.redirect(url)
   }
@@ -88,7 +88,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (url.pathname.startsWith('/restaurant') && role !== 'owner') {
+    if ((url.pathname.startsWith('/restaurant') || url.pathname.startsWith('/dashboard')) && role !== 'owner') {
       url.pathname = '/'
       return NextResponse.redirect(url)
     }
@@ -104,5 +104,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/account/:path*', '/admin/:path*', '/restaurant/:path*'],
+  matcher: ['/account/:path*', '/admin/:path*', '/restaurant/:path*', '/dashboard/:path*'],
 }

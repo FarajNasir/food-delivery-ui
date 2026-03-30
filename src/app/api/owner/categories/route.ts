@@ -10,11 +10,11 @@ export async function GET() {
       .from('restaurants')
       .select('id')
       .eq('owner_id', auth.user!.id)
-      
+
     const restaurantIds = ownerRestaurants?.map(r => r.id) || []
 
     let categories: any[] = []
-    
+
     if (restaurantIds.length > 0) {
       const { data, error } = await auth.supabase!
         .from('categories')

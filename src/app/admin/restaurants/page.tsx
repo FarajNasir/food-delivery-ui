@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthContext";
+import { useCart } from "@/components/CartContext";
 import { restaurantService } from "@/services/api";
 import { Restaurant, MenuCategory, MenuItem, MenuItemCreate, Owner, RestaurantLocation } from "@/types/restaurant";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 
 export default function AdminRestaurantsPage() {
   const { role } = useAuth();
+  const { items: cartItems, removeItem } = useCart();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -97,6 +99,14 @@ export default function AdminRestaurantsPage() {
         owner_id: editingRestaurant.owner_id
       };
       await restaurantService.updateRestaurant(editingRestaurant.id, updateData);
+      
+      // Clear relevant cart items if owner changed (to avoid "old" items)
+      cartItems.forEach(item => {
+        if (item.restaurant_id === editingRestaurant.id) {
+          removeItem(item.id);
+        }
+      });
+
       toast.success("Restaurant updated successfully!");
       setEditingRestaurant(null);
       fetchData();
@@ -145,6 +155,14 @@ export default function AdminRestaurantsPage() {
         onClick: async () => {
           try {
             await restaurantService.deleteRestaurant(id);
+            
+            // Clear relevant cart items
+            cartItems.forEach(item => {
+              if (item.restaurant_id === id) {
+                removeItem(item.id);
+              }
+            });
+
             toast.success("Restaurant deleted successfully!");
             fetchData();
           } catch (err: any) {
@@ -512,6 +530,7 @@ export default function AdminRestaurantsPage() {
                                         onClick: () => {
                                           restaurantService.deleteMenuItem(item.id)
                                             .then(() => {
+                                              removeItem(item.id);
                                               toast.success("Item deleted");
                                               fetchData();
                                             })

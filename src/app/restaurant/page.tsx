@@ -1,6 +1,8 @@
 "use client";
 
 import { useAuth } from "@/components/AuthContext";
+import { useCart } from "@/components/CartContext";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ShoppingBag, Utensils, TrendingUp, Clock, Plus, Trash2, Edit2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function RestaurantDashboard() {
   const { user, role, userDetails, loading: authLoading } = useAuth();
+  const { items: cartItems, removeItem } = useCart();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -115,6 +118,10 @@ export default function RestaurantDashboard() {
     if (!editingItem) return;
     try {
       await restaurantService.updateMenuItemByOwner(editingItem.id, restaurant.id, editingItem);
+
+      // If item became unavailable, we might want to sync the cart
+      // (The CartPage sync will handle this, but we can be proactive)
+
       toast.success("Menu item updated");
       setEditingItem(null);
       fetchData();
@@ -131,6 +138,10 @@ export default function RestaurantDashboard() {
         onClick: async () => {
           try {
             await restaurantService.deleteMenuItemByOwner(id, restaurant.id);
+
+            // Clear from local cart
+            removeItem(id);
+
             toast.success("Menu item deleted");
             fetchData();
           } catch (err: any) {
@@ -138,7 +149,7 @@ export default function RestaurantDashboard() {
           }
         }
       },
-      cancel: { label: "Cancel", onClick: () => {} }
+      cancel: { label: "Cancel", onClick: () => { } }
     });
   };
 
@@ -173,11 +184,11 @@ export default function RestaurantDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-white border p-1 mb-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="menu">Manage Menu</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="menu">Manage Menu</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-8 outline-none">
+          <TabsContent value="overview" className="space-y-8 outline-none ">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {stats.map((stat) => (
                 <Card key={stat.title}>
@@ -219,9 +230,16 @@ export default function RestaurantDashboard() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab("menu")}>
-                    Go to Menu Management
-                  </Button>
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full mt-4 cursor-pointer" onClick={() => setActiveTab("menu")}>
+                      Go to Menu Management
+                    </Button>
+                    <Link href="/dashboard/menu">
+                      <Button variant="outline" className="w-full mt-4 cursor-pointer">
+                        Manage Item Availability
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -259,7 +277,7 @@ export default function RestaurantDashboard() {
                   <CardDescription>Add and update your restaurant's dishes</CardDescription>
                 </div>
                 {!isAddingItem && (
-                  <Button className="bg-orange-600 hover:bg-orange-700" onClick={() => setIsAddingItem(true)}>
+                  <Button className="bg-orange-600 hover:bg-orange-700 cursor-pointer" onClick={() => setIsAddingItem(true)}>
                     <Plus className="w-4 h-4 mr-2" /> Add Item
                   </Button>
                 )}
@@ -271,27 +289,27 @@ export default function RestaurantDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Name *</Label>
-                        <Input 
-                          placeholder="e.g. Classic Burger" 
-                          value={newItem.name || ""} 
-                          onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                        <Input
+                          placeholder="e.g. Classic Burger"
+                          value={newItem.name || ""}
+                          onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Price ($) *</Label>
-                        <Input 
-                          type="number" 
-                          placeholder="0.00" 
-                          value={newItem.price || ""} 
-                          onChange={(e) => setNewItem({...newItem, price: Number(e.target.value)})}
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={newItem.price || ""}
+                          onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Category *</Label>
-                        <select 
+                        <select
                           className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                           value={newItem.category_id || ""}
-                          onChange={(e) => setNewItem({...newItem, category_id: e.target.value})}
+                          onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value })}
                         >
                           <option value="">Select Category</option>
                           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -299,16 +317,16 @@ export default function RestaurantDashboard() {
                       </div>
                       <div className="space-y-2">
                         <Label>Description</Label>
-                        <Input 
-                          placeholder="Short description..." 
-                          value={newItem.description || ""} 
-                          onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                        <Input
+                          placeholder="Short description..."
+                          value={newItem.description || ""}
+                          onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                         />
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={handleCreateMenuItem} className="bg-orange-600 hover:bg-orange-700">Save Item</Button>
-                      <Button variant="outline" onClick={() => setIsAddingItem(false)}>Cancel</Button>
+                      <Button onClick={handleCreateMenuItem} className="bg-orange-600 hover:bg-orange-700 cursor-pointer">Save Item</Button>
+                      <Button variant="outline" className="cursor-pointer" onClick={() => setIsAddingItem(false)}>Cancel</Button>
                     </div>
                   </div>
                 )}
@@ -328,19 +346,19 @@ export default function RestaurantDashboard() {
                         <tr key={item.id} className="group">
                           <td className="py-4 font-medium">
                             {editingItem?.id === item.id ? (
-                              <Input 
-                                value={editingItem.name} 
-                                onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                              <Input
+                                value={editingItem.name}
+                                onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                                 className="h-8 max-w-[200px]"
                               />
                             ) : item.name}
                           </td>
                           <td className="py-4 text-gray-600">
                             {editingItem?.id === item.id ? (
-                              <select 
+                              <select
                                 className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                                 value={editingItem.category_id}
-                                onChange={(e) => setEditingItem({...editingItem, category_id: e.target.value})}
+                                onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
                               >
                                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               </select>
@@ -350,10 +368,10 @@ export default function RestaurantDashboard() {
                           </td>
                           <td className="py-4 text-gray-900 font-mono">
                             {editingItem?.id === item.id ? (
-                              <Input 
+                              <Input
                                 type="number"
-                                value={editingItem.price} 
-                                onChange={(e) => setEditingItem({...editingItem, price: Number(e.target.value)})}
+                                value={editingItem.price}
+                                onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
                                 className="h-8 max-w-[80px]"
                               />
                             ) : `$${Number(item.price).toFixed(2)}`}
@@ -362,7 +380,7 @@ export default function RestaurantDashboard() {
                             <div className="flex justify-end gap-2">
                               {editingItem?.id === item.id ? (
                                 <>
-                                  <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700" onClick={handleUpdateMenuItem}>
+                                  <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 cursor-pointer" onClick={handleUpdateMenuItem}>
                                     <Save className="w-3 h-3" />
                                   </Button>
                                   <Button size="sm" variant="outline" className="h-8 text-gray-500" onClick={() => setEditingItem(null)}>
@@ -371,10 +389,10 @@ export default function RestaurantDashboard() {
                                 </>
                               ) : (
                                 <>
-                                  <Button size="sm" variant="outline" className="h-8 text-blue-600 border-blue-200" onClick={() => setEditingItem(item)}>
+                                  <Button size="sm" variant="outline" className="h-8 text-blue-600 border-blue-200 cursor-pointer" onClick={() => setEditingItem(item)}>
                                     <Edit2 className="w-3 h-3" />
                                   </Button>
-                                  <Button size="sm" variant="outline" className="h-8 text-red-600 border-red-200" onClick={() => handleDeleteMenuItem(item.id)}>
+                                  <Button size="sm" variant="outline" className="h-8 text-red-600 border-red-200 cursor-pointer" onClick={() => handleDeleteMenuItem(item.id)}>
                                     <Trash2 className="w-3 h-3" />
                                   </Button>
                                 </>
@@ -407,13 +425,13 @@ export default function RestaurantDashboard() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Category Name</Label>
-                    <Input 
-                      placeholder="e.g. Main Course, Desserts, Drinks" 
+                    <Input
+                      placeholder="e.g. Main Course, Desserts, Drinks"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                     />
                   </div>
-                  <Button className="w-full bg-orange-600 hover:bg-orange-700" onClick={handleCreateCategory}>
+                  <Button className="w-full bg-orange-600 hover:bg-orange-700 cursor-pointer" onClick={handleCreateCategory}>
                     Create Category
                   </Button>
                 </CardContent>

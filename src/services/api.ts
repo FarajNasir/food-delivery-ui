@@ -327,6 +327,17 @@ export const restaurantService = {
     return data.menuItem;
   },
 
+  async toggleMenuItemAvailability(id: string, restaurantId: string, isAvailable: boolean): Promise<MenuItem> {
+    const response = await fetch(`/api/owner/menu-items/${id}/availability`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_available: isAvailable, restaurant_id: restaurantId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to toggle availability');
+    return data.menuItem;
+  },
+
   // --- Public ---
   async getPublicRestaurants(): Promise<Restaurant[]> {
     const response = await fetch('/api/v1/restaurants');
