@@ -10,7 +10,7 @@ export async function checkAdmin() {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .single()
 
     if (!roleData && !roleError) {
         // Fallback to old 'id' column
@@ -18,7 +18,7 @@ export async function checkAdmin() {
             .from('user_roles')
             .select('role')
             .eq('id', user.id)
-            .maybeSingle()
+            .single()
         roleData = fallback.data
     }
 
@@ -39,7 +39,7 @@ export async function checkOwner(restaurantId?: string) {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .single()
 
     if (!roleData && !roleError) {
         // Fallback to old 'id' column
@@ -47,7 +47,7 @@ export async function checkOwner(restaurantId?: string) {
             .from('user_roles')
             .select('role')
             .eq('id', user.id)
-            .maybeSingle()
+            .single()
         roleData = fallback.data
     }
 

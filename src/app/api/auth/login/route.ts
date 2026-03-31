@@ -24,14 +24,14 @@ export async function POST(request: Request) {
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
-        .maybeSingle()
+        .single()
 
     if (!roleData && !roleError) {
         const fallback = await supabase
             .from('user_roles')
             .select('role')
             .eq('id', data.user.id)
-            .maybeSingle()
+            .single()
 
         roleData = fallback.data
         roleError = fallback.error

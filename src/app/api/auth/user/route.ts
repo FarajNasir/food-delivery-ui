@@ -15,14 +15,14 @@ export async function GET() {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .single()
 
     if (!roleData) {
         const { data: fallback } = await supabase
             .from('user_roles')
             .select('role')
             .eq('id', user.id)
-            .maybeSingle()
+            .single()
 
         roleData = fallback
     }
@@ -31,7 +31,7 @@ export async function GET() {
         .from('user_details')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle()
+        .single()
 
     return NextResponse.json({
         user,

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     mobile,
     postcode
   } = await request.json()
+  console.log('Signup Request Data:', { email, role, first_name, last_name })
 
   // Validation
   if (password !== confirmPassword) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
   })
 
   if (authError) {
+    console.error('Signup Auth Error:', authError)
     return NextResponse.json({ error: authError.message }, { status: authError.status || 400 })
   }
 
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
   }
 
   const userId = authData.user.id
+  console.log('Signup Auth Success. User ID:', userId)
 
   // ✅ Insert into user_details FIRST
   const { error: detailsError } = await supabase
