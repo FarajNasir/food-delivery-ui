@@ -20,19 +20,22 @@ export async function POST(request: Request) {
     }
 
     // 2. Fetch role
+    // ✅ Fetch role (Try both 'user_id' and 'id' for compatibility)
     let { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('id', data.user.id)
+        .eq('user_id', data.user.id)
         .maybeSingle()
 
     if (!roleData && !roleError) {
-        const { data: fallback } = await supabase
+        const fallback = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', data.user.id)
+            .eq('id', data.user.id)
             .maybeSingle()
-        roleData = fallback
+
+        roleData = fallback.data
+        roleError = fallback.error
     }
 
     if (roleError || !roleData) {

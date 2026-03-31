@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
   const userId = authData.user.id
 
-  // ✅ STEP 1: user_details FIRST
+  // ✅ Insert into user_details FIRST
   const { error: detailsError } = await supabase
     .from('user_details')
     .insert({
@@ -54,11 +54,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Profile details failed' }, { status: 500 })
   }
 
-  // ✅ STEP 2: user_roles AFTER
+  // ✅ Insert into user_roles AFTER
   const { error: roleError } = await supabase
     .from('user_roles')
     .insert({
-      user_id: userId,   // 🔥 ONLY THIS
+      user_id: userId,
       role: role,
     })
 
@@ -69,5 +69,9 @@ export async function POST(request: Request) {
 
   await supabase.auth.signOut()
 
-  return NextResponse.json({ user: authData.user, role })
+  return NextResponse.json({
+    message: 'Signup successful',
+    user: authData.user,
+    role
+  })
 }
