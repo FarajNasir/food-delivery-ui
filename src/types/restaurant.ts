@@ -1,5 +1,15 @@
 export type RestaurantLocation = "Newcastle" | "Downpatrick" | "Kilkeel";
 
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image_url?: string;
+  is_available?: boolean;
+  restaurant_id?: string;
+}
+
 
 export interface MenuItem {
   id: string;
@@ -68,3 +78,27 @@ export interface RestaurantWithStatus extends RestaurantWithStats {
 
 export type SortOption = "name" | "price" | "items" | "rating";
 export type FilterOption = "all" | string;
+
+export interface Order {
+  id: string;
+  user_id: string;
+  restaurant_id: string;
+  total_amount: number;
+  vat_amount: number;
+  service_charge: number;
+  payment_status: 'pending' | 'completed' | 'failed';
+  payment_intent_id?: string;
+  created_at: string;
+  restaurants?: { name: string };
+  order_items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  item_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  created_at?: string;
+}

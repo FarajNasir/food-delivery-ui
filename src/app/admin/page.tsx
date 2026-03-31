@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/components/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Store, ShoppingBag, ShieldAlert, ArrowRight } from "lucide-react";
+import { Users, Store, ShoppingBag, ShieldAlert, ArrowRight, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -88,8 +88,8 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-500 mt-1">Configure stores, locations, and hierarchical menu data.</p>
                     </div>
                  </Link>
-                 <Link href="/admin/users" className="group/btn">
-                    <div className="p-6 rounded-3xl bg-slate-50 border-2 border-transparent hover:border-blue-500/20 hover:bg-blue-50 transition-all">
+                  <Link href="/admin/users" className="group/btn">
+                    <div className="p-6 rounded-3xl bg-slate-50 border-2 border-transparent hover:border-blue-500/20 hover:bg-blue-50 transition-all text-left">
                       <div className="flex items-center justify-between mb-2">
                         <Users className="w-6 h-6 text-blue-600" />
                         <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
@@ -97,7 +97,17 @@ export default function AdminDashboard() {
                       <h4 className="font-black text-slate-900">Manage Users</h4>
                       <p className="text-sm text-slate-500 mt-1">Review profiles and manage system-wide role permissions.</p>
                     </div>
-                 </Link>
+                  </Link>
+                  <Link href="/admin/revenue" className="group/btn lg:col-span-2">
+                    <div className="p-6 rounded-3xl bg-slate-900 border-2 border-transparent hover:border-orange-500/20 hover:bg-slate-800 transition-all text-left">
+                      <div className="flex items-center justify-between mb-2">
+                        <DollarSign className="w-6 h-6 text-orange-500" />
+                        <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-orange-500 transform group-hover:translate-x-1 transition-all" />
+                      </div>
+                      <h4 className="font-black text-white">Revenue Dashboard</h4>
+                      <p className="text-sm text-slate-400 mt-1">View total platform earnings, order counts, and restaurant-wise performance analytics.</p>
+                    </div>
+                  </Link>
               </div>
             </CardContent>
           </Card>

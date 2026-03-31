@@ -11,7 +11,9 @@ import {
   MenuCategory,
   MenuItem,
   MenuItemCreate,
-  Owner
+  Owner,
+  Order,
+  CartItem
 } from "../types/restaurant";
 
 export const authService = {
@@ -176,6 +178,13 @@ export const restaurantService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
     return data.users;
+  },
+
+  async getRevenue(): Promise<{ orders: { total_amount: number; restaurant_id: string }[] }> {
+    const response = await fetch('/api/admin/revenue');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch revenue');
+    return data;
   },
 
   async updateUserRole(id: string, role: string, details?: Partial<AdminUser>): Promise<MessageResponse> {
@@ -368,5 +377,25 @@ export const restaurantService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to fetch menu items');
     return data.menuItems;
+  },
+
+  // --- Customer/Orders ---
+  async createCheckoutSession(items: CartItem[], totalPrice: number): Promise<{ url: string }> {
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items, totalPrice }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Checkout failed");
+    return data;
+  },
+
+  async getUserOrders(): Promise<Order[]> {
+    const response = await fetch("/api/orders/user");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to fetch orders");
+    return data.orders || [];
   },
 };

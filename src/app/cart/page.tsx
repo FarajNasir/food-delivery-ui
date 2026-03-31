@@ -9,7 +9,7 @@ import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, ChevronRight, Loader2 } fr
 import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -17,6 +17,36 @@ export default function CartPage() {
   const { items, updateQuantity, removeItem, totalPrice } = useCart();
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  const handleCheckout = async () => {
+    if (items.length === 0) {
+      toast.error("Your bag is empty");
+      return;
+    }
+
+    const hasUnavailable = items.some(i => i.is_available === false);
+    if (hasUnavailable) {
+      toast.error("Some items are no longer available. Please remove them to continue.");
+      return;
+    }
+
+    try {
+      setCheckingOut(true);
+      const data = await restaurantService.createCheckoutSession(items, totalPrice);
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+      toast.error(err.message || "An error occurred during checkout");
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && (!user || role !== 'customer')) {
@@ -36,7 +66,7 @@ export default function CartPage() {
         try {
           // Using getPublicRestaurantById to get the menu items
           const restaurantData = await restaurantService.getPublicRestaurantById(restaurantId as string);
-          
+
           if (restaurantData.menu_items) {
             // Find items that are no longer in the menu
             items.forEach(item => {
@@ -226,13 +256,21 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white h-20 text-xl font-black rounded-[2rem] shadow-2xl shadow-orange-900/20 transition-all active:scale-95 group relative z-10 cursor-pointer">
-                Place Order <ChevronRight className="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" />
+              <Button
+                onClick={handleCheckout}
+                disabled={checkingOut}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white h-20 text-xl font-black rounded-[2rem] shadow-2xl shadow-orange-900/20 transition-all active:scale-95 group relative z-10 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {checkingOut ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    Place Order <ChevronRight className="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </Button>
-
-              <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed relative z-10 italic">
-                Secure SSL encrypted checkout • No hidden charges
-              </p>
             </Card>
           </div>
         </div>
