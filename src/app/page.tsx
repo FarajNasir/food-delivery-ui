@@ -1,78 +1,65 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { MapPin, ArrowRight } from "lucide-react";
-import { RestaurantLocation } from "@/types/restaurant";
-
-const locations: RestaurantLocation[] = ["Newcastle", "Downpatrick", "Kilkeel"];
+import Image from "next/image";
 
 export default function Home() {
-  const router = useRouter();
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
-
-  useEffect(() => {
-    const savedLocation = localStorage.getItem("selectedLocation");
-    if (savedLocation) {
-      setSelectedLocation(savedLocation);
-    }
-  }, []);
-
-  const handleLocationSelect = (location: RestaurantLocation) => {
-    localStorage.setItem("selectedLocation", location);
-    setSelectedLocation(location);
-    router.push(`/restaurants?location=${encodeURIComponent(location)}`);
-  };
-
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-[#f8fafc] p-4">
-      <div className="max-w-2xl w-full text-center space-y-12">
-        <div className="space-y-6">
-          <div className="flex justify-center">
-            <div className="p-6 bg-orange-100 rounded-[2.5rem] shadow-sm animate-bounce-slow">
-              <MapPin className="h-16 w-16 text-orange-600" />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900">
-              Your <span className="text-orange-600 underline decoration-orange-200 underline-offset-8">Local</span> Food Hub
-            </h1>
-            <p className="text-xl text-slate-500 font-bold max-w-lg mx-auto leading-relaxed">
-              Serving the best flavors across Newcastle, Downpatrick, and Kilkeel.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {locations.map((location) => (
-            <button
-              key={location}
-              onClick={() => handleLocationSelect(location)}
-              className="group relative flex flex-col items-center p-8 bg-white rounded-[3rem] shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-500 border-none overflow-hidden cursor-pointer"
+    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+        <Image
+          className="dark:invert"
+          src="/next.svg"
+          alt="Next.js logo"
+          width={100}
+          height={20}
+          priority
+        />
+        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
+          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
+            To get started, edit the page.tsx file.
+          </h1>
+          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
+            Looking for a starting point or more instructions? Head over to{" "}
+            <a
+              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/0 to-orange-500/5 group-hover:from-orange-500/5 transition-all"></div>
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-orange-600 group-hover:text-white transition-colors duration-500 shadow-sm">
-                <MapPin className="h-8 w-8" />
-              </div>
-              <span className="text-2xl font-black text-slate-900 tracking-tight mb-2">{location}</span>
-              <p className="text-xs text-slate-400 font-black uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                Explore <ArrowRight className="w-3 h-3" />
-              </p>
-            </button>
-          ))}
+              Templates
+            </a>{" "}
+            or the{" "}
+            <a
+              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Learning
+            </a>{" "}
+            center.
+          </p>
         </div>
-
-        {selectedLocation && (
-          <div className="pt-8">
-            <div className="inline-flex items-center gap-3 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100">
-              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-              <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">
-                Last seen in <span className="text-slate-900">{selectedLocation}</span>
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
+        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <a
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
+            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              className="dark:invert"
+              src="/vercel.svg"
+              alt="Vercel logomark"
+              width={16}
+              height={16}
+            />
+            Deploy Now
+          </a>
+          <a
+            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
+            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation
+          </a>
+        </div>
+      </main>
+    </div>
   );
 }
