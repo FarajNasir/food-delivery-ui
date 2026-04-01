@@ -2,7 +2,7 @@
 
 import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
-import { MapPin, ArrowRight } from "lucide-react";
+import { MapPin, ArrowRight, Store } from "lucide-react";
 
 export default function AppCTA() {
   const { site, setSite } = useSite();
@@ -51,10 +51,10 @@ export default function AppCTA() {
                 }`}
               >
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl"
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
                   style={{ background: `linear-gradient(135deg, ${s.theme.gradientFrom}, ${s.theme.gradientTo})` }}
                 >
-                  📍
+                  <Store className="w-5 h-5 text-white" strokeWidth={1.75} />
                 </div>
                 <div className="text-white">
                   <p className="font-heading font-bold">{s.name}</p>

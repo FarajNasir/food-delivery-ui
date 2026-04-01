@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Search, MapPin, Star, Clock, ChevronDown } from "lucide-react";
@@ -27,27 +28,9 @@ export default function HeroSection() {
         style={{ background: site.theme.gradientFrom }}
       />
 
-      {/* Floating food icons */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
-        {["🍕", "🍔", "🌮", "🍜", "🍣", "🥗", "🍗", "🍩"].map((emoji, i) => (
-          <span
-            key={i}
-            className="absolute text-3xl opacity-10"
-            style={{
-              top: `${10 + i * 11}%`,
-              left: i % 2 === 0 ? `${3 + i * 4}%` : undefined,
-              right: i % 2 !== 0 ? `${3 + i * 4}%` : undefined,
-              animation: `float ${3 + i * 0.5}s ease-in-out infinite`,
-              animationDelay: `${i * 0.4}s`,
-            }}
-          >
-            {emoji}
-          </span>
-        ))}
-      </div>
-
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
         <div className="grid lg:grid-cols-2 gap-10 items-center">
+
           {/* Left content */}
           <div className="text-center lg:text-left">
             {/* Location pill */}
@@ -78,10 +61,10 @@ export default function HeroSection() {
               </div>
               <a
                 href="#restaurants"
-                className="px-6 py-3.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 active:scale-95 shadow-lg whitespace-nowrap text-center"
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 active:scale-95 shadow-lg whitespace-nowrap text-center text-white"
                 style={{
-                  background: `linear-gradient(135deg, #1C0A00, #3D1A00)`,
-                  color: site.theme.accent,
+                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,
+                  filter: "brightness(0.85)",
                 }}
               >
                 Find Food
@@ -91,12 +74,12 @@ export default function HeroSection() {
             {/* Stats row */}
             <div className="flex flex-wrap gap-6 justify-center lg:justify-start">
               {[
-                { icon: <Star className="w-4 h-4" />, value: site.stats.rating, label: "Rating" },
-                { icon: "🏪", value: site.stats.restaurants, label: "Restaurants" },
+                { icon: <Star className="w-4 h-4 fill-white" />, value: site.stats.rating, label: "Rating" },
+                { icon: <MapPin className="w-4 h-4" />, value: site.stats.restaurants, label: "Restaurants" },
                 { icon: <Clock className="w-4 h-4" />, value: `${site.stats.minutes} min`, label: "Avg delivery" },
               ].map((s, i) => (
                 <div key={i} className="flex items-center gap-2 text-white">
-                  <span className="text-sm opacity-70">{typeof s.icon === "string" ? s.icon : s.icon}</span>
+                  <span className="opacity-80">{s.icon}</span>
                   <div>
                     <p className="font-heading font-black text-xl leading-none">{s.value}</p>
                     <p className="text-xs opacity-60">{s.label}</p>
@@ -106,33 +89,39 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* Right — illustration + site switcher */}
+          {/* Right — photo + location switcher */}
           <div className="flex flex-col items-center gap-6">
-            {/* Delivery illustration (CSS art + emoji) */}
+            {/* Hero food image */}
             <div className="relative w-72 h-72 sm:w-80 sm:h-80 float">
               <div
-                className="w-full h-full rounded-full flex items-center justify-center text-9xl shadow-2xl"
-                style={{
-                  background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.25), rgba(0,0,0,0.15))`,
-                  border: "3px solid rgba(255,255,255,0.25)",
-                }}
+                className="w-full h-full rounded-full overflow-hidden shadow-2xl border-4 border-white/30"
               >
-                🛵
+                <Image
+                  src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=700&q=85"
+                  alt="Delicious food delivery"
+                  fill
+                  className="object-cover"
+                  priority
+                />
               </div>
-              {/* Floating badges */}
+
+              {/* Floating info badges */}
               <div className="absolute -top-3 -right-3 bg-white rounded-2xl shadow-xl px-3 py-2 flex items-center gap-1.5 text-sm font-bold text-gray-800">
                 <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                 {site.stats.rating}
               </div>
               <div
-                className="absolute -bottom-3 -left-3 rounded-2xl shadow-xl px-3 py-2 text-white text-sm font-bold"
-                style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
+                className="absolute -bottom-3 -left-3 rounded-2xl shadow-xl px-3 py-2 text-white text-sm font-bold flex items-center gap-1.5"
+                style={{
+                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
+                }}
               >
-                ⚡ {site.stats.minutes} min delivery
+                <Clock className="w-4 h-4" />
+                {site.stats.minutes} min delivery
               </div>
             </div>
 
-            {/* Location switcher cards */}
+            {/* Location switcher */}
             <div className="flex gap-3 flex-wrap justify-center">
               {ALL_SITES.map((s) => (
                 <button
@@ -140,7 +129,7 @@ export default function HeroSection() {
                   onClick={() => setSite(s.key as SiteKey)}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all border-2 ${
                     s.key === site.key
-                      ? "text-white border-white scale-105 shadow-lg"
+                      ? "text-white border-white scale-105 shadow-lg bg-white/10"
                       : "text-white/60 border-white/20 hover:border-white/50 hover:text-white"
                   }`}
                 >
@@ -161,7 +150,10 @@ export default function HeroSection() {
       {/* Wave divider */}
       <div className="absolute bottom-0 left-0 right-0">
         <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-          <path d="M0 80L60 69.3C120 59 240 37 360 32C480 27 600 37 720 42.7C840 48 960 48 1080 42.7C1200 37 1320 27 1380 21.3L1440 16V80H0Z" fill="white" />
+          <path
+            d="M0 80L60 69.3C120 59 240 37 360 32C480 27 600 37 720 42.7C840 48 960 48 1080 42.7C1200 37 1320 27 1380 21.3L1440 16V80H0Z"
+            fill="white"
+          />
         </svg>
       </div>
     </section>

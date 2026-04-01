@@ -1,31 +1,35 @@
 "use client";
 
 import { useSite } from "@/context/SiteContext";
+import { MapPin, UtensilsCrossed, CreditCard, Bike } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const steps = [
+interface Step {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}
+
+const steps: Step[] = [
   {
-    emoji: "📍",
+    icon: MapPin,
     title: "Choose Your Location",
     desc: "Select from Kilkeel, Newcastle or Downpatrick and browse restaurants near you.",
-    step: "01",
   },
   {
-    emoji: "🍽️",
+    icon: UtensilsCrossed,
     title: "Pick Your Favourites",
     desc: "Browse menus, explore cuisines, and add delicious items to your cart.",
-    step: "02",
   },
   {
-    emoji: "💳",
+    icon: CreditCard,
     title: "Pay Securely",
     desc: "Checkout easily with card, Apple Pay, or Google Pay — all fully encrypted.",
-    step: "03",
   },
   {
-    emoji: "🚀",
+    icon: Bike,
     title: "Fast Delivery",
     desc: "Your food is picked up and delivered hot to your door in as little as 25 minutes.",
-    step: "04",
   },
 ];
 
@@ -39,7 +43,9 @@ export default function HowItWorks() {
         <div className="text-center mb-14">
           <span
             className="inline-block text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full text-white mb-4"
-            style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
+            style={{
+              background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
+            }}
           >
             Simple &amp; Fast
           </span>
@@ -51,44 +57,51 @@ export default function HowItWorks() {
           </p>
         </div>
 
-        {/* Steps */}
-        <div className="relative">
-          {/* Connecting line (desktop) */}
-          <div
-            className="hidden lg:block absolute top-16 left-[12.5%] right-[12.5%] h-0.5 opacity-20"
-            style={{ background: `linear-gradient(90deg, ${site.theme.gradientFrom}, ${site.theme.gradientTo})` }}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((s, i) => (
+        {/* Steps grid — no connecting line */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {steps.map((s, i) => {
+            const Icon = s.icon;
+            return (
               <div
                 key={i}
-                className="relative flex flex-col items-center text-center group"
+                className="flex flex-col items-center text-center group"
               >
-                {/* Step number badge */}
-                <div className="relative mb-5">
+                {/* Icon circle */}
+                <div className="relative mb-6">
                   <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center text-4xl shadow-lg transition-transform group-hover:scale-110"
+                    className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg"
                     style={{
-                      background: `linear-gradient(135deg, ${site.theme.gradientFrom}22, ${site.theme.gradientTo}33)`,
-                      border: `2px solid ${site.theme.accent}44`,
+                      background: `linear-gradient(135deg, ${site.theme.gradientFrom}18, ${site.theme.gradientTo}28)`,
+                      border: `2px solid ${site.theme.accent}30`,
                     }}
                   >
-                    {s.emoji}
+                    <Icon
+                      className="w-8 h-8"
+                      style={{ color: site.theme.gradientFrom }}
+                      strokeWidth={1.75}
+                    />
                   </div>
+
+                  {/* Step badge */}
                   <span
-                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full text-white text-xs font-black flex items-center justify-center"
-                    style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
+                    className="absolute -top-2 -right-2 w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center shadow"
+                    style={{
+                      background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
+                    }}
                   >
                     {i + 1}
                   </span>
                 </div>
 
-                <h3 className="font-heading font-bold text-gray-900 text-lg mb-2">{s.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{s.desc}</p>
+                <h3 className="font-heading font-bold text-gray-900 text-lg mb-2">
+                  {s.title}
+                </h3>
+                <p className="text-gray-500 text-sm leading-relaxed max-w-[220px]">
+                  {s.desc}
+                </p>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>

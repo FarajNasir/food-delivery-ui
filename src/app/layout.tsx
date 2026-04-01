@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { SiteProvider } from "@/context/SiteContext";
+import SiteTitle from "@/components/layout/SiteTitle";
 
 /*
  * ── Font configuration ──────────────────────────────────────────────────────
@@ -40,7 +41,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${poppins.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <SiteProvider>{children}</SiteProvider>
+        <SiteProvider>
+          <SiteTitle />
+          {children}
+        </SiteProvider>
       </body>
     </html>
   );
