@@ -6,7 +6,6 @@ import {
   Bell, MapPin, Shield, Trash2, LogOut,
   ChevronRight, Smartphone,
 } from "lucide-react";
-import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -26,7 +25,7 @@ function Toggle({ on, onToggle, accentColor }: { on: boolean; onToggle: () => vo
   );
 }
 
-export default function CustomerSettings({ user: _user }: { user: SessionUser }) {
+export default function CustomerSettings() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();

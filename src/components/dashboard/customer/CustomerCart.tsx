@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { ShoppingBag, ArrowRight } from "lucide-react";
-import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
 
-export default function CustomerCart({ user: _user }: { user: SessionUser }) {
+export default function CustomerCart() {
   const { site } = useSite();
   const { gradientFrom, gradientTo, accent } = site.theme;
   // Cart is empty for now — real cart state would come from DB / local state

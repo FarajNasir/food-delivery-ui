@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Search, SlidersHorizontal, RotateCcw } from "lucide-react";
-import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
 
 const allOrders = [
@@ -47,7 +46,7 @@ const statusMeta: Record<string, { color: string; bg: string }> = {
 const TABS = ["All", "Active", "Delivered", "Cancelled"] as const;
 type Tab = typeof TABS[number];
 
-export default function CustomerOrders({ user: _user }: { user: SessionUser }) {
+export default function CustomerOrders() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const [tab, setTab] = useState<Tab>("All");

@@ -51,7 +51,7 @@ export default function CustomerNavbar({ user }: { user: SessionUser }) {
 
           {/* ── LEFT: Logo + location ── */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <Link href="/dashboard/customer" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow"
                 style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
