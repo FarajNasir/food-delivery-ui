@@ -1,9 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import AdminOverview from "@/components/dashboard/admin/AdminOverview";
+import AdminUsers from "@/components/dashboard/admin/AdminUsers";
 
-export default async function AdminDashboardPage() {
+export default async function AdminUsersPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/dashboard");
-  return <AdminOverview user={user} />;
+  return <AdminUsers currentUserId={user.id} />;
 }
