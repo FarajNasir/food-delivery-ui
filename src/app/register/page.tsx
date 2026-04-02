@@ -14,6 +14,7 @@ import {
   ArrowRight, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import PhoneCountrySelect from "@/components/ui/PhoneCountrySelect";
 import type { E164Number } from "libphonenumber-js";
 import "react-phone-number-input/style.css";
 
@@ -188,6 +189,7 @@ export default function RegisterPage() {
               international
               countryCallingCodeEditable={false}
               defaultCountry="GB"
+              countrySelectComponent={PhoneCountrySelect}
               value={phone}
               onChange={(val) => {
                 setPhone(val);

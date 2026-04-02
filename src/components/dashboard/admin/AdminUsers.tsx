@@ -10,6 +10,7 @@ import {
 import { adminApi, type AdminUserItem, type UserRole, type UserStatus } from "@/lib/api";
 import { toast } from "sonner";
 import PhoneInput from "react-phone-number-input";
+import PhoneCountrySelect from "@/components/ui/PhoneCountrySelect";
 import type { E164Number } from "libphonenumber-js";
 import "react-phone-number-input/style.css";
 
@@ -794,6 +795,7 @@ function UserFormFields({
             international
             countryCallingCodeEditable={false}
             defaultCountry="GB"
+            countrySelectComponent={PhoneCountrySelect}
             value={values.phone as E164Number | undefined}
             onChange={(val) => onChange("phone", val ?? "")}
             className="phone-input-wrapper w-full"
