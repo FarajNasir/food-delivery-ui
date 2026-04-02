@@ -99,7 +99,7 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
             {CATEGORIES.map(({ label, icon: Icon }) => (
               <button
                 key={label}
-                onClick={() => setQuery(label)}
+                onClick={() => {}}
                 className="group flex flex-col items-center gap-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-gray-100"
               >
                 <span
@@ -116,9 +116,8 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
           </div>
         </section>
 
-        {/* ── Featured restaurants ── (hidden when searching) */}
-        {!query && (
-          <section>
+        {/* ── Featured restaurants ── */}
+        <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-bold text-lg flex items-center gap-2" style={{ color: "var(--dash-text-primary)" }}>
                 <Sparkles className="w-5 h-5" style={{ color: accent }} />
@@ -131,7 +130,6 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
               ))}
             </div>
           </section>
-        )}
 
         {/* ── All restaurants ── */}
         <section>

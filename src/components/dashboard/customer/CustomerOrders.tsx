@@ -63,7 +63,7 @@ export default function CustomerOrders({ user: _user }: { user: SessionUser }) {
   });
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-5">
 
       {/* Page header */}
       <div>

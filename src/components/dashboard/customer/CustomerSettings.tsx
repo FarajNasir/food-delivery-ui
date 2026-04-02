@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell, MapPin, Shield, Trash2, LogOut,
-  ChevronRight, Moon, Smartphone,
+  ChevronRight, Smartphone,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
@@ -26,49 +26,12 @@ function Toggle({ on, onToggle, accentColor }: { on: boolean; onToggle: () => vo
   );
 }
 
-function SettingRow({
-  icon: Icon,
-  label,
-  sub,
-  action,
-  danger = false,
-}: {
-  icon: React.ElementType;
-  label: string;
-  sub?: string;
-  action: React.ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-4 py-4 px-1">
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: danger ? "#fef2f2" : "var(--dash-bg)" }}
-      >
-        <Icon className="w-4 h-4" style={{ color: danger ? "#ef4444" : "var(--dash-text-secondary)" }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold" style={{ color: danger ? "#ef4444" : "var(--dash-text-primary)" }}>
-          {label}
-        </p>
-        {sub && (
-          <p className="text-xs mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
-            {sub}
-          </p>
-        )}
-      </div>
-      {action}
-    </div>
-  );
-}
-
 export default function CustomerSettings({ user: _user }: { user: SessionUser }) {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
   const [notifOrders,   setNotifOrders]   = useState(true);
   const [notifPromos,   setNotifPromos]   = useState(false);
-  const [darkMode,      setDarkMode]      = useState(false);
   const [smsUpdates,    setSmsUpdates]    = useState(true);
   const [loggingOut,    setLoggingOut]    = useState(false);
 
@@ -79,8 +42,57 @@ export default function CustomerSettings({ user: _user }: { user: SessionUser })
     router.push("/login");
   };
 
+  const rows: {
+    label: string;
+    sub?: string;
+    action: React.ReactNode;
+    danger?: boolean;
+    onClick?: () => void;
+  }[] = [
+    {
+      label: "Order updates",
+      sub: "Notify when order status changes",
+      action: <Toggle on={notifOrders} onToggle={() => setNotifOrders(!notifOrders)} accentColor={gradientFrom} />,
+    },
+    {
+      label: "Promotions & offers",
+      sub: "Deals and special discounts",
+      action: <Toggle on={notifPromos} onToggle={() => setNotifPromos(!notifPromos)} accentColor={gradientFrom} />,
+    },
+    {
+      label: "SMS updates",
+      sub: "Text messages for delivery tracking",
+      action: <Toggle on={smsUpdates} onToggle={() => setSmsUpdates(!smsUpdates)} accentColor={gradientFrom} />,
+    },
+    {
+      label: "Saved addresses",
+      sub: "Manage delivery locations",
+      action: <ChevronRight className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />,
+    },
+    {
+      label: "Privacy & security",
+      sub: "Password, two-factor authentication",
+      action: <ChevronRight className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />,
+    },
+    {
+      label: loggingOut ? "Logging out…" : "Log out",
+      sub: "Sign out of your account",
+      danger: true,
+      onClick: handleLogout,
+      action: <ChevronRight className="w-4 h-4 text-red-400" />,
+    },
+    {
+      label: "Delete account",
+      sub: "Permanently remove your data",
+      danger: true,
+      action: <ChevronRight className="w-4 h-4 text-red-400" />,
+    },
+  ];
+
+  const icons = [Bell, Bell, Smartphone, MapPin, Shield, LogOut, Trash2];
+
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 space-y-5">
 
       {/* Page header */}
       <div>
@@ -92,7 +104,7 @@ export default function CustomerSettings({ user: _user }: { user: SessionUser })
         </p>
       </div>
 
-      {/* Notifications */}
+      {/* Single compact list */}
       <div
         className="rounded-3xl px-5 divide-y"
         style={{
@@ -101,91 +113,43 @@ export default function CustomerSettings({ user: _user }: { user: SessionUser })
           divideColor: "var(--dash-card-border)",
         }}
       >
-        <p className="text-xs font-bold uppercase tracking-widest pt-4 pb-2" style={{ color: "var(--dash-text-secondary)" }}>
-          Notifications
-        </p>
-        <SettingRow
-          icon={Bell}
-          label="Order updates"
-          sub="Get notified when your order status changes"
-          action={<Toggle on={notifOrders} onToggle={() => setNotifOrders(!notifOrders)} accentColor={gradientFrom} />}
-        />
-        <SettingRow
-          icon={Bell}
-          label="Promotions & offers"
-          sub="Deals, discounts and special offers"
-          action={<Toggle on={notifPromos} onToggle={() => setNotifPromos(!notifPromos)} accentColor={gradientFrom} />}
-        />
-        <SettingRow
-          icon={Smartphone}
-          label="SMS updates"
-          sub="Text messages for delivery tracking"
-          action={<Toggle on={smsUpdates} onToggle={() => setSmsUpdates(!smsUpdates)} accentColor={gradientFrom} />}
-        />
-      </div>
+        {rows.map((row, i) => {
+          const Icon = icons[i];
+          const content = (
+            <div className="flex items-center gap-4 py-4">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: row.danger ? "#fef2f2" : "var(--dash-bg)" }}
+              >
+                <Icon className="w-4 h-4" style={{ color: row.danger ? "#ef4444" : "var(--dash-text-secondary)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: row.danger ? "#ef4444" : "var(--dash-text-primary)" }}>
+                  {row.label}
+                </p>
+                {row.sub && (
+                  <p className="text-xs mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
+                    {row.sub}
+                  </p>
+                )}
+              </div>
+              {row.action}
+            </div>
+          );
 
-      {/* Preferences */}
-      <div
-        className="rounded-3xl px-5 divide-y"
-        style={{
-          background: "var(--dash-card)",
-          border: "1px solid var(--dash-card-border)",
-        }}
-      >
-        <p className="text-xs font-bold uppercase tracking-widest pt-4 pb-2" style={{ color: "var(--dash-text-secondary)" }}>
-          Preferences
-        </p>
-        <SettingRow
-          icon={Moon}
-          label="Dark mode"
-          sub="Switch to a darker interface"
-          action={<Toggle on={darkMode} onToggle={() => setDarkMode(!darkMode)} accentColor={gradientFrom} />}
-        />
-        <SettingRow
-          icon={MapPin}
-          label="Saved addresses"
-          sub="Manage your delivery locations"
-          action={<ChevronRight className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />}
-        />
-      </div>
-
-      {/* Account */}
-      <div
-        className="rounded-3xl px-5 divide-y"
-        style={{
-          background: "var(--dash-card)",
-          border: "1px solid var(--dash-card-border)",
-        }}
-      >
-        <p className="text-xs font-bold uppercase tracking-widest pt-4 pb-2" style={{ color: "var(--dash-text-secondary)" }}>
-          Account
-        </p>
-        <SettingRow
-          icon={Shield}
-          label="Privacy & security"
-          sub="Password, two-factor authentication"
-          action={<ChevronRight className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />}
-        />
-        <button
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="w-full text-left disabled:opacity-60"
-        >
-          <SettingRow
-            icon={LogOut}
-            label={loggingOut ? "Logging out…" : "Log out"}
-            sub="Sign out of your account"
-            action={<ChevronRight className="w-4 h-4 text-red-400" />}
-            danger
-          />
-        </button>
-        <SettingRow
-          icon={Trash2}
-          label="Delete account"
-          sub="Permanently remove your data"
-          action={<ChevronRight className="w-4 h-4 text-red-400" />}
-          danger
-        />
+          return row.onClick ? (
+            <button
+              key={row.label}
+              onClick={row.onClick}
+              disabled={loggingOut}
+              className="w-full text-left disabled:opacity-60"
+            >
+              {content}
+            </button>
+          ) : (
+            <div key={row.label}>{content}</div>
+          );
+        })}
       </div>
 
       {/* Version */}

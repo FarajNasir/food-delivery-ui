@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, Mail, Phone, User, ShieldCheck, Calendar } from "lucide-react";
+import { Mail, Phone, User, ShieldCheck, Calendar } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
     .slice(0, 2);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 space-y-5">
 
       {/* Page header */}
       <div>
@@ -54,12 +54,6 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
           >
             {initials}
           </div>
-          <button
-            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl flex items-center justify-center shadow-md border-2 border-white transition-all hover:scale-110"
-            style={{ background: gradientFrom }}
-          >
-            <Camera className="w-3.5 h-3.5 text-white" />
-          </button>
         </div>
         <div>
           <p className="text-lg font-bold" style={{ color: "var(--dash-text-primary)" }}>
