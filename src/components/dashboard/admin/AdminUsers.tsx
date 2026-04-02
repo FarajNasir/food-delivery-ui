@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search, Plus, MoreVertical, Shield, ShieldOff,
   Pencil, Trash2, X, ChevronDown, User, Mail,
@@ -38,9 +38,11 @@ const EMPTY_FORM = { name: "", email: "", phone: "", role: "customer" as UserRol
 
 /* ── Main Component ── */
 export default function AdminUsers({ currentUserId }: { currentUserId: string }) {
-  const [userData, setUserData]   = useState<{ users: AdminUserItem[]; total: number }>({ users: [], total: 0 });
-  const [loading,  setLoading]    = useState(true);
-  const [filters,  setFilters]    = useState<Filters>({
+  const [userData,    setUserData]    = useState<{ users: AdminUserItem[]; total: number }>({ users: [], total: 0 });
+  const [initialLoad, setInitialLoad] = useState(true);  // skeleton on first mount only
+  const [fetching,    setFetching]    = useState(false);  // subtle indicator on subsequent fetches
+  const [searchInput, setSearchInput] = useState("");     // controlled input — updates instantly
+  const [filters,     setFilters]     = useState<Filters>({
     search: "", role: "all", status: "all",
     sort: "name", order: "asc", page: 1, pageSize: 10,
   });
@@ -53,44 +55,42 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
   const [deleteTarget, setDeleteTarget] = useState<AdminUserItem | null>(null);
   const [saving,       setSaving]       = useState(false);
 
-  const searchRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchInput  = useRef(filters.search);
-
-  /* ── Fetch ── */
-  const fetchUsers = useCallback(async (f: Filters) => {
-    setLoading(true);
-    const res = await adminApi.listUsers({
-      search:  f.search || undefined,
-      role:    f.role   !== "all" ? f.role   : undefined,
-      status:  f.status !== "all" ? f.status : undefined,
-      sort:    f.sort,
-      order:   f.order,
-      page:    f.page,
-      limit:   f.pageSize,
-    });
-    setLoading(false);
-    if (res.success && res.data) {
-      setUserData({ users: res.data.users, total: res.data.total });
-    } else {
-      toast.error(res.error ?? "Failed to load users.");
-    }
-  }, []);
-
+  /* ── Debounce: commit search to filters 1s after user stops typing ── */
   useEffect(() => {
-    fetchUsers(filters);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.role, filters.status, filters.sort, filters.order, filters.page, filters.pageSize]);
+    const t = setTimeout(() => {
+      setFilters((f) => ({ ...f, search: searchInput, page: 1 }));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  /* Debounce search */
-  const handleSearchChange = (val: string) => {
-    searchInput.current = val;
-    setFilters((f) => ({ ...f, search: val }));
-    if (searchRef.current) clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => {
-      setFilters((f) => ({ ...f, search: searchInput.current, page: 1 }));
-      fetchUsers({ ...filters, search: searchInput.current, page: 1 });
-    }, 400);
-  };
+  /* ── Fetch: runs whenever committed filters change ── */
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setFetching(true);
+      const res = await adminApi.listUsers({
+        search:  filters.search  || undefined,
+        role:    filters.role    !== "all" ? filters.role    : undefined,
+        status:  filters.status  !== "all" ? filters.status  : undefined,
+        sort:    filters.sort,
+        order:   filters.order,
+        page:    filters.page,
+        limit:   filters.pageSize,
+      });
+      if (cancelled) return;          // newer request already in flight — discard
+      setFetching(false);
+      setInitialLoad(false);
+      if (res.success && res.data) {
+        setUserData({ users: res.data.users, total: res.data.total });
+      } else {
+        toast.error(res.error ?? "Failed to load users.");
+      }
+    };
+
+    run();
+    return () => { cancelled = true; }; // cancel stale requests on re-run
+  }, [filters]);
 
   /* ── Filter helpers ── */
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
@@ -209,7 +209,7 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
             User Management
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
-            {loading ? "Loading…" : `${userData.total} users on the platform`}
+            {initialLoad ? "Loading…" : `${userData.total} users on the platform`}
           </p>
         </div>
         <button
@@ -233,13 +233,16 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
           <input
             type="text"
             placeholder="Search name or email…"
-            defaultValue={filters.search}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="flex-1 text-sm bg-transparent outline-none min-w-0"
             style={{ color: "var(--dash-text-primary)" }}
           />
-          {filters.search && (
-            <button onClick={() => handleSearchChange("")}>
+          {fetching && !initialLoad && (
+            <span className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin shrink-0" />
+          )}
+          {searchInput && !fetching && (
+            <button onClick={() => setSearchInput("")}>
               <X className="w-3.5 h-3.5" style={{ color: "var(--dash-text-secondary)" }} />
             </button>
           )}
@@ -309,9 +312,10 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
           <span />
         </div>
 
-        {loading ? (
+        {initialLoad ? (
+          /* First load only — show skeleton */
           <div className="divide-y" style={{ borderColor: "var(--dash-card-border)" }}>
-            {Array.from({ length: filters.pageSize > 10 ? 10 : filters.pageSize }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
                 <div className="w-9 h-9 rounded-xl shrink-0" style={{ background: "var(--dash-bg)" }} />
                 <div className="flex-1 space-y-2">
@@ -332,7 +336,14 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
             </p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "var(--dash-card-border)" }}>
+          <div
+            className="divide-y transition-opacity duration-150"
+            style={{
+              borderColor: "var(--dash-card-border)",
+              opacity: fetching ? 0.5 : 1,
+              pointerEvents: fetching ? "none" : "auto",
+            }}
+          >
             {userData.users.map((u) => (
               <UserRow
                 key={u.id}
@@ -350,7 +361,7 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
       </div>
 
       {/* ── Pagination ── */}
-      {!loading && userData.total > 0 && (
+      {!initialLoad && userData.total > 0 && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>
             Showing {(filters.page - 1) * filters.pageSize + 1}–{Math.min(filters.page * filters.pageSize, userData.total)} of {userData.total}
