@@ -45,8 +45,8 @@ export default function RestaurantCard({
   return (
     <div
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
-      className="group/rest bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer h-full flex flex-col focus:outline-none focus:ring-2 focus:ring-offset-2"
-      style={{ "--tw-ring-color": theme.accent } as React.CSSProperties}
+      className="group/rest bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer h-full flex flex-col focus:outline-none focus:ring-2 focus:ring-offset-2 transform-gpu"
+      style={{ "--tw-ring-color": theme.accent, WebkitMaskImage: '-webkit-radial-gradient(white, black)' } as React.CSSProperties}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -65,7 +65,7 @@ export default function RestaurantCard({
             fill
             priority={priority}
             className="object-cover transition-transform duration-500 ease-out group-hover/rest:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-300 gap-2">
@@ -113,15 +113,6 @@ export default function RestaurantCard({
             {cuisine && (
               <span style={{ color: theme.accent }}>{cuisine}</span>
             )}
-            {location && !cuisine && (
-               <span>{location}</span>
-            )}
-            {cuisine && location && (
-              <>
-                 <span className="w-1 h-1 rounded-full bg-gray-300 shrink-0" />
-                 <span className="line-clamp-1">{location}</span>
-              </>
-            )}
           </div>
           
           {description && (
@@ -146,17 +137,18 @@ export default function RestaurantCard({
               </span>
             )}
             {!deliveryTime && !deliveryFee && (
-               <span className="text-gray-400 flex items-center gap-1 font-bold">
-                 <span>View details</span>
+               <span className="text-gray-400 flex items-center gap-1 font-bold opacity-0 hidden">
+                 {/* Empty space placeholder */}
                </span>
             )}
           </div>
           
           <div
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex shrink-0 items-center justify-center text-white shadow-md transition-all duration-300 ease-out group-hover/rest:scale-110 group-hover/rest:rotate-6 group-hover/rest:shadow-lg ml-2"
+            className="flex items-center flex-shrink-0 gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 text-white shadow-md group-hover/rest:shadow-lg group-hover/rest:scale-105"
             style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` }}
           >
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Explore Menu</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </div>
       </div>

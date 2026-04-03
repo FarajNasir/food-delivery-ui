@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     if (!location) return fail("Location is required.", 400);
 
     const conditions: SQL[] = [
-      eq(restaurants.location, location),
+      ilike(restaurants.location, location),
       eq(menuItems.status, "available"),
     ];
 
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       conditions.push(ilike(menuItems.name, `%${search}%`));
     }
     if (category) {
-      conditions.push(eq(menuItems.category, category));
+      conditions.push(ilike(menuItems.category, category));
     }
 
     const rows = await db

@@ -13,6 +13,7 @@ export default function FeaturedDishes() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     const fetchFeatured = async () => {
@@ -26,28 +27,6 @@ export default function FeaturedDishes() {
     fetchFeatured();
   }, [site.location]);
 
-  // Auto-scroll logic (every 3 seconds)
-  useEffect(() => {
-    if (featured.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % featured.length);
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [featured.length]);
-
-  // Scroll to the current slide
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = currentIndex * (scrollContainerRef.current.offsetWidth / getVisibleItems());
-      scrollContainerRef.current.scrollTo({
-        left: scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  }, [currentIndex]);
-
   const getVisibleItems = () => {
     if (typeof window === "undefined") return 1;
     if (window.innerWidth >= 1024) return 3;
@@ -55,38 +34,96 @@ export default function FeaturedDishes() {
     return 1;
   };
 
+  // Sync scroll position when currentIndex changes programmatically
+  useEffect(() => {
+    if (!scrollContainerRef.current || isScrollingRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+
+    isScrollingRef.current = true;
+    container.scrollTo({
+      left: currentIndex * scrollStep,
+      behavior: "smooth",
+    });
+
+    const timer = setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current || isScrollingRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+    
+    const newIndex = Math.round(container.scrollLeft / scrollStep);
+    const maxIndex = Math.max(0, featured.length - getVisibleItems());
+    const clampedIndex = Math.min(newIndex, maxIndex);
+    
+    if (clampedIndex !== currentIndex) {
+      setCurrentIndex(clampedIndex);
+    }
+  };
+
+  // Navigate forward/backward
+  const prev = () => {
+    if (isScrollingRef.current) return;
+    setCurrentIndex((p) => Math.max(0, p - 1));
+  };
+  
+  const next = () => {
+    if (isScrollingRef.current) return;
+    const maxIndex = Math.max(0, featured.length - getVisibleItems());
+    setCurrentIndex((p) => Math.min(maxIndex, p + 1));
+  };
+
   if (!loading && featured.length === 0) return null;
 
   return (
-    <section key={site.key} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-hidden">
+    <section key={site.key} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-heading font-black text-xl flex items-center gap-2 text-gray-900">
-            <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400" />
-            Spotlight Dishes in {site.location}
+      <div className="flex items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <h2 className="font-heading font-black text-lg sm:text-xl flex items-center gap-2 text-gray-900 leading-tight">
+            <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400 shrink-0" />
+            <span className="truncate">Spotlight Dishes in {site.location}</span>
           </h2>
-          <p className="text-xs text-gray-400 font-medium mt-1">Our chef's top recommendations for you</p>
+          <p className="text-xs text-gray-400 font-medium mt-1 ml-7">Our chef's top recommendations for you</p>
         </div>
-        <Link
-          href="/dashboard/customer/all-dishes"
-          className="text-sm font-bold flex items-center gap-1.5 transition-all hover:gap-2.5 px-4 py-2 rounded-full bg-white shadow-sm border border-gray-100 hover:shadow-md"
-          style={{ color: site.theme.accent }}
-        >
-          See all dishes <ChevronRight className="w-4 h-4" />
-        </Link>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/dashboard/customer/all-dishes"
+            className="hidden sm:flex items-center gap-1.5 text-sm font-bold transition-all px-4 py-2 rounded-full bg-white shadow-sm border border-gray-100 hover:shadow-md whitespace-nowrap"
+            style={{ color: site.theme.accent }}
+          >
+            See all <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
 
       {/* Carousel Container */}
       <div className="relative group">
         <div
           ref={scrollContainerRef}
-          className="flex gap-6 overflow-x-auto no-scrollbar pb-4 -mx-1"
+          onScroll={handleScroll}
+          className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar pb-3 -mx-1 px-1"
           style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
         >
           {loading ? (
             [1, 2, 3].map((n) => (
-              <div key={n} className="min-w-[300px] sm:min-w-[calc(50%-12px)] lg:min-w-[calc(33.333%-16px)]">
+              <div key={n} className="min-w-[85vw] sm:min-w-[calc(50%-12px)] lg:min-w-[calc(33.333%-16px)] shrink-0" style={{ scrollSnapAlign: "start" }}>
                 <SkeletonDishCard />
               </div>
             ))
@@ -94,7 +131,7 @@ export default function FeaturedDishes() {
             featured.map((dish, i) => (
               <div
                 key={dish.id}
-                className="min-w-[280px] sm:min-w-[calc(50%-12px)] lg:min-w-[calc(33.333%-16px)] scroll-snap-align-start transition-opacity duration-300"
+                className="min-w-[85vw] sm:min-w-[calc(50%-12px)] lg:min-w-[calc(33.333%-16px)] shrink-0"
                 style={{ scrollSnapAlign: "start" }}
               >
                 <DishCard
@@ -108,38 +145,38 @@ export default function FeaturedDishes() {
           )}
         </div>
 
-        {/* Navigation Arrows */}
+        {/* Overlay Navigation Arrows */}
         {!loading && featured.length > 1 && (
           <>
             <button
-              onClick={() => setCurrentIndex((prev) => (prev - 1 + featured.length) % featured.length)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all z-10 hover:bg-gray-50"
+              onClick={prev}
+              disabled={currentIndex === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+              style={{ color: site.theme.accent }}
             >
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
+              <ChevronLeft className="w-6 h-6" />
             </button>
             <button
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % featured.length)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all z-10 hover:bg-gray-50"
+              onClick={next}
+              disabled={currentIndex >= Math.max(0, featured.length - getVisibleItems())}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+              style={{ color: site.theme.accent }}
             >
-              <ChevronRight className="w-5 h-5 text-gray-600" />
+              <ChevronRight className="w-6 h-6" />
             </button>
           </>
         )}
+      </div>
 
-        {/* Dot Indicators */}
-        {!loading && featured.length > 1 && (
-          <div className="flex justify-center gap-1.5 mt-2">
-            {featured.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentIndex(i)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${i === currentIndex ? "w-6" : "w-1.5 opacity-30"
-                  }`}
-                style={{ backgroundColor: i === currentIndex ? site.theme.accent : "gray" }}
-              />
-            ))}
-          </div>
-        )}
+      {/* Mobile See All link */}
+      <div className="sm:hidden flex justify-center mt-5">
+        <Link
+          href="/dashboard/customer/all-dishes"
+          className="flex items-center gap-1.5 text-sm font-bold px-5 py-2.5 rounded-full bg-white shadow-sm border border-gray-100"
+          style={{ color: site.theme.accent }}
+        >
+          See all dishes <ChevronRight className="w-4 h-4" />
+        </Link>
       </div>
     </section>
   );

@@ -14,6 +14,7 @@ export default function DishesGrid() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     const fetchDishes = async () => {
@@ -38,30 +39,69 @@ export default function DishesGrid() {
     fetchDishes();
   }, [site.location]);
 
-  // Sync scroll position for manual carousel
-  useEffect(() => {
-    if (!scrollRef.current) return;
-    const visibleItems = getVisibleItems();
-    const cardWidth = scrollRef.current.offsetWidth / visibleItems;
-    scrollRef.current.scrollTo({
-      left: currentIndex * cardWidth,
-      behavior: "smooth"
-    });
-  }, [currentIndex]);
-
   const getVisibleItems = () => {
      if (typeof window === "undefined") return 1;
-     if (window.innerWidth >= 1024) return 3; // Match restaurant carousel (3 per row)
-     if (window.innerWidth >= 640) return 2;  // Match restaurant carousel (2 per row)
+     if (window.innerWidth >= 1024) return 3;
+     if (window.innerWidth >= 640) return 2;
      return 1;
+  };
+
+  // Sync scroll position for manual carousel
+  useEffect(() => {
+    if (!scrollRef.current || isScrollingRef.current) return;
+    
+    const container = scrollRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+
+    isScrollingRef.current = true;
+    container.scrollTo({
+      left: currentIndex * scrollStep,
+      behavior: "smooth",
+    });
+
+    const timer = setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
+
+  const handleScroll = () => {
+    if (!scrollRef.current || isScrollingRef.current) return;
+    
+    const container = scrollRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+    
+    const newIndex = Math.round(container.scrollLeft / scrollStep);
+    const maxIndex = Math.max(0, (featured.length + 1) - getVisibleItems());
+    const clampedIndex = Math.min(newIndex, maxIndex);
+    
+    if (clampedIndex !== currentIndex) {
+      setCurrentIndex(clampedIndex);
+    }
+  };
+
+  const prev = () => {
+    if (isScrollingRef.current) return;
+    setCurrentIndex((p) => Math.max(0, p - 1));
+  };
+  
+  const next = () => {
+    if (isScrollingRef.current) return;
+    const maxIndex = Math.max(0, (featured.length + 1) - getVisibleItems());
+    setCurrentIndex((p) => Math.min(maxIndex, p + 1));
   };
 
   if (!loading && featured.length === 0 && popular.length === 0) return null;
 
   const { gradientFrom, accent } = site.theme;
-
-  const nextSlide = () => setCurrentIndex(prev => (prev + 1) % (featured.length + 1));
-  const prevSlide = () => setCurrentIndex(prev => (prev - 1 + featured.length + 1) % (featured.length + 1));
 
   return (
     <div className="space-y-12 sm:space-y-16 pb-8">
@@ -76,30 +116,13 @@ export default function DishesGrid() {
               </h2>
               <p className="text-xs text-gray-400 font-medium mt-1 ml-7">Handpicked favorites for a premium experience</p>
             </div>
-            
-            <div className="flex items-center gap-2 shrink-0">
-               {/* Mobile: Hidden, Desktop: Controls */}
-               <button 
-                 onClick={prevSlide}
-                 aria-label="Previous dishes"
-                 className="hidden sm:flex w-9 h-9 rounded-full border border-gray-100 bg-white items-center justify-center shadow-sm hover:shadow-md hover:bg-gray-50 transition-all active:scale-90"
-               >
-                 <ChevronLeft className="w-4 h-4 text-gray-600" />
-               </button>
-               <button 
-                 onClick={nextSlide}
-                 aria-label="Next dishes"
-                 className="hidden sm:flex w-9 h-9 rounded-full border border-gray-100 bg-white items-center justify-center shadow-sm hover:shadow-md hover:bg-gray-50 transition-all active:scale-90"
-               >
-                 <ChevronRight className="w-4 h-4 text-gray-600" />
-               </button>
-            </div>
           </div>
 
           <div className="relative group">
             <div 
               ref={scrollRef}
-              className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar pb-3"
+              onScroll={handleScroll}
+              className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar pb-3 -mx-1 px-1"
               style={{ scrollSnapType: "x mandatory" }}
             >
               {loading ? (
@@ -152,21 +175,26 @@ export default function DishesGrid() {
               )}
             </div>
 
-            {/* Dot Indicators */}
+            {/* Overlay Navigation Arrows */}
             {!loading && featured.length > 0 && (
-              <div className="flex justify-center gap-1.5 mt-5">
-                {[...Array(featured.length + 1)].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentIndex(i)}
-                    aria-label={`Go to slide ${i + 1}`}
-                    className={`h-1.5 rounded-full transition-all duration-400 ${
-                      i === currentIndex ? "w-6" : "w-1.5 opacity-30 hover:opacity-60"
-                    }`}
-                    style={{ backgroundColor: i === currentIndex ? accent : "#9ca3af" }}
-                  />
-                ))}
-              </div>
+              <>
+                <button
+                  onClick={prev}
+                  disabled={currentIndex === 0}
+                  className={`absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+                  style={{ color: accent }}
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={next}
+                  disabled={currentIndex >= Math.max(0, (featured.length + 1) - getVisibleItems())}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+                  style={{ color: accent }}
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
             )}
           </div>
         </section>

@@ -6,13 +6,16 @@ import { featuredApi, type PublicFeaturedRestaurant } from "@/lib/api";
 import { getRestaurants, type Restaurant } from "@/data/restaurants";
 import RestaurantCard from "@/components/dashboard/customer/RestaurantCard";
 import { Sparkles, Utensils, Search, ChevronLeft } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function AllRestaurantsPage() {
   const { site } = useSite();
+  const searchParams = useSearchParams();
   const [featured, setFeatured] = useState<PublicFeaturedRestaurant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  const searchQuery = searchParams.get("search") || "";
 
   const allMock = getRestaurants(site.key);
 
@@ -59,23 +62,12 @@ export default function AllRestaurantsPage() {
             </div>
           </div>
 
-          <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name or cuisine..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all"
-              style={{ "--tw-ring-color": `${site.theme.accent}40` } as any}
-            />
-          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
         {/* Featured Section */}
-        {(loading || filteredFeatured.length > 0) && (
+        {(loading || featured.length > 0) && (
           <section>
             <div className="flex items-center gap-2 mb-6">
               <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400" />
@@ -86,7 +78,7 @@ export default function AllRestaurantsPage() {
               {loading ? (
                 [1, 2, 3, 4].map(n => <SkeletonCard key={n} />)
               ) : (
-                filteredFeatured.map(r => (
+                featured.map(r => (
                   <RestaurantCard 
                     key={r.id} 
                     restaurant={r} 
@@ -117,10 +109,27 @@ export default function AllRestaurantsPage() {
               ))}
             </div>
           ) : !loading && (
-            <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-200">
-               <Search className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-               <h3 className="text-gray-900 font-bold">No restaurants found</h3>
-               <p className="text-sm text-gray-400">Try adjusting your search criteria</p>
+            <div className="text-center py-24 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+               <div 
+                 className="w-20 h-20 rounded-[2rem] bg-gray-50 flex items-center justify-center mx-auto mb-6 shadow-sm ring-8 ring-gray-50/50"
+               >
+                 <Search className="w-10 h-10 text-gray-200" />
+               </div>
+               <h3 className="text-gray-900 font-black text-2xl tracking-tight">No restaurants found</h3>
+               <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto leading-relaxed">
+                 {searchQuery 
+                   ? `We couldn't find any results matching "${searchQuery}".`
+                   : "We couldn't find any restaurants in this area right now."}
+               </p>
+               {searchQuery && (
+                 <Link 
+                   href="/dashboard/customer/all-restaurants"
+                   className="mt-8 text-sm font-bold transition-all px-8 py-3 rounded-full border border-gray-100 hover:shadow-lg hover:bg-gray-50 active:scale-95 inline-block text-gray-900"
+                   style={{ color: site.theme.accent }}
+                 >
+                   Clear search
+                 </Link>
+               )}
             </div>
           )}
         </section>

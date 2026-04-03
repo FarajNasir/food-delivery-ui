@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,6 +34,10 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
   const { site } = useSite();
   const router = useRouter();
   const { gradientFrom, gradientVia, gradientTo, accent } = site.theme;
+
+  const handleCategoryClick = (label: string) => {
+    router.push(`/dashboard/customer/category/${label}`);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--dash-bg)]">
@@ -102,12 +107,11 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
               What are you in the mood for?
             </h2>
           </div>
-
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2.5 sm:gap-3">
             {CATEGORIES.map(({ label, icon: Icon }) => (
               <button
                 key={label}
-                onClick={() => {}}
+                onClick={() => handleCategoryClick(label)}
                 className="group/cat flex flex-col items-center gap-2 p-3 sm:p-4 bg-white rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 border border-gray-100 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 style={{ "--tw-ring-color": accent } as React.CSSProperties}
                 aria-label={`Filter by ${label}`}
@@ -122,7 +126,7 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
                     strokeWidth={1.75}
                   />
                 </span>
-                <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 text-center leading-tight">
+                <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 text-center leading-tight transition-colors group-hover/cat:text-gray-900">
                   {label}
                 </span>
               </button>
@@ -130,10 +134,10 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
           </div>
         </section>
 
-        {/* ── Dishes Section ── */}
-        <section className="pb-16">
-          <DishesGrid />
-        </section>
+      {/* ── Dishes Section ── */}
+      <section className="pb-16">
+        <DishesGrid />
+      </section>
 
       </div>
     </div>

@@ -129,17 +129,15 @@ export default function DishCard({
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 group-hover/dish:text-gray-600 transition-colors">
-            <span>View details</span>
-          </div>
-
-          <div
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 ease-out ${isUnavailable ? "bg-gray-300" : "group-hover/dish:scale-110 group-hover/dish:rotate-6 group-hover/dish:shadow-lg"}`}
+        <div className="mt-auto pt-4 border-t border-gray-50 flex justify-end">
+          <button
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${isUnavailable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-white shadow-lg hover:shadow-xl hover:scale-105"}`}
             style={!isUnavailable ? { background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` } : {}}
+            disabled={isUnavailable}
           >
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
+            <span>Explore Dish</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>

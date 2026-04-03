@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSite } from "@/context/SiteContext";
 import { Sparkles, ChevronRight, ChevronLeft, ArrowRight, Store } from "lucide-react";
-import { featuredApi, type PublicFeaturedRestaurant } from "@/lib/api";
+import { featuredApi, restaurantApi, type PublicFeaturedRestaurant } from "@/lib/api";
 import RestaurantCard from "@/components/dashboard/customer/RestaurantCard";
 
 export default function FeaturedRestaurants() {
@@ -13,6 +13,7 @@ export default function FeaturedRestaurants() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     setLoading(true);
@@ -22,25 +23,66 @@ export default function FeaturedRestaurants() {
     });
   }, [site.location]);
 
-  // Auto-scroll removed as requested
-
-  // Sync scroll position
-  useEffect(() => {
-    if (!scrollRef.current) return;
-    const visibleItems = getVisibleCount();
-    const cardWidth = scrollRef.current.offsetWidth / visibleItems;
-    scrollRef.current.scrollTo({ left: currentIndex * cardWidth, behavior: "smooth" });
-  }, [currentIndex]);
-
   function getVisibleCount() {
     if (typeof window === "undefined") return 1;
-    if (window.innerWidth >= 1024) return 3;
+    if (window.innerWidth >= 1024) return 4;
     if (window.innerWidth >= 640) return 2;
     return 1;
   }
 
-  const prev = () => setCurrentIndex((p) => (p - 1 + featured.length) % featured.length);
-  const next = () => setCurrentIndex((p) => (p + 1) % featured.length);
+  // Sync scroll position when currentIndex changes programmatically
+  useEffect(() => {
+    if (!scrollRef.current || isScrollingRef.current) return;
+    
+    const container = scrollRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+    
+    isScrollingRef.current = true;
+    container.scrollTo({ 
+      left: currentIndex * scrollStep, 
+      behavior: "smooth" 
+    });
+
+    // Reset flag after animation
+    const timer = setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
+
+  const handleScroll = () => {
+    if (!scrollRef.current || isScrollingRef.current) return;
+    
+    const container = scrollRef.current;
+    if (container.children.length === 0) return;
+
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseInt(window.getComputedStyle(container).columnGap) || 0;
+    const scrollStep = firstChild.offsetWidth + gap;
+    
+    const newIndex = Math.round(container.scrollLeft / scrollStep);
+    const maxIndex = Math.max(0, (featured.length + 1) - getVisibleCount());
+    const clampedIndex = Math.min(newIndex, maxIndex);
+    
+    if (clampedIndex !== currentIndex) {
+      setCurrentIndex(clampedIndex);
+    }
+  };
+
+  const prev = () => {
+    if (isScrollingRef.current) return;
+    setCurrentIndex((p) => Math.max(0, p - 1));
+  };
+  
+  const next = () => {
+    if (isScrollingRef.current) return;
+    const maxIndex = Math.max(0, (featured.length + 1) - getVisibleCount());
+    setCurrentIndex((p) => Math.min(maxIndex, p + 1));
+  };
 
   if (!loading && featured.length === 0) return null;
 
@@ -65,25 +107,6 @@ export default function FeaturedRestaurants() {
           >
             See all <ChevronRight className="w-4 h-4" />
           </Link>
-          {/* Arrow controls */}
-          {featured.length > 1 && (
-            <>
-              <button
-                onClick={prev}
-                aria-label="Previous restaurants"
-                className="w-9 h-9 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center hover:bg-gray-50 hover:shadow-md transition-all active:scale-90"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
-              </button>
-              <button
-                onClick={next}
-                aria-label="Next restaurants"
-                className="w-9 h-9 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center hover:bg-gray-50 hover:shadow-md transition-all active:scale-90"
-              >
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-              </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -91,12 +114,13 @@ export default function FeaturedRestaurants() {
       <div className="relative">
         <div
           ref={scrollRef}
+          onScroll={handleScroll}
           className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar pb-3"
           style={{ scrollSnapType: "x mandatory" }}
         >
           {loading ? (
-            [1, 2, 3].map((n) => (
-              <div key={n} className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(33.333%-14px)] shrink-0" style={{ scrollSnapAlign: "start" }}>
+            [1, 2, 3, 4].map((n) => (
+              <div key={n} className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(25%-15px)] shrink-0" style={{ scrollSnapAlign: "start" }}>
                 <SkeletonCard />
               </div>
             ))
@@ -105,7 +129,7 @@ export default function FeaturedRestaurants() {
               {featured.map((restaurant, i) => (
                 <div
                   key={restaurant.id}
-                  className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(33.333%-14px)] shrink-0"
+                  className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(25%-15px)] shrink-0"
                   style={{ scrollSnapAlign: "start" }}
                 >
                   <RestaurantCard restaurant={restaurant} theme={site.theme} priority={i < 2} featured />
@@ -114,7 +138,7 @@ export default function FeaturedRestaurants() {
 
               {/* See All Bridge Card */}
               <div
-                className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(33.333%-14px)] shrink-0"
+                className="min-w-[85vw] sm:min-w-[calc(50%-10px)] lg:min-w-[calc(25%-15px)] shrink-0"
                 style={{ scrollSnapAlign: "start" }}
               >
                 <Link
@@ -138,24 +162,29 @@ export default function FeaturedRestaurants() {
             </>
           )}
         </div>
-      </div>
 
-      {/* Dot indicators */}
-      {!loading && featured.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-5">
-          {[...Array(featured.length + 1)].map((_, i) => (
+        {/* Overlay Navigation Arrows */}
+        {!loading && featured.length > 1 && (
+          <>
             <button
-              key={i}
-              onClick={() => setCurrentIndex(i)}
-              aria-label={`Go to slide ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-400 ${
-                i === currentIndex ? "w-6" : "w-1.5 opacity-30 hover:opacity-60"
-              }`}
-              style={{ backgroundColor: i === currentIndex ? site.theme.accent : "#9ca3af" }}
-            />
-          ))}
-        </div>
-      )}
+              onClick={prev}
+              disabled={currentIndex === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+              style={{ color: site.theme.accent }}
+            >
+              <ChevronLeft className="w-6 h-6 rotate-0" />
+            </button>
+            <button
+              onClick={next}
+              disabled={currentIndex >= Math.max(0, (featured.length + 1) - getVisibleCount())}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-gray-100 flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none hover:bg-gray-50`}
+              style={{ color: site.theme.accent }}
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Mobile See All link */}
       <div className="sm:hidden flex justify-center mt-5">

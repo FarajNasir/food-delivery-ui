@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import {
   Search, ShoppingBag, ChevronDown, MapPin,
-  User, Tag, ShoppingBag as OrdersIcon, Settings, LogOut,
+  User, Tag, ShoppingBag as OrdersIcon, Settings, LogOut, Store,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
@@ -16,12 +17,27 @@ import { toast } from "sonner";
 export default function CustomerNavbar({ user }: { user: SessionUser }) {
   const { site, setSite } = useSite();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [locationOpen, setLocationOpen] = useState(false);
   const [profileOpen,  setProfileOpen]  = useState(false);
+  const [searchValue, setSearchValue] = useState(searchParams.get("search") || "");
 
   const locationRef = useRef<HTMLDivElement>(null);
   const profileRef  = useRef<HTMLDivElement>(null);
+
+  // Update URL on search change
+  const handleSearch = (val: string) => {
+    setSearchValue(val);
+    const params = new URLSearchParams(searchParams);
+    if (val) params.set("search", val);
+    else params.delete("search");
+    
+    // If we're not on a list page, we might want to redirect to a search page
+    // For now, let's just update the URL of the current page
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -111,16 +127,45 @@ export default function CustomerNavbar({ user }: { user: SessionUser }) {
             </div>
           </div>
 
+          {/* ── MIDDLE: Global Search ── */}
+          <div className="flex-1 max-w-md hidden sm:block">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchValue}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full h-9 pl-9 pr-4 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 transition-all"
+                style={{ 
+                  "--tw-ring-color": `${accent}33`,
+                  borderColor: searchValue ? accent : "border-gray-100" 
+                } as any}
+              />
+            </div>
+          </div>
+
           {/* ── RIGHT: Actions ── */}
           <div className="flex items-center gap-0.5 shrink-0">
 
-            {/* Search icon → goes to /search page */}
+            {/* Mobile Search Icon (Links to Search Page) */}
             <Link
               href="/dashboard/customer/search"
-              className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+              className="sm:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
               title="Search"
             >
               <Search className="w-5 h-5" />
+            </Link>
+
+            {/* Restaurants Option for Desktop/Web view */}
+            <Link
+              href="/dashboard/customer/all-restaurants"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5 mr-1"
+              style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+              title="All Restaurants"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Restaurants</span>
             </Link>
 
             {/* Offers */}

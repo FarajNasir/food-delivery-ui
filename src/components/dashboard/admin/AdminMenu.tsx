@@ -32,6 +32,10 @@ const MENU_CATEGORIES = [
   "Meal Deals",
   "Specials",
   "Alcohol",
+  "Sushi",
+  "Healthy",
+  "Asian",
+  "Hot",
 ] as const;
 
 /* ── Types ── */

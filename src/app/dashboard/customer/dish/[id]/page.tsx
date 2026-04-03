@@ -99,10 +99,10 @@ export default async function DishDetailPage({
         </div>
 
         {/* Right: Info Section */}
-        <div className="flex flex-col justify-center">
-          <div className="space-y-6">
+        <div className="flex flex-col justify-center lg:max-w-md">
+          <div className="space-y-5">
             <div>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span
                   className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm"
                   style={{ background: `${accent}15`, color: accent }}
@@ -119,7 +119,7 @@ export default async function DishDetailPage({
                 )}
               </div>
 
-              <h1 className="font-heading font-black text-4xl sm:text-5xl text-gray-900 leading-tight mb-4">
+              <h1 className="font-heading font-black text-3xl sm:text-4xl text-gray-900 leading-tight mb-4 capitalize tracking-tight">
                 {dish.name}
               </h1>
 
@@ -151,19 +151,19 @@ export default async function DishDetailPage({
 
             {/* Hardcoded delivery sections completely removed as requested */}
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-3">
               <button
                 disabled={isUnavailable}
-                className="flex-[1.5] flex items-center justify-center gap-2.5 py-3.5 rounded-2xl text-white font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 disabled:grayscale disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-white font-bold uppercase tracking-wider shadow-md transition-all hover:opacity-90 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
               >
-                <ShoppingCart className="w-4.5 h-4.5" />
-                <span className="text-sm sm:text-base">Add to Order — £{dish.price.toFixed(2)}</span>
+                <ShoppingCart className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Add to Order — £{dish.price.toFixed(2)}</span>
               </button>
 
               <Link
                 href={`/dashboard/customer/restaurant/${dish.restaurantId}`}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white border border-gray-100 text-gray-900 font-bold text-sm shadow-sm hover:bg-gray-50 transition-all active:scale-95"
+                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 font-bold text-xs sm:text-sm shadow-sm hover:bg-gray-50 transition-all active:scale-95"
               >
                 View Menu
               </Link>

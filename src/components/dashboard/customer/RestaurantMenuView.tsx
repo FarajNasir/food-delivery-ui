@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Store } from "lucide-react";
+import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Store, Utensils } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { getMenu } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
@@ -90,32 +90,32 @@ export default function RestaurantMenuView({
   return (
     <div className="max-w-4xl mx-auto pb-24">
       {/* ── Restaurant hero ── */}
-      <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-gray-100 flex items-center justify-center">
+      <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-gray-900 flex items-center justify-center">
         {restaurant.image ? (
           <Image
             src={restaurant.image}
             alt={restaurant.name}
             fill
             priority
-            className="object-cover"
+            className="object-cover z-0 opacity-90"
             sizes="100vw"
           />
         ) : (
-          <Store className="w-20 h-20 text-gray-200" />
+          <Store className="w-20 h-20 text-gray-200 z-0" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
 
         {/* Back button */}
         <Link
           href="/dashboard/customer"
-          className="absolute top-6 left-6 flex items-center gap-1.5 bg-white backdrop-blur-md text-gray-900 text-xs font-black px-4 py-2.5 rounded-full shadow-xl hover:bg-gray-50 transition-all z-10"
+          className="absolute top-6 left-6 flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-900 text-xs font-black px-4 py-2.5 rounded-full shadow-lg hover:bg-white transition-all z-20 hover:-translate-x-1"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
 
         {/* Info overlay */}
-        <div className="absolute bottom-8 left-6 right-6">
+        <div className="absolute bottom-8 left-6 right-6 z-20">
           <div className="flex flex-col gap-2">
             <h1 className="font-heading font-black text-white text-3xl sm:text-4xl leading-tight drop-shadow-md">
               {restaurant.name}
@@ -154,6 +154,19 @@ export default function RestaurantMenuView({
 
       {/* ── Content ── */}
       <div className="px-4 sm:px-6 py-8">
+        {/* Menu Header */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h2 className="font-heading font-black text-2xl text-gray-900 flex items-center gap-2">
+              <Utensils className="w-6 h-6" style={{ color: accent }} />
+              Explore Menu
+            </h2>
+            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-widest">
+              Discover {restaurant.name}'s dishes
+            </p>
+          </div>
+        </div>
+
         {/* Category tabs */}
         <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide mb-8">
           {menu.map((section) => (

@@ -193,6 +193,12 @@ export const restaurantApi = {
   getPublic(id: string) {
     return get<AdminRestaurantItem>(`/api/restaurants/${id}`);
   },
+
+  listPublic(params: { location: string; category?: string }) {
+    const qs = new URLSearchParams({ location: params.location });
+    if (params.category) qs.set("category", params.category);
+    return get<{ items: AdminRestaurantItem[] }>(`/api/restaurants?${qs.toString()}`);
+  },
 };
 
 /* ── Admin: User Management API ── */

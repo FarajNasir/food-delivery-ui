@@ -248,25 +248,44 @@ export default function AdminFeatured() {
         ) : (
           <div className="divide-y" style={{ borderColor: "var(--dash-card-border)" }}>
             {items.map(item => (
-              <div key={item.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_44px] gap-4 px-5 py-4 text-sm items-center hover:bg-black/[0.015] transition-colors">
-                <div className="font-semibold truncate" style={{ color: "var(--dash-text-primary)" }}>{item.entityName}</div>
-                <div className="flex items-center gap-1.5 capitalize text-xs" style={{ color: "var(--dash-text-secondary)" }}>
-                  {item.type === "restaurant" ? <Store className="w-3.5 h-3.5" /> : <Utensils className="w-3.5 h-3.5" />}
-                  {item.type}
+              <div key={item.id} className="flex flex-col sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_44px] gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-sm hover:bg-black/[0.015] transition-colors relative">
+                {/* Mobile Top Row / Desktop Name */}
+                <div className="flex items-center justify-between sm:contents">
+                  <div className="font-semibold truncate pr-4 sm:pr-0 text-base sm:text-sm" style={{ color: "var(--dash-text-primary)" }}>{item.entityName}</div>
+                  <div className="flex items-center gap-3 sm:hidden">
+                    <div className="font-bold text-base" style={{ color: "var(--dash-text-primary)" }}>#{item.sortOrder}</div>
+                    <button onClick={() => setDeleteTarget(item)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors -mr-2">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>{item.location}</div>
-                <div>
-                  <span
-                    onClick={() => toggleStatus(item)}
-                    className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all ${item.status === "active" ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
-                  >
-                    {item.status === "active" ? "Active" : "Inactive"}
-                  </span>
+
+                {/* Attributes Row on Mobile / Desktop Columns */}
+                <div className="flex items-center gap-4 border-t border-black/5 pt-3 sm:border-0 sm:pt-0 sm:contents">
+                  <div className="flex items-center gap-1.5 capitalize text-xs" style={{ color: "var(--dash-text-secondary)" }}>
+                    {item.type === "restaurant" ? <Store className="w-3.5 h-3.5" /> : <Utensils className="w-3.5 h-3.5" />}
+                    {item.type}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>{item.location}</div>
+                  <div>
+                    <span
+                      onClick={() => toggleStatus(item)}
+                      className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all ${item.status === "active" ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                    >
+                      {item.status === "active" ? "Active" : "Inactive"}
+                    </span>
+                  </div>
                 </div>
-                <div className="font-bold" style={{ color: "var(--dash-text-primary)" }}>#{item.sortOrder}</div>
-                <button onClick={() => setDeleteTarget(item)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+                {/* Desktop Rank */}
+                <div className="hidden sm:block font-bold" style={{ color: "var(--dash-text-primary)" }}>#{item.sortOrder}</div>
+                
+                {/* Desktop Action */}
+                <div className="hidden sm:block">
+                  <button onClick={() => setDeleteTarget(item)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors ml-auto">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
