@@ -1,19 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Search, Star, Clock, Truck, Sparkles, Flame,
+  Search, Flame,
   Pizza, Beef, Fish, Salad, Drumstick, Cookie, Soup, ArrowRight,
-  Store, Utensils,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { getRestaurants } from "@/data/restaurants";
-import type { Restaurant } from "@/data/restaurants";
 import type { SessionUser } from "@/lib/auth";
 import FeaturedRestaurants from "@/components/sections/FeaturedRestaurants";
-// useRouter is used inside RestaurantCard below
+import RestaurantCard from "@/components/dashboard/customer/RestaurantCard";
 
 function greeting() {
   const h = new Date().getHours();
@@ -88,15 +85,15 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      {/* Live Featured Section */}
+      {/* Live Featured Section (Auto-scrolling Carousel) */}
       <FeaturedRestaurants />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
 
         {/* ── Category chips ── */}
         <section>
-          <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2" style={{ color: "var(--dash-text-primary)" }}>
-            <Flame className="w-5 h-5" style={{ color: accent }} />
+          <h2 className="font-heading font-black text-xl mb-6 flex items-center gap-2 text-gray-900">
+            <Flame className="w-6 h-6 text-orange-500 fill-orange-500" />
             What are you in the mood for?
           </h2>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
@@ -104,15 +101,15 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
               <button
                 key={label}
                 onClick={() => { }}
-                className="group flex flex-col items-center gap-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-gray-100"
+                className="group flex flex-col items-center gap-2 p-3 sm:p-4 bg-white rounded-3xl shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-gray-100"
               >
                 <span
-                  className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl transition-transform group-hover:scale-110"
+                  className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl transition-transform group-hover:scale-110"
                   style={{ background: `${gradientFrom}15` }}
                 >
                   <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: gradientFrom }} strokeWidth={1.75} />
                 </span>
-                <span className="text-[10px] sm:text-xs font-semibold text-gray-700 text-center leading-tight">
+                <span className="text-[10px] sm:text-xs font-bold text-gray-700 text-center leading-tight">
                   {label}
                 </span>
               </button>
@@ -120,106 +117,26 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
           </div>
         </section>
 
-        {/* ── Featured restaurants (live from DB) ── */}
-
         {/* ── All restaurants ── */}
         <section>
-          <h2 className="font-heading font-bold text-lg mb-4" style={{ color: "var(--dash-text-primary)" }}>
-            All Restaurants in {site.location}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {all.map((r, i) => (
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-heading font-black text-xl text-gray-900">
+              All Restaurants in {site.location}
+            </h2>
+            <Link 
+              href="/dashboard/customer/all-restaurants"
+              className="text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
+              style={{ color: accent }}
+            >
+              See all <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {all.slice(0, 6).map((r, i) => (
               <RestaurantCard key={r.id} restaurant={r} theme={site.theme} priority={i < 3} />
             ))}
           </div>
         </section>
-      </div>
-    </div>
-  );
-}
-
-/* ── Restaurant card ── */
-function RestaurantCard({
-  restaurant: r,
-  theme,
-  featured = false,
-  priority = false,
-}: {
-  restaurant: Restaurant;
-  theme: { gradientFrom: string; gradientVia: string; gradientTo: string; primary: string; accent: string };
-  featured?: boolean;
-  priority?: boolean;
-}) {
-  const router = useRouter();
-
-  return (
-    <div
-      onClick={() => router.push(`/dashboard/customer/restaurant/${r.id}`)}
-      className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer"
-    >
-      {/* Image */}
-      <div className="relative h-48 w-full overflow-hidden bg-gray-50 flex items-center justify-center">
-        {r.image ? (
-          <Image
-            src={r.image}
-            alt={r.name}
-            fill
-            priority={priority}
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        ) : (
-          <Store className="w-12 h-12 text-gray-200" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-
-        {featured && (
-          <div
-            className="absolute top-3 left-3 inline-flex items-center gap-1 text-[11px] font-bold text-white px-2.5 py-1 rounded-full"
-            style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` }}
-          >
-            <Sparkles className="w-3 h-3" />
-            Featured
-          </div>
-        )}
-
-        {r.promo && (
-          <div className="absolute top-3 right-3 text-[11px] font-bold bg-white text-gray-800 px-2.5 py-1 rounded-full shadow">
-            {r.promo}
-          </div>
-        )}
-
-        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
-          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-          <span className="text-white text-[11px] font-bold">{r.rating}</span>
-          <span className="text-white/60 text-[10px]">({r.reviews})</span>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-4">
-        <h3 className="font-heading font-bold text-gray-900 mb-0.5">{r.name}</h3>
-        <p className="text-xs font-medium mb-1" style={{ color: theme.accent }}>{r.cuisine}</p>
-        <p className="text-xs text-gray-400 mb-3 line-clamp-1">{r.description}</p>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {r.deliveryTime}
-            </span>
-            <span className="flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5" />
-              {r.deliveryFee}
-            </span>
-          </div>
-          <div
-            className="text-white text-xs font-bold px-3 py-1.5 rounded-full transition-all group-hover:scale-105"
-            style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` }}
-          >
-            View menu
-          </div>
-        </div>
       </div>
     </div>
   );

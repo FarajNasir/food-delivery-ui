@@ -189,6 +189,10 @@ export const restaurantApi = {
   delete(id: string) {
     return del<{ id: string }>(`/api/admin/restaurants/${id}`);
   },
+
+  getPublic(id: string) {
+    return get<AdminRestaurantItem>(`/api/restaurants/${id}`);
+  },
 };
 
 /* ── Admin: User Management API ── */
