@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, X, Clock, Star, Truck, ArrowRight, Flame } from "lucide-react";
+import { Search, X, Clock, Star, Truck, ArrowRight, Flame, Store } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { getRestaurants } from "@/data/restaurants";
 import { getMenu } from "@/data/menus";
@@ -235,8 +235,12 @@ function RestaurantRow({
       href={`/dashboard/customer/restaurant/${r.id}`}
       className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 hover:shadow-md transition-all group"
     >
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
-        <Image src={r.image} alt={r.name} fill className="object-cover" sizes="56px" />
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-50 flex items-center justify-center">
+        {r.image ? (
+          <Image src={r.image} alt={r.name} fill className="object-cover" sizes="56px" />
+        ) : (
+          <Store className="w-8 h-8 text-gray-300" style={{ color: theme.accent }} />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-gray-900 truncate">{r.name}</p>

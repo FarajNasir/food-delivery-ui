@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import {
   Search, Star, Clock, Truck, Sparkles, Flame,
   Pizza, Beef, Fish, Salad, Drumstick, Cookie, Soup, ArrowRight,
+  Store, Utensils,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
-import { getRestaurants, getFeaturedRestaurants } from "@/data/restaurants";
+import { getRestaurants } from "@/data/restaurants";
 import type { Restaurant } from "@/data/restaurants";
 import type { SessionUser } from "@/lib/auth";
+import FeaturedRestaurants from "@/components/sections/FeaturedRestaurants";
 // useRouter is used inside RestaurantCard below
 
 function greeting() {
@@ -21,22 +23,21 @@ function greeting() {
 }
 
 const CATEGORIES = [
-  { label: "Pizza",    icon: Pizza },
-  { label: "Burgers",  icon: Beef },
-  { label: "Sushi",    icon: Fish },
-  { label: "Healthy",  icon: Salad },
-  { label: "Chicken",  icon: Drumstick },
+  { label: "Pizza", icon: Pizza },
+  { label: "Burgers", icon: Beef },
+  { label: "Sushi", icon: Fish },
+  { label: "Healthy", icon: Salad },
+  { label: "Chicken", icon: Drumstick },
   { label: "Desserts", icon: Cookie },
-  { label: "Asian",    icon: Soup },
-  { label: "Hot",      icon: Flame },
+  { label: "Asian", icon: Soup },
+  { label: "Hot", icon: Flame },
 ];
 
 export default function CustomerHome({ user }: { user: SessionUser }) {
   const { site } = useSite();
   const router = useRouter();
 
-  const featured = getFeaturedRestaurants(site.key);
-  const all      = getRestaurants(site.key);
+  const all = getRestaurants(site.key);
 
   const { gradientFrom, gradientVia, gradientTo, accent } = site.theme;
 
@@ -87,6 +88,9 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
         </div>
       </section>
 
+      {/* Live Featured Section */}
+      <FeaturedRestaurants />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
 
         {/* ── Category chips ── */}
@@ -99,7 +103,7 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
             {CATEGORIES.map(({ label, icon: Icon }) => (
               <button
                 key={label}
-                onClick={() => {}}
+                onClick={() => { }}
                 className="group flex flex-col items-center gap-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 border border-gray-100"
               >
                 <span
@@ -116,20 +120,7 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
           </div>
         </section>
 
-        {/* ── Featured restaurants ── */}
-        <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading font-bold text-lg flex items-center gap-2" style={{ color: "var(--dash-text-primary)" }}>
-                <Sparkles className="w-5 h-5" style={{ color: accent }} />
-                Featured in {site.location}
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {featured.map((r, i) => (
-                <RestaurantCard key={r.id} restaurant={r} theme={site.theme} featured priority={i < 2} />
-              ))}
-            </div>
-          </section>
+        {/* ── Featured restaurants (live from DB) ── */}
 
         {/* ── All restaurants ── */}
         <section>
@@ -167,15 +158,19 @@ function RestaurantCard({
       className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer"
     >
       {/* Image */}
-      <div className="relative h-48 overflow-hidden">
-        <Image
-          src={r.image}
-          alt={r.name}
-          fill
-          priority={priority}
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        />
+      <div className="relative h-48 w-full overflow-hidden bg-gray-50 flex items-center justify-center">
+        {r.image ? (
+          <Image
+            src={r.image}
+            alt={r.name}
+            fill
+            priority={priority}
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <Store className="w-12 h-12 text-gray-200" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
 
         {featured && (

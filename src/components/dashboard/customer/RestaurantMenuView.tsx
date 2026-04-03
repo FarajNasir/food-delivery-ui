@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Flame } from "lucide-react";
+import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Flame, Store } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { getMenu } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
@@ -53,15 +53,19 @@ export default function RestaurantMenuView({ restaurant }: { restaurant: Restaur
     <div className="max-w-4xl mx-auto">
 
       {/* ── Restaurant hero ── */}
-      <div className="relative h-56 sm:h-72 w-full overflow-hidden">
-        <Image
-          src={restaurant.image}
-          alt={restaurant.name}
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-        />
+      <div className="relative h-56 sm:h-72 w-full overflow-hidden bg-gray-100 flex items-center justify-center">
+        {restaurant.image ? (
+          <Image
+            src={restaurant.image}
+            alt={restaurant.name}
+            fill
+            priority
+            className="object-cover"
+            sizes="100vw"
+          />
+        ) : (
+          <Store className="w-20 h-20 text-gray-200" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Back button */}
