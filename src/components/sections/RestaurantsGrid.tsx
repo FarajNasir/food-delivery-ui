@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useSite } from "@/context/SiteContext";
-import { Star, Clock, Truck } from "lucide-react";
+import { Star, Clock, Truck, Store } from "lucide-react";
 import { getRestaurants } from "@/data/restaurants";
 import type { Restaurant } from "@/data/restaurants";
 
@@ -57,14 +57,18 @@ function RestaurantCard({
   return (
     <div className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer group">
       {/* Image */}
-      <div className="relative h-48 w-full overflow-hidden">
-        <Image
-          src={restaurant.image}
-          alt={restaurant.name}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        />
+      <div className="relative h-48 w-full overflow-hidden bg-gray-50 flex items-center justify-center">
+        {restaurant.image ? (
+          <Image
+            src={restaurant.image}
+            alt={restaurant.name}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <Store className="w-12 h-12 text-gray-200" />
+        )}
         {restaurant.promo && (
           <span
             className="absolute top-3 left-3 text-xs font-bold text-white px-2.5 py-1 rounded-full shadow"

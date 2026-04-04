@@ -189,6 +189,16 @@ export const restaurantApi = {
   delete(id: string) {
     return del<{ id: string }>(`/api/admin/restaurants/${id}`);
   },
+
+  getPublic(id: string) {
+    return get<AdminRestaurantItem>(`/api/restaurants/${id}`);
+  },
+
+  listPublic(params: { location: string; category?: string }) {
+    const qs = new URLSearchParams({ location: params.location });
+    if (params.category) qs.set("category", params.category);
+    return get<{ items: AdminRestaurantItem[] }>(`/api/restaurants?${qs.toString()}`);
+  },
 };
 
 /* ── Admin: User Management API ── */
@@ -247,6 +257,10 @@ export interface AdminMenuItemResponse {
   createdAt:          string;
 }
 
+export interface DishListResponse {
+  items: AdminMenuItemResponse[];
+}
+
 export interface AdminMenuListResponse {
   items:    AdminMenuItemResponse[];
   total:    number;
@@ -293,5 +307,109 @@ export const menuApi = {
 
   delete(id: string) {
     return del<{ id: string }>(`/api/admin/menu/${id}`);
+  },
+};
+
+export const dishesApi = {
+  list(params: { location: string; search?: string; category?: string; limit?: number }) {
+    const qs = new URLSearchParams({ location: params.location });
+    if (params.search)   qs.set("search",   params.search);
+    if (params.category) qs.set("category", params.category);
+    if (params.limit)    qs.set("limit",    String(params.limit));
+    return get<DishListResponse>(`/api/dishes?${qs.toString()}`);
+  },
+  getOne(id: string) {
+    // We'll reuse the public restaurant item API for this or create a new one
+    return get<AdminMenuItemResponse>(`/api/dishes/${id}`);
+  }
+};
+
+/* ── Public Featured API ── */
+
+export interface PublicFeaturedRestaurant {
+  id:        string;
+  entityId:  string;
+  type:      "restaurant";
+  name:      string;
+  location:  string | null;
+  logoUrl:   string | null;
+  sortOrder: number;
+}
+
+export interface PublicFeaturedDish {
+  id:             string;
+  entityId:       string;
+  type:           "dish";
+  name:           string;
+  restaurantName: string;
+  restaurantId:   string;
+  price:          number;
+  imageUrl:       string;
+  category:       string;
+  sortOrder:      number;
+}
+
+export const featuredApi = {
+  listRestaurants(location: string) {
+    return get<{ items: PublicFeaturedRestaurant[] }>(
+      `/api/featured?location=${encodeURIComponent(location)}&type=restaurant`
+    );
+  },
+  listDishes(location: string, restaurantId?: string) {
+    const qs = new URLSearchParams({ location, type: "dish" });
+    if (restaurantId) qs.set("restaurantId", restaurantId);
+    return get<{ items: PublicFeaturedDish[] }>(`/api/featured?${qs.toString()}`);
+  },
+};
+
+/* ── Admin: Featured Management API ── */
+
+export type FeaturedType   = "restaurant" | "dish";
+export type FeaturedStatus = "active" | "inactive";
+
+export interface AdminFeaturedItem {
+  id:         string;
+  type:       FeaturedType;
+  entityId:   string;
+  entityName: string;
+  location:   string;
+  status:     FeaturedStatus;
+  sortOrder:  number;
+  createdAt:  string;
+}
+
+export interface AdminFeaturedListResponse {
+  items:    AdminFeaturedItem[];
+  total:    number;
+  page:     number;
+  pageSize: number;
+}
+
+export interface FeaturedPayload {
+  type:       FeaturedType;
+  entityId:   string;
+  location:   string;
+  status?:    FeaturedStatus;
+  sortOrder?: number;
+}
+
+export const adminFeaturedApi = {
+  list(params: { location?: string; type?: string; status?: string; page?: number; limit?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.location) qs.set("location", params.location);
+    if (params.type)     qs.set("type",     params.type);
+    if (params.status)   qs.set("status",   params.status);
+    if (params.page)     qs.set("page",     String(params.page));
+    if (params.limit)    qs.set("limit",    String(params.limit));
+    return get<AdminFeaturedListResponse>(`/api/admin/featured?${qs.toString()}`);
+  },
+  create(payload: FeaturedPayload) {
+    return post<AdminFeaturedItem>("/api/admin/featured", payload);
+  },
+  update(id: string, payload: { status?: FeaturedStatus; sortOrder?: number }) {
+    return put<AdminFeaturedItem>(`/api/admin/featured/${id}`, payload);
+  },
+  delete(id: string) {
+    return del<{ id: string }>(`/api/admin/featured/${id}`);
   },
 };

@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Search, User, Settings } from "lucide-react";
+import { Home, ShoppingBag, Store, Settings } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 
 const tabs = [
   { label: "Home",     href: "/dashboard/customer",          icon: Home },
+  { label: "Restaurants", href: "/dashboard/customer/all-restaurants", icon: Store },
   { label: "Orders",   href: "/dashboard/customer/orders",   icon: ShoppingBag },
-  { label: "Search",   href: "/dashboard/customer/search",   icon: Search },
-  { label: "Profile",  href: "/dashboard/customer/profile",  icon: User },
   { label: "Settings", href: "/dashboard/customer/settings", icon: Settings },
 ];
 

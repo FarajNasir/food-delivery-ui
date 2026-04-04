@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ShoppingBag, Clock, Star, Flame, Zap, TrendingUp,
-  ChevronRight, MapPin, Search, Gift, Sparkles, Truck,
+  ChevronRight, MapPin, Search, Gift, Sparkles, Truck, Store,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
@@ -225,15 +225,19 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
                   className="shrink-0 w-56 rounded-2xl overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
                   style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
                 >
-                  <div className="relative h-32 w-full">
-                    <Image
-                      src={r.image}
-                      alt={r.name}
-                      fill
-                      className="object-cover"
-                      sizes="224px"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="relative h-32 w-full bg-gray-50 flex items-center justify-center">
+                      {r.image ? (
+                        <Image
+                          src={r.image}
+                          alt={r.name}
+                          fill
+                          className="object-cover"
+                          sizes="224px"
+                        />
+                      ) : (
+                        <Store className="w-10 h-10 text-gray-200" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     <div
                       className="absolute top-2 left-2 text-[10px] font-bold text-white px-2 py-0.5 rounded-full flex items-center gap-1"
                       style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
