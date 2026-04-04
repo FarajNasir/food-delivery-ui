@@ -25,9 +25,10 @@ const StatusSchema = z.object({
  */
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await getCurrentUser();
     if (!user) return fail("Unauthorized", 401);
 
@@ -36,7 +37,7 @@ export async function PATCH(
     const { status, paymentIntentId } = body.data;
 
     // Fetch the order
-    const [order] = await db.select().from(orders).where(eq(orders.id, params.id)).limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
     if (!order) return fail("Order not found", 404);
 
     // Permission Check: 
@@ -53,7 +54,7 @@ export async function PATCH(
     const [updated] = await db
       .update(orders)
       .set(updateData)
-      .where(eq(orders.id, params.id))
+      .where(eq(orders.id, id))
       .returning();
 
     return ok({ order: updated });

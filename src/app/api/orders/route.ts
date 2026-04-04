@@ -1,8 +1,9 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, orderItems, cartItems, menuItems } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
+export const dynamic = "force-dynamic";
 
 /**
  * POST /api/orders
@@ -75,14 +76,27 @@ export async function POST(req: Request) {
 
 /**
  * GET /api/orders
- * Fetches orders for the current customer.
+ * Fetches all orders for the current customer with restaurant and item details.
  */
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return fail("Unauthorized", 401);
 
-    const results = await db.select().from(orders).where(eq(orders.userId, user.id));
+    // Fetch orders for customer using query API (with relations)
+    const results = await db.query.orders.findMany({
+      where: eq(orders.userId, user.id),
+      with: {
+        restaurant: true,
+        items: {
+          with: {
+            menuItem: true
+          }
+        }
+      },
+      orderBy: [desc(orders.createdAt)]
+    });
+
     return ok({ orders: results });
   } catch (err) {
     console.error("[api/orders GET]", err);

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ShoppingBag, ArrowRight, Minus, Plus, Trash2, ChevronRight, Store } from "lucide-react";
 import React from "react";
 import { useSite } from "@/context/SiteContext";
@@ -13,6 +14,7 @@ export default function CustomerCart() {
   const { gradientFrom, accent } = site.theme;
   const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading, isGuest, refreshCart } = useCart();
   const [checkingOut, setCheckingOut] = React.useState(false);
+  const router = useRouter();
 
   // Group items by restaurant
   const groupedItems = React.useMemo(() => {
@@ -24,25 +26,8 @@ export default function CustomerCart() {
     }, {} as Record<string, { name: string; items: typeof cartItems }>);
   }, [cartItems]);
 
-  const handleCheckout = async () => {
-    try {
-      setCheckingOut(true);
-      const res = await fetch("/api/orders", { method: "POST" });
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success("Orders placed successfully!");
-        refreshCart();
-        // Redirect to orders page (to be created)
-        window.location.href = "/dashboard/customer/orders";
-      } else {
-        toast.error(data.message || "Failed to place orders");
-      }
-    } catch (err) {
-      toast.error("Something went wrong during checkout");
-    } finally {
-      setCheckingOut(false);
-    }
+  const handleCheckout = () => {
+    router.push("/dashboard/customer/checkout");
   };
 
   const isEmpty = !loading && cartItems.length === 0;

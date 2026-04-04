@@ -6,6 +6,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Truck, Store,
   BarChart3, Settings, Globe, X, UtensilsCrossed, MapPin,
   Home, ShoppingCart, User, ChefHat, Star, CreditCard,
+  History as HistoryIcon
 } from "lucide-react";
 import type { SessionUser, UserRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,8 @@ type NavItem = { label: string; href: string; icon: React.ElementType };
 const navByRole: Record<UserRole, NavItem[]> = {
   owner: [
     { label: "Overview",        href: "/dashboard/owner",             icon: LayoutDashboard },
+    { label: "Live Orders",     href: "/dashboard/owner/orders",      icon: UtensilsCrossed },
+    { label: "Order History",   href: "/dashboard/owner/orders/history", icon: HistoryIcon },
     { label: "Sites",           href: "/dashboard/owner/sites",       icon: Globe },
     { label: "User Management", href: "/dashboard/owner/users",       icon: Users },
     { label: "Restaurants",     href: "/dashboard/owner/restaurants", icon: Store },

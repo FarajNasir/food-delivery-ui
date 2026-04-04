@@ -13,6 +13,18 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   paymentIntentId?: string | null;
+  restaurant?: {
+    name: string;
+  };
+  items?: {
+    id: string;
+    quantity: number;
+    price: string;
+    menuItem: {
+      name: string;
+      imageUrl?: string;
+    };
+  }[];
 }
 
 interface OrderContextType {
@@ -23,15 +35,15 @@ interface OrderContextType {
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
+const supabase = createClient();
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch("/api/orders");
+      const res = await fetch("/api/orders", { cache: "no-store" });
       const data = await res.json();
       if (data.data) {
         setOrders(data.data.orders);
@@ -48,51 +60,78 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     // ── Supabase Realtime Subscription ──────────────────────────
     const channel = supabase
-      .channel("orders_realtime")
+      .channel("orders_realtime_customer")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        (payload) => {
-          console.log("Realtime order update:", payload);
+        (payload: { eventType: string; new: Order; }) => {
+          console.log("🔔 Realtime update received:", payload);
           
           if (payload.eventType === "INSERT") {
             const newOrder = payload.new as Order;
-            setOrders((prev) => [newOrder, ...prev]);
-            toast.info(`New order received! Status: ${newOrder.status}`);
+            setOrders((prev) => {
+              if (prev.find(o => o.id === newOrder.id)) return prev;
+              return [newOrder, ...prev];
+            });
+            toast.info("Order update received!", { icon: "📦" });
           } 
           else if (payload.eventType === "UPDATE") {
             const updatedOrder = payload.new as Order;
             setOrders((prev) => 
-              prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+              prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
             );
             
-            // Notify customer of status change
+            // Check for status specific toasts
             if (updatedOrder.status === "CONFIRMED") {
-              toast.success("Order confirmed! You can now proceed to payment.");
-            } else {
-              toast.info(`Order status updated to: ${updatedOrder.status}`);
+              toast.success("Restaurant confirmed your order!", { icon: "✅" });
+            } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
+              toast.info("Your food is on the way!", { icon: "🛵" });
             }
           }
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log("📡 Realtime subscription status:", status);
+        if (status === "CHANNEL_ERROR") {
+          console.error("❌ Realtime connection failed. Checking replication settings might be needed.");
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchOrders, supabase]);
+  }, [fetchOrders]);
 
   const updateOrderStatus = async (id: string, status: string, paymentIntentId?: string) => {
+    // 1. Store previous state for rollback
+    const previousOrders = [...orders];
+
+    // 2. Optimistically update local state
+    setOrders((prev) => 
+      prev.map((o) => (o.id === id ? { ...o, status, paymentIntentId } : o))
+    );
+
     try {
       const res = await fetch(`/api/orders/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, paymentIntentId }),
       });
-      if (!res.ok) throw new Error("Failed to update status");
-      // Realtime will handle the state update
+      
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Rollback on failure
+        setOrders(previousOrders);
+        toast.error(data.message || "Failed to update order status");
+        return;
+      }
+      
+      // Realtime will handle the sync, but we already updated optimistically
     } catch (err) {
-      toast.error("Failed to update order status");
+      // Rollback on network error
+      setOrders(previousOrders);
+      toast.error("Network error: Failed to update order status");
     }
   };
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { SiteProvider } from "@/context/SiteContext";
 import { CartProvider } from "@/context/CartContext";
 import { OrderProvider } from "@/context/OrderContext";
+import { OwnerOrderProvider } from "@/context/OwnerOrderContext";
 import SiteTitle from "@/components/layout/SiteTitle";
 import { Toaster } from "sonner";
 
@@ -47,16 +48,18 @@ export default function RootLayout({
         <SiteProvider>
           <CartProvider>
             <OrderProvider>
-              <SiteTitle />
-              {children}
-              <Toaster
-                position="top-center"
-                richColors
-                closeButton
-                toastOptions={{
-                  style: { fontSize: "14px" },
-                }}
-              />
+              <OwnerOrderProvider>
+                <SiteTitle />
+                {children}
+                <Toaster
+                  position="top-center"
+                  richColors
+                  closeButton
+                  toastOptions={{
+                    style: { fontSize: "14px" },
+                  }}
+                />
+              </OwnerOrderProvider>
             </OrderProvider>
           </CartProvider>
         </SiteProvider>
