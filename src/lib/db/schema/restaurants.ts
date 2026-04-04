@@ -4,11 +4,6 @@ import { users } from "./users";
 
 export const restaurantStatusEnum = pgEnum("restaurant_status", ["active", "inactive", "suspended"]);
 
-/**
- * Opening hours stored as JSONB:
- * { mon: { open: "09:00", close: "22:00" }, tue: null, ... }
- * null for a day means closed.
- */
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type DayHours = { open: string; close: string } | null;
 export type OpeningHours = Partial<Record<DayKey, DayHours>>;
@@ -32,7 +27,6 @@ export const restaurants = pgTable("restaurants", {
   index("restaurants_owner_idx").on(t.ownerId),
   index("restaurants_status_idx").on(t.status),
   index("restaurants_created_at_idx").on(t.createdAt),
-  // GIN full-text search on name + contact email
   index("restaurants_search_gin_idx")
     .using("gin", sql`to_tsvector('simple', coalesce(name, '') || ' ' || coalesce(contact_email, ''))`),
 ]);
