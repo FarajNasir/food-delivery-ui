@@ -7,6 +7,7 @@ import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Menu, X, MapPin, ChevronDown, ShoppingBag, LogIn, LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { type Session } from "@supabase/supabase-js";
 
 export default function Navbar() {
   const { site, setSite } = useSite();
@@ -21,11 +22,11 @@ export default function Navbar() {
   // Check session on mount
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setLoggedIn(!!session);
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      setLoggedIn(!!data?.session);
     });
     // Listen for auth state changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       setLoggedIn(!!session);
     });
     return () => subscription.unsubscribe();

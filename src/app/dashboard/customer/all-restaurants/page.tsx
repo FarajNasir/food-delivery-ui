@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSite } from "@/context/SiteContext";
 import { featuredApi, type PublicFeaturedRestaurant } from "@/lib/api";
 import { getRestaurants, type Restaurant } from "@/data/restaurants";
@@ -10,6 +10,18 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function AllRestaurantsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--dash-bg)] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+      </div>
+    }>
+      <AllRestaurantsContent />
+    </Suspense>
+  );
+}
+
+function AllRestaurantsContent() {
   const { site } = useSite();
   const searchParams = useSearchParams();
   const [featured, setFeatured] = useState<PublicFeaturedRestaurant[]>([]);

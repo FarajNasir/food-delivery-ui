@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSite } from "@/context/SiteContext";
 import AuthCard from "@/components/auth/AuthCard";
@@ -13,6 +13,20 @@ import { authApi } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <AuthCard title="Loading..." subtitle="Checking authentication status...">
+        <div className="flex justify-center py-12">
+          <div className="w-10 h-10 border-4 border-gray-100 border-t-gray-900 rounded-full animate-spin" />
+        </div>
+      </AuthCard>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const { site } = useSite();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -177,5 +191,6 @@ export default function LoginPage() {
         </Link>
       </p>
     </AuthCard>
+
   );
 }
