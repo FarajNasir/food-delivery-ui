@@ -51,7 +51,7 @@ function OrderTicket({ order, onUpdate }: { order: OwnerOrder; onUpdate: (id: st
   const handleAction = async (nextStatus: string) => {
     setIsUpdating(true);
     const success = await onUpdate(order.id, nextStatus);
-    if (!success) setIsUpdating(false);
+    setIsUpdating(false);
   };
 
   const currentStepIndex = STATUS_STEPS.findIndex(s => s.id === order.status);
@@ -256,7 +256,21 @@ function OrderTicket({ order, onUpdate }: { order: OwnerOrder; onUpdate: (id: st
 }
 
 export default function LiveOrdersView() {
-  const { orders, updateOrderStatus, loading } = useOwnerOrders();
+  const { orders, updateOrderStatus, refreshOrders, loading } = useOwnerOrders();
+
+  useEffect(() => {
+    // Initial refresh on mount
+    refreshOrders();
+
+    // Refresh when the window gains focus (e.g. user returns to the tab)
+    const onFocus = () => {
+      console.log("🏙️ [OWNER] Window focused, refreshing orders...");
+      refreshOrders();
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshOrders]);
 
   const activeOrders = orders.filter(o => 
     o.status === "PENDING_CONFIRMATION" || 

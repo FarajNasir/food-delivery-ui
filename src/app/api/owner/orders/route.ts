@@ -39,7 +39,18 @@ export async function GET() {
       orderBy: [desc(orders.createdAt)]
     });
 
-    return ok({ orders: ownerOrders });
+    // 2. Fetch the owner's restaurant IDs to enable frontend filtering
+    const ownedRestos = await db
+      .select({ id: restaurants.id })
+      .from(restaurants)
+      .where(eq(restaurants.ownerId, user.id));
+    
+    const ownedRestaurantIds = ownedRestos.map(r => r.id);
+
+    return ok({ 
+      orders: ownerOrders,
+      ownedRestaurantIds
+    });
   } catch (err) {
     console.error("[api/owner/orders GET]", err);
     return fail("Failed to fetch owner orders.", 500);

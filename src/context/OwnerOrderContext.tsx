@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -31,6 +31,7 @@ interface OwnerOrderContextType {
   loading: boolean;
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (id: string, status: string) => Promise<boolean>;
+  ownedRestaurantIds: string[];
 }
 
 const OwnerOrderContext = createContext<OwnerOrderContextType | undefined>(undefined);
@@ -38,54 +39,111 @@ const supabase = createClient();
 
 export function OwnerOrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<OwnerOrder[]>([]);
+  const [ownedRestaurantIds, setOwnedRestaurantIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchOrders = useCallback(async () => {
+  
+  const ownedRestaurantIdsRef = useRef<string[]>([]);
+  
+  const fetchOrders = useCallback(async (targetOrderId?: string, isRetry = false) => {
     try {
-      const res = await fetch("/api/owner/orders", { cache: "no-store" });
+      console.log(`🔄 [OWNER] Syncing data... (isRetry: ${isRetry})`);
+      // Cache busting with timestamp ensures the browser never serves stale data
+      const res = await fetch(`/api/owner/orders?t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
+      
       if (data.data) {
-        setOrders(data.data.orders);
+        const fetchedOrders = data.data.orders as OwnerOrder[];
+        setOrders(fetchedOrders);
+        console.log(`✅ [OWNER] Fetched ${fetchedOrders.length} orders.`);
+
+        if (data.data.ownedRestaurantIds) {
+          setOwnedRestaurantIds(data.data.ownedRestaurantIds);
+          ownedRestaurantIdsRef.current = data.data.ownedRestaurantIds;
+        }
+
+        // If we were expecting a specific new order, verify it's there
+        if (targetOrderId) {
+          const found = fetchedOrders.some(o => o.id === targetOrderId);
+          if (found) {
+            console.log(`🎯 [OWNER] New order ${targetOrderId} successfully found in list.`);
+          } else if (!isRetry) {
+            console.warn(`⚠️ [OWNER] New order ${targetOrderId} NOT found yet. Retrying in 1.5s...`);
+            setTimeout(() => fetchOrders(targetOrderId, true), 1500);
+          } else {
+            console.error(`❌ [OWNER] New order ${targetOrderId} still missing after retry.`);
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch owner orders:", err);
     } finally {
-      setLoading(false);
+      if (!isRetry) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // 1. Initial fetch
     fetchOrders();
 
-    // ── Supabase Realtime Subscription ──────────────────────────
-    // Note: Owners listen for any orders in restaurants they own.
-    // For now, we subscribe to all order updates and the context filters them locally
-    // or we'll rely on the API for the initial fetch and Realtime for the "instant" feel.
+    // 2. Listen for auth changes to refetch when the user logs in as owner
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((event: any) => {
+      if (event === "SIGNED_IN") {
+        console.log("🔐 [OWNER] Auth state changed (SIGNED_IN), refetching...");
+        fetchOrders();
+      }
+    });
+
+    // 3. ── Supabase Realtime Subscription ──────────────────────────
     const channel = supabase
       .channel("owner_orders_realtime_dashboard")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        (payload: { eventType: string; new: any; }) => {
-          console.log("🔔 [OWNER] Realtime update:", payload);
-          // When a new order arrives, just refresh to get full item details
-          fetchOrders(); 
+        async (payload: any) => {
+          console.log("🔔 [OWNER] Realtime update received:", payload);
           
           if (payload.eventType === "INSERT") {
-            toast.info("A new order just landed at your restaurant!", { icon: "🔔" });
+            const newOrder = payload.new;
+            
+            // 🔥 ONLY show toast and refresh if the order belongs to one of the owner's restaurants
+            if (ownedRestaurantIdsRef.current.includes(newOrder.restaurant_id)) {
+              console.log("🎯 [OWNER] Relevant new order detected!", newOrder.id);
+              toast.info("A new order just landed at your restaurant!", { icon: "🔔" });
+              fetchOrders(newOrder.id);
+            } else {
+              console.log("⏭️ [OWNER] Ignoring new order for restaurant", newOrder.restaurant_id);
+            }
           } else if (payload.eventType === "UPDATE") {
-            const updatedOrder = payload.new as any;
-            if (updatedOrder.status === "PAID") {
+            const row = payload.new;
+            
+            // Map snake_case from DB to camelCase for our state
+            const mappedRow = {
+              id: row.id,
+              userId: row.user_id,
+              restaurantId: row.restaurant_id,
+              status: row.status,
+              totalAmount: row.total_amount,
+              updatedAt: row.updated_at,
+            };
+            
+            setOrders((prev) => 
+               prev.map((o) => (o.id === row.id ? { ...o, ...mappedRow } : o))
+            );
+
+            if (row.status === "PAID") {
               toast.success("Payment confirmed for an order!", { icon: "💰" });
             }
+          } else if (payload.eventType === "DELETE") {
+            setOrders((prev) => prev.filter((o) => o.id !== payload.old.id));
           }
         }
       )
       .subscribe((status: string) => {
-        console.log("📡 [OWNER] Realtime status:", status);
+        console.log("📡 [OWNER] Realtime sync status:", status);
       });
 
     return () => {
+      authListener.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [fetchOrders]);
@@ -126,7 +184,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <OwnerOrderContext.Provider value={{ orders, loading, refreshOrders: fetchOrders, updateOrderStatus }}>
+    <OwnerOrderContext.Provider value={{ orders, loading, refreshOrders: fetchOrders, updateOrderStatus, ownedRestaurantIds }}>
       {children}
     </OwnerOrderContext.Provider>
   );

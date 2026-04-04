@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
 import { toast } from "sonner";
 import { 
@@ -20,6 +21,7 @@ import Image from "next/image";
 
 export default function CheckoutView() {
   const { cartItems, totalPrice, totalItems, clearCart, refreshCart } = useCart();
+  const { refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
@@ -47,6 +49,7 @@ export default function CheckoutView() {
         toast.success("Order placed successfully!");
         clearCart();
         refreshCart();
+        await refreshOrders();
         // Redirect to the first order ID created (or the general status list)
         const firstOrder = data.data.orders[0];
         router.push(`/dashboard/customer/status/${firstOrder.id}`);
