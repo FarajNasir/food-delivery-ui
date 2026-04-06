@@ -427,3 +427,18 @@ export const ownerRestaurantApi = {
     return put<AdminRestaurantItem>(`/api/owner/restaurants/${id}`, payload);
   },
 };
+
+export const ownerMenuApi = {
+  list() {
+    return get<{ items: AdminMenuItemResponse[] }>("/api/owner/menu");
+  },
+  create(payload: MenuItemPayload) {
+    return post<AdminMenuItemResponse>("/api/owner/menu", payload);
+  },
+  update(id: string, payload: Partial<MenuItemPayload>) {
+    return put<AdminMenuItemResponse>(`/api/owner/menu/${id}`, payload);
+  },
+  delete(id: string) {
+    return del<{ id: string }>(`/api/owner/menu/${id}`);
+  },
+};

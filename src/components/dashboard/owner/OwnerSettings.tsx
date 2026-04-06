@@ -10,6 +10,7 @@ import { ownerRestaurantApi, type AdminRestaurantItem, type OpeningHours, type D
 import { LOCATIONS } from "@/lib/locations";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import MenuEditor from "./MenuEditor";
 
 /* ── Hours Types ── */
 type DayHoursRow = { enabled: boolean; open: string; close: string };
@@ -53,6 +54,7 @@ export default function OwnerSettings() {
   const [selectedId,  setSelectedId]  = useState<string>("");
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
+  const [activeTab,   setActiveTab]   = useState<"profile" | "menu">("profile");
 
   // Form state
   const [form, setForm] = useState({
@@ -139,9 +141,9 @@ export default function OwnerSettings() {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Settings" subtitle="Manage your restaurant profile and operating hours" />
+      <PageHeader title="Settings" subtitle="Manage your restaurant profile and menu" />
 
-      {/* Restaurant Selector (Neutral Professional Design) */}
+      {/* Restaurant Selector */}
       {restaurants.length > 1 && (
         <div className="mb-8 p-1.5 bg-slate-50/8 rounded-2xl border border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-soft">
           <div className="flex items-center gap-3 px-3 py-2">
@@ -169,76 +171,105 @@ export default function OwnerSettings() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* Tab Switcher */}
+      <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-2xl mb-8 w-fit border border-gray-100">
+        <button
+          onClick={() => setActiveTab("profile")}
+          className={cn(
+            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            activeTab === "profile" 
+              ? "bg-white text-gray-900 shadow-sm" 
+              : "text-gray-400 hover:text-gray-600"
+          )}
+        >
+          Profile Settings
+        </button>
+        <button
+          onClick={() => setActiveTab("menu")}
+          className={cn(
+            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            activeTab === "menu" 
+              ? "bg-white text-gray-900 shadow-sm" 
+              : "text-gray-400 hover:text-gray-600"
+          )}
+        >
+          Menu & Prices
+        </button>
+      </div>
+
+      {activeTab === "profile" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         
-        {/* Basic Information */}
-        <div className="space-y-6">
-          <Section icon={Store} title="Business Profile">
-            <Field label="Restaurant Name">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Store className="w-4 h-4 text-gray-400" />
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
+          {/* Basic Information */}
+          <div className="space-y-6">
+            <Section icon={Store} title="Business Profile">
+              <Field label="Restaurant Name">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Store className="w-4 h-4 text-gray-400" />
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
 
-            <Field label="Location">
-              <div className="relative">
-                <select 
-                  value={form.location}
-                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                  className="w-full h-11 pl-10 pr-8 rounded-xl border border-gray-200 bg-gray-50/50 text-sm outline-none appearance-none"
-                >
-                  <option value="">— Select Location —</option>
-                  {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                </select>
-                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </Field>
+              <Field label="Location">
+                <div className="relative">
+                  <select 
+                    value={form.location}
+                    onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                    className="w-full h-11 pl-10 pr-8 rounded-xl border border-gray-200 bg-gray-50/50 text-sm outline-none appearance-none"
+                  >
+                    <option value="">— Select Location —</option>
+                    {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                  </select>
+                  <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </Field>
 
-            <Field label="Logo URL">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Globe className="w-4 h-4 text-gray-400" />
-                <input value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-          </Section>
+              <Field label="Logo URL">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Globe className="w-4 h-4 text-gray-400" />
+                  <input value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+            </Section>
 
-          <Section icon={Phone} title="Contact Details">
-             <Field label="Email Address">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <input type="email" value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-            <Field label="Phone Number">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Phone className="w-4 h-4 text-gray-400" />
-                <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-          </Section>
-        </div>
+            <Section icon={Phone} title="Contact Details">
+               <Field label="Email Address">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <input type="email" value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+              <Field label="Phone Number">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+            </Section>
+          </div>
 
-        {/* Operating Hours */}
-        <div className="space-y-6">
-          <Section icon={Clock} title="Operating Hours">
-            <HoursEditor hours={form.hours} onChange={hours => setForm(f => ({ ...f, hours }))} />
-          </Section>
+          {/* Operating Hours */}
+          <div className="space-y-6">
+            <Section icon={Clock} title="Operating Hours">
+              <HoursEditor hours={form.hours} onChange={hours => setForm(f => ({ ...f, hours }))} />
+            </Section>
 
-          <div className="pt-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save All Changes
-            </button>
+            <div className="pt-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save All Changes
+              </button>
+            </div>
           </div>
         </div>
-
-      </div>
+      ) : (
+        <MenuEditor restaurantId={selectedId} />
+      )}
     </div>
   );
 }

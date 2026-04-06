@@ -73,7 +73,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
               if (prev.find(o => o.id === newOrder.id)) return prev;
               return [newOrder, ...prev];
             });
-            toast.info("Order update received!", { icon: "📦" });
           } 
           else if (payload.eventType === "UPDATE") {
             const updatedOrder = payload.new as Order;
