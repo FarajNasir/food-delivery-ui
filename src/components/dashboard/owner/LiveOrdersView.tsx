@@ -17,25 +17,25 @@ import { formatDistanceToNow } from "date-fns";
  */
 
 const PIPELINE = [
-  { id: "PENDING_CONFIRMATION", label: "New",      icon: AlertCircle, color: "text-amber-500",   bg: "bg-amber-500" },
-  { id: "PAID",                 label: "Paid",     icon: CheckCircle2,color: "text-blue-500",    bg: "bg-blue-500"  },
-  { id: "PREPARING",            label: "Kitchen",  icon: Utensils,    color: "text-purple-500",  bg: "bg-purple-500"},
-  { id: "OUT_FOR_DELIVERY",     label: "Dispatched",icon: Truck,      color: "text-orange-500",  bg: "bg-orange-500"},
+  { id: "PENDING_CONFIRMATION", label: "New", icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500" },
+  { id: "PAID", label: "Paid", icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-500" },
+  { id: "PREPARING", label: "Kitchen", icon: Utensils, color: "text-purple-500", bg: "bg-purple-500" },
+  { id: "OUT_FOR_DELIVERY", label: "Dispatched", icon: Truck, color: "text-orange-500", bg: "bg-orange-500" },
 ];
 
 const STATUS_BAR: Record<string, string> = {
   PENDING_CONFIRMATION: "bg-amber-400",
-  CONFIRMED:            "bg-blue-400",
-  PAID:                 "bg-blue-500",
-  PREPARING:            "bg-purple-500",
-  OUT_FOR_DELIVERY:     "bg-orange-500",
+  CONFIRMED: "bg-blue-400",
+  PAID: "bg-blue-500",
+  PREPARING: "bg-purple-500",
+  OUT_FOR_DELIVERY: "bg-orange-500",
 };
 
 const NEXT_STATUS: Record<string, { label: string; status: string; color: string }> = {
-  PENDING_CONFIRMATION: { label: "Accept Order",      status: "CONFIRMED",        color: "bg-emerald-600 shadow-emerald-200" },
-  PAID:                 { label: "Send to Kitchen",   status: "PREPARING",        color: "bg-blue-600 shadow-blue-200" },
-  PREPARING:            { label: "Dispatch Food",     status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
-  OUT_FOR_DELIVERY:     { label: "Mark Delivered",    status: "DELIVERED",        color: "bg-emerald-600 shadow-emerald-200" },
+  PENDING_CONFIRMATION: { label: "Accept Order", status: "CONFIRMED", color: "bg-emerald-600 shadow-emerald-200" },
+  PAID: { label: "Send to Kitchen", status: "PREPARING", color: "bg-blue-600 shadow-blue-200" },
+  PREPARING: { label: "Dispatch Food", status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
+  OUT_FOR_DELIVERY: { label: "Mark Delivered", status: "DELIVERED", color: "bg-emerald-600 shadow-emerald-200" },
 };
 
 // ── Order Card ────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function OrderCard({
           <div className="text-right">
             <p className="text-lg font-black text-gray-900 tracking-tight">£{parseFloat(order.totalAmount).toFixed(2)}</p>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-               {order.items.length} Item{order.items.length !== 1 ? 's' : ''}
+              {order.items.length} Item{order.items.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -200,15 +200,15 @@ export default function LiveOrdersView() {
 
   return (
     <div className="w-full space-y-8 pb-12 selection:bg-primary/20">
-      
+
       {/* Header with Stats */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Utensils className="w-5 h-5 text-primary" />
-             </div>
-             <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Kitchen Dashboard</h1>
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Utensils className="w-5 h-5 text-primary" />
+            </div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Kitchen Dashboard</h1>
           </div>
           <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
             Managing <span className="text-gray-900 font-black">{activeOrders.length}</span> Active Tickets
@@ -217,17 +217,17 @@ export default function LiveOrdersView() {
 
         <div className="flex items-center gap-3">
           <div className="glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border border-border/40">
-             <div className="relative">
-                <Bell className="w-5 h-5 text-slate-500" />
-                {activeOrders.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
-             </div>
-             <div className="h-4 w-px bg-border/40" />
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Sync Active</span>
-             </div>
+            <div className="relative">
+              <Bell className="w-5 h-5 text-slate-500" />
+              {activeOrders.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
+            </div>
+            <div className="h-4 w-px bg-border/40" />
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Sync Active</span>
+            </div>
           </div>
-          <button 
+          <button
             onClick={() => refreshOrders()}
             className="p-3 rounded-2xl bg-white border border-border/40 shadow-soft hover:shadow-elevated transition-all active:rotate-180 duration-500"
           >
@@ -240,8 +240,8 @@ export default function LiveOrdersView() {
       <AnimatePresence mode="wait">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
-             <div className="w-12 h-12 rounded-full border-4 border-muted/30 border-t-primary animate-spin" />
-             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground shimmer px-4 py-1 rounded-lg">Syncing Orders...</p>
+            <div className="w-12 h-12 rounded-full border-4 border-muted/30 border-t-primary animate-spin" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground shimmer px-4 py-1 rounded-lg">Syncing Orders...</p>
           </div>
         ) : activeOrders.length === 0 ? (
           <motion.div
@@ -256,7 +256,7 @@ export default function LiveOrdersView() {
             <p className="text-sm text-muted-foreground font-medium mt-2">All orders have been dispatched. Enjoy the calm!</p>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             layout
             className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
           >
@@ -277,16 +277,16 @@ export default function LiveOrdersView() {
 // Simple internal helper for refresh
 function RotateCcw(props: any) {
   return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       {...props}
     >
       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

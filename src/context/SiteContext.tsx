@@ -26,6 +26,10 @@ export function SiteProvider({
 
   const setSite = (key: SiteKey) => {
     setSiteKey(key);
+    // Sync with Zustand store to fix the "See all" location bug
+    import("@/store/useConfigStore").then((m) => {
+      m.useConfigStore.getState().setSite(key);
+    });
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedSite", key);
     }
@@ -34,7 +38,7 @@ export function SiteProvider({
   useEffect(() => {
     if (!initialSite && typeof window !== "undefined") {
       const stored = localStorage.getItem("selectedSite") as SiteKey | null;
-      if (stored && SITES[stored]) setSiteKey(stored);
+      if (stored && SITES[stored]) setSite(stored);
     }
   }, [initialSite]);
 

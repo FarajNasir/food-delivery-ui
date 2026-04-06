@@ -5,117 +5,50 @@ import { useSite } from "@/context/SiteContext";
 import { Star, Clock, Truck, Store } from "lucide-react";
 import { getRestaurants } from "@/data/restaurants";
 import type { Restaurant } from "@/data/restaurants";
+import RestaurantCard from "@/components/dashboard/customer/RestaurantCard";
 
 export default function RestaurantsGrid() {
   const { site } = useSite();
   const restaurants = getRestaurants(site.key);
 
   return (
-    <section id="all-restaurants" className="py-20 bg-gray-50">
+    <section id="all-restaurants" className="py-20 bg-dash-bg shadow-inset">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div className="mb-10">
-          <span
-            className="inline-block text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full text-white mb-3"
-            style={{
-              background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
-            }}
-          >
-            {site.location}
-          </span>
-          <h2 className="font-heading text-3xl sm:text-4xl font-black text-gray-900">
-            All Restaurants
-          </h2>
-          <p className="text-gray-500 mt-2">
-            Every restaurant delivering in {site.location} — order in minutes.
-          </p>
+        <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <span
+              className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] px-4 py-1.5 rounded-full text-white mb-4 shadow-lg shadow-primary/20"
+              style={{
+                background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
+              }}
+            >
+              Nearby {site.location}
+            </span>
+            <h2 className="font-heading text-4xl sm:text-5xl font-black text-gray-900 tracking-tight">
+              Local Culinary <br className="hidden sm:block" /> Treasures
+            </h2>
+            <p className="text-gray-500 mt-4 max-w-lg text-lg font-medium leading-relaxed">
+              Every restaurant delivering in {site.location} — handpicked for quality and speed.
+            </p>
+          </div>
+          <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-gray-100 shadow-soft">
+            <div className="px-4 py-2 text-right">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-none">Total</p>
+              <p className="text-xl font-black text-gray-900">{restaurants.length} Places</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Store className="w-6 h-6 text-primary" />
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {restaurants.map((r) => (
-            <RestaurantCard key={r.id} restaurant={r} siteTheme={site.theme} />
+            <RestaurantCard key={r.id} restaurant={r} theme={site.theme} />
           ))}
         </div>
       </div>
     </section>
-  );
-}
-
-function RestaurantCard({
-  restaurant,
-  siteTheme,
-}: {
-  restaurant: Restaurant;
-  siteTheme: {
-    gradientFrom: string;
-    gradientVia: string;
-    gradientTo: string;
-    primary: string;
-    accent: string;
-  };
-}) {
-  return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer group">
-      {/* Image */}
-      <div className="relative h-48 w-full overflow-hidden bg-gray-50 flex items-center justify-center">
-        {restaurant.image ? (
-          <Image
-            src={restaurant.image}
-            alt={restaurant.name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        ) : (
-          <Store className="w-12 h-12 text-gray-200" />
-        )}
-        {restaurant.promo && (
-          <span
-            className="absolute top-3 left-3 text-xs font-bold text-white px-2.5 py-1 rounded-full shadow"
-            style={{
-              background: `linear-gradient(135deg, ${siteTheme.gradientFrom}, ${siteTheme.accent})`,
-            }}
-          >
-            {restaurant.promo}
-          </span>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-1">
-          <h4 className="font-heading font-bold text-gray-900">{restaurant.name}</h4>
-          <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full shrink-0">
-            <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-            {restaurant.rating}
-          </span>
-        </div>
-        <p className="text-xs font-medium mb-1" style={{ color: siteTheme.accent }}>
-          {restaurant.cuisine}
-        </p>
-        <p className="text-xs text-gray-400 mb-4 line-clamp-1">{restaurant.description}</p>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {restaurant.deliveryTime}
-            </span>
-            <span className="flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5" />
-              {restaurant.deliveryFee}
-            </span>
-          </div>
-          <button
-            className="text-white text-xs font-bold px-3 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95 shadow-sm"
-            style={{
-              background: `linear-gradient(135deg, ${siteTheme.gradientFrom}, ${siteTheme.accent})`,
-            }}
-          >
-            Order
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

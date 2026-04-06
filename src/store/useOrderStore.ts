@@ -66,7 +66,6 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
               if (state.orders.find(o => o.id === newOrder.id)) return state;
               return { orders: [newOrder, ...state.orders] };
             });
-            toast.info("New order update!", { icon: "📦" });
           } 
           else if (payload.eventType === "UPDATE") {
             const updatedOrder = payload.new as Order;

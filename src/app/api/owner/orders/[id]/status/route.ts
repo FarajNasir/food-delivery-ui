@@ -1,19 +1,8 @@
-import { ok, fail, parseBody } from "@/lib/proxy";
+import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, restaurants } from "@/lib/db/schema";
-import { eq, and, exists } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
-import { z } from "zod";
-
-const StatusSchema = z.object({
-  status: z.enum([
-    "CONFIRMED", 
-    "PREPARING", 
-    "OUT_FOR_DELIVERY", 
-    "DELIVERED", 
-    "CANCELLED"
-  ]),
-});
 
 /**
  * PATCH /api/owner/orders/[id]/status
@@ -30,9 +19,12 @@ export async function PATCH(
       return fail("Unauthorized - Owner role required", 401);
     }
 
-    const body = await parseBody(req, StatusSchema);
-    if ("error" in body) return body.error;
-    const { status } = body.data;
+    const json = await req.json();
+    const { status } = json;
+
+    if (!status) {
+      return fail("Status is required.", 400);
+    }
 
     // 1. Ownership Validation: 
     // Join the order with restaurants table to check if' ownerId matches

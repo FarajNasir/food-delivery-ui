@@ -9,6 +9,8 @@ import PageHeader from "@/components/dashboard/shared/PageHeader";
 import { ownerRestaurantApi, type AdminRestaurantItem, type OpeningHours, type DayKey } from "@/lib/api";
 import { LOCATIONS } from "@/lib/locations";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import MenuEditor from "./MenuEditor";
 
 /* ── Hours Types ── */
 type DayHoursRow = { enabled: boolean; open: string; close: string };
@@ -52,6 +54,7 @@ export default function OwnerSettings() {
   const [selectedId,  setSelectedId]  = useState<string>("");
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
+  const [activeTab,   setActiveTab]   = useState<"profile" | "menu">("profile");
 
   // Form state
   const [form, setForm] = useState({
@@ -62,6 +65,8 @@ export default function OwnerSettings() {
     contactPhone: "",
     hours:        structuredClone(DEFAULT_HOURS),
   });
+
+  const selectedRestaurant = restaurants.find(r => r.id === selectedId);
 
   /* 1. Fetch restaurants on mount */
   useEffect(() => {
@@ -136,100 +141,135 @@ export default function OwnerSettings() {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Settings" subtitle="Manage your restaurant profile and operating hours" />
+      <PageHeader title="Settings" subtitle="Manage your restaurant profile and menu" />
 
-      {/* Restaurant Selector (only if multiple) */}
+      {/* Restaurant Selector */}
       {restaurants.length > 1 && (
-        <div className="mb-6 p-4 bg-orange-50/50 rounded-2xl border border-orange-100/50 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-            <Store className="w-5 h-5 text-orange-600" />
+        <div className="mb-8 p-1.5 bg-slate-50/8 rounded-2xl border border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-soft">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center shrink-0 shadow-lg">
+              <Store className="w-5 h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Active Property</p>
+              <h3 className="text-sm font-black text-gray-900 truncate tracking-tight">{selectedRestaurant?.name}</h3>
+            </div>
           </div>
-          <div className="flex-1">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-0.5">Switch Restaurant</label>
-            <div className="relative max-w-sm">
+
+          <div className="flex items-center gap-2 pr-3 pl-3 sm:pl-0 pb-2 sm:pb-0">
+            <div className="relative min-w-[200px]">
               <select 
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
-                className="w-full h-10 pl-0 pr-8 bg-transparent text-sm font-bold text-gray-900 outline-none appearance-none cursor-pointer"
+                className="w-full h-10 pl-4 pr-10 bg-white border border-border/40 rounded-xl text-xs font-black uppercase tracking-widest outline-none appearance-none cursor-pointer hover:border-gray-900 transition-colors shadow-sm"
               >
                 {restaurants.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* Tab Switcher */}
+      <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-2xl mb-8 w-fit border border-gray-100">
+        <button
+          onClick={() => setActiveTab("profile")}
+          className={cn(
+            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            activeTab === "profile" 
+              ? "bg-white text-gray-900 shadow-sm" 
+              : "text-gray-400 hover:text-gray-600"
+          )}
+        >
+          Profile Settings
+        </button>
+        <button
+          onClick={() => setActiveTab("menu")}
+          className={cn(
+            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            activeTab === "menu" 
+              ? "bg-white text-gray-900 shadow-sm" 
+              : "text-gray-400 hover:text-gray-600"
+          )}
+        >
+          Menu & Prices
+        </button>
+      </div>
+
+      {activeTab === "profile" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         
-        {/* Basic Information */}
-        <div className="space-y-6">
-          <Section icon={Store} title="Business Profile">
-            <Field label="Restaurant Name">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Store className="w-4 h-4 text-gray-400" />
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
+          {/* Basic Information */}
+          <div className="space-y-6">
+            <Section icon={Store} title="Business Profile">
+              <Field label="Restaurant Name">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Store className="w-4 h-4 text-gray-400" />
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
 
-            <Field label="Location">
-              <div className="relative">
-                <select 
-                  value={form.location}
-                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                  className="w-full h-11 pl-10 pr-8 rounded-xl border border-gray-200 bg-gray-50/50 text-sm outline-none appearance-none"
-                >
-                  <option value="">— Select Location —</option>
-                  {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                </select>
-                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </Field>
+              <Field label="Location">
+                <div className="relative">
+                  <select 
+                    value={form.location}
+                    onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                    className="w-full h-11 pl-10 pr-8 rounded-xl border border-gray-200 bg-gray-50/50 text-sm outline-none appearance-none"
+                  >
+                    <option value="">— Select Location —</option>
+                    {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                  </select>
+                  <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </Field>
 
-            <Field label="Logo URL">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Globe className="w-4 h-4 text-gray-400" />
-                <input value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-          </Section>
+              <Field label="Logo URL">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Globe className="w-4 h-4 text-gray-400" />
+                  <input value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+            </Section>
 
-          <Section icon={Phone} title="Contact Details">
-             <Field label="Email Address">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <input type="email" value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-            <Field label="Phone Number">
-              <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                <Phone className="w-4 h-4 text-gray-400" />
-                <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
-              </div>
-            </Field>
-          </Section>
-        </div>
+            <Section icon={Phone} title="Contact Details">
+               <Field label="Email Address">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <input type="email" value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+              <Field label="Phone Number">
+                <div className="flex items-center gap-3 h-11 px-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} className="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </Field>
+            </Section>
+          </div>
 
-        {/* Operating Hours */}
-        <div className="space-y-6">
-          <Section icon={Clock} title="Operating Hours">
-            <HoursEditor hours={form.hours} onChange={hours => setForm(f => ({ ...f, hours }))} />
-          </Section>
+          {/* Operating Hours */}
+          <div className="space-y-6">
+            <Section icon={Clock} title="Operating Hours">
+              <HoursEditor hours={form.hours} onChange={hours => setForm(f => ({ ...f, hours }))} />
+            </Section>
 
-          <div className="pt-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save All Changes
-            </button>
+            <div className="pt-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save All Changes
+              </button>
+            </div>
           </div>
         </div>
-
-      </div>
+      ) : (
+        <MenuEditor restaurantId={selectedId} />
+      )}
     </div>
   );
 }
@@ -266,26 +306,57 @@ function HoursEditor({ hours, onChange }: { hours: HoursForm; onChange: (h: Hour
       {DAYS.map(({ key, label }) => {
         const row = hours[key];
         return (
-          <div key={key} className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-gray-100 bg-gray-50/50 transition-colors hover:bg-white hover:border-gray-200">
+          <div key={key} className={cn(
+            "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border transition-all duration-300",
+            row.enabled 
+              ? "bg-white border-border/40 shadow-soft" 
+              : "bg-slate-50/50 border-gray-100 opacity-60"
+          )}>
             <div className="flex items-center gap-3">
                <button
                 type="button"
                 onClick={() => toggle(key)}
-                className={`relative w-8 h-4.5 rounded-full transition-colors ${row.enabled ? "bg-green-500" : "bg-gray-200"}`}
+                className={cn(
+                  "relative w-9 h-5 rounded-full transition-colors duration-500",
+                  row.enabled ? "bg-emerald-500" : "bg-slate-200"
+                )}
               >
-                <div className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${row.enabled ? "translate-x-3.5" : "translate-x-0"}`} />
+                <div className={cn(
+                  "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-500",
+                  row.enabled ? "translate-x-4" : "translate-x-0"
+                )} />
               </button>
-              <span className={`text-xs font-bold ${row.enabled ? "text-gray-900" : "text-gray-400"}`}>{label}</span>
+              <span className={cn(
+                "text-xs font-black uppercase tracking-widest",
+                row.enabled ? "text-gray-900" : "text-muted-foreground/40"
+              )}>{label}</span>
             </div>
 
             {row.enabled ? (
-              <div className="flex items-center gap-2">
-                <input type="time" value={row.open} onChange={e => setTime(key, "open", e.target.value)} className="text-[11px] font-bold px-2 py-1 rounded-lg border border-gray-100 bg-white outline-none focus:border-gray-300" />
-                <span className="text-gray-300">—</span>
-                <input type="time" value={row.close} onChange={e => setTime(key, "close", e.target.value)} className="text-[11px] font-bold px-2 py-1 rounded-lg border border-gray-100 bg-white outline-none focus:border-gray-300" />
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex items-center group/input">
+                   <Clock className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/10 group-focus-within/input:text-primary transition-colors" />
+                   <input 
+                    type="time" 
+                    value={row.open} 
+                    onChange={e => setTime(key, "open", e.target.value)} 
+                    className="w-full sm:w-28 pl-8 pr-2 py-2.5 rounded-xl text-[10px] font-black border border-border/40 bg-slate-50/50 outline-none focus:border-gray-900 focus:bg-white transition-all shadow-inset appearance-none" 
+                   />
+                </div>
+                <div className="hidden sm:block text-[9px] font-black text-muted-foreground/30 tracking-widest px-1">TO</div>
+                <div className="relative flex items-center group/input">
+                   <input 
+                    type="time" 
+                    value={row.close} 
+                    onChange={e => setTime(key, "close", e.target.value)} 
+                    className="w-full sm:w-28 px-3 py-2.5 rounded-xl text-[10px] font-black border border-border/40 bg-slate-50/50 outline-none focus:border-gray-900 focus:bg-white transition-all shadow-inset appearance-none" 
+                   />
+                </div>
               </div>
             ) : (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Closed</span>
+              <div className="flex items-center gap-2 text-muted-foreground/30">
+                <span className="text-[10px] font-black uppercase tracking-widest">Platform Offline</span>
+              </div>
             )}
           </div>
         );
