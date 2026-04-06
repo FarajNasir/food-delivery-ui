@@ -1,19 +1,8 @@
-import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
+import { ok, fail } from "@/lib/proxy";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { menuItems, restaurants } from "@/lib/db/schema";
-import { eq, and, SQL, asc, inArray } from "drizzle-orm";
-
-const CreateMenuItemSchema = z.object({
-  restaurantId: z.string().uuid(),
-  name:         z.string().min(1).max(150),
-  description:  z.string().max(500).optional().or(z.literal("")).transform(v => v || null),
-  category:     z.string().min(1).max(100),
-  price:        z.number().positive(),
-  status:       z.enum(["available", "unavailable"]).default("available"),
-  imageUrl:     z.string().url(),
-});
+import { eq, and, asc, inArray } from "drizzle-orm";
 
 /* ── GET /api/owner/menu ── */
 export async function GET() {
@@ -68,10 +57,13 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
 
-    const parsed = await parseBody(req, CreateMenuItemSchema);
-    if ("error" in parsed) return parsed.error;
+    const body = await req.json();
+    const { restaurantId, name, description, category, price, status, imageUrl } = body;
 
-    const { restaurantId, name, description, category, price, status, imageUrl } = parsed.data;
+    // Manual Validation
+    if (!restaurantId || !name || !category || !price || !imageUrl) {
+      return fail("Missing required fields.", 400);
+    }
 
     /* 1. Verify user owns the restaurant */
     const [restaurant] = await db

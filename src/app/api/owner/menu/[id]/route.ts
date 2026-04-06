@@ -1,19 +1,8 @@
-import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
+import { ok, fail } from "@/lib/proxy";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-
-const UpdateMenuItemSchema = z.object({
-  restaurantId: z.string().uuid().optional(),
-  name:         z.string().min(1).max(150).optional(),
-  description:  z.string().max(500).optional().or(z.literal("")).transform(v => v || null),
-  category:     z.string().min(1).max(100).optional(),
-  price:        z.number().positive().optional(),
-  status:       z.enum(["available", "unavailable"]).optional(),
-  imageUrl:     z.string().url().optional(),
-});
 
 /* ── PATCH /api/owner/menu/[id] ── */
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
@@ -21,10 +10,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const user = await getCurrentUser();
     if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
 
-    const parsed = await parseBody(req, UpdateMenuItemSchema);
-    if ("error" in parsed) return parsed.error;
-
+    const body = await req.json();
     const { id } = params;
+    const updateData = { ...body };
 
     /* 1. Verify item exists and belongs to a restaurant owned by the user */
     const [item] = await db
@@ -36,7 +24,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (!item) return fail("Menu item not found or permission denied.", 403);
 
     /* 2. Prepare payload */
-    const updatePayload: any = { ...parsed.data };
+    const updatePayload: any = { ...updateData };
     if (updatePayload.price !== undefined) {
       updatePayload.price = String(updatePayload.price);
     }
