@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, cartItems, menuItems } from "@/lib/db/schema";
+import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications } from "@/lib/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
@@ -60,6 +60,39 @@ export async function POST(req: Request) {
           price: (parseFloat(item.price as string)).toFixed(2),
         }))
       );
+
+      // --- Notification Logic ---
+      try {
+        const [restaurant] = await db
+          .select({ ownerId: restaurants.ownerId, name: restaurants.name })
+          .from(restaurants)
+          .where(eq(restaurants.id, restaurantId))
+          .limit(1);
+
+        if (restaurant) {
+          const [owner] = await db
+            .select({ lastActive: users.lastActive })
+            .from(users)
+            .where(eq(users.id, restaurant.ownerId))
+            .limit(1);
+
+          const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
+
+          await db.insert(notifications).values({
+            recipientId: restaurant.ownerId,
+            type: "ORDER",
+            subject: "New Order Received!",
+            body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
+            channel: isActive ? "FCM" : "WHATSAPP",
+            status: "PENDING",
+            metadata: { orderId: newOrder.id }
+          });
+        }
+      } catch (notifyErr) {
+        console.error("Failed to queue notification:", notifyErr);
+        // Don't fail the order if notification fails
+      }
+      // --------------------------
 
       createdOrders.push(newOrder);
     }
