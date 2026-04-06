@@ -37,11 +37,15 @@ export default function RestaurantCard({
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -8, transition: { duration: 0.3, ease: "easeOut" } }}
+      whileHover={{ 
+        y: -8, 
+        borderColor: `${theme.accent}30`,
+        transition: { duration: 0.3, ease: "easeOut" } 
+      }}
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
       className={cn(
         "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
-        "hover:shadow-elevated hover:border-primary/20 shadow-soft transform-gpu"
+        "hover:shadow-elevated shadow-soft transform-gpu"
       )}
     >
       {/* Visual Depth Overlay */}
@@ -94,8 +98,13 @@ export default function RestaurantCard({
       <div className="flex flex-1 flex-col p-6">
         <div className="mb-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-heading text-lg font-black leading-tight text-gray-900 line-clamp-1 group-hover:text-primary transition-colors duration-300">
-              {name}
+            <h3 
+              className="font-heading text-lg font-black leading-tight text-gray-900 line-clamp-1 transition-colors duration-300"
+              style={{ "--group-hover-color": theme.accent } as any}
+            >
+              <span className="group-hover:text-[var(--group-hover-color)] transition-colors duration-300">
+                {name}
+              </span>
             </h3>
           </div>
           
@@ -110,25 +119,33 @@ export default function RestaurantCard({
         <div className="mt-auto flex items-center justify-between pt-5 border-t border-border/40">
           <div className="flex items-center gap-4 text-[12px] font-bold text-muted-foreground">
             {deliveryTime && (
-              <div className="flex items-center gap-1.5 group-hover:text-gray-900 transition-colors">
-                <Clock className="h-4 w-4 text-primary" />
+              <div 
+                className="flex items-center gap-1.5 transition-colors group-hover:text-gray-900"
+              >
+                <Clock className="h-4 w-4" style={{ color: theme.accent }} />
                 <span>{deliveryTime} mins</span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 group-hover:text-gray-900 transition-colors">
-              <Truck className="h-4 w-4 text-primary" />
-              <span>Fast Refill</span>
-            </div>
           </div>
 
           <motion.div
-            whileHover={{ x: 4 }}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/40 transition-all duration-300 group-hover:bg-primary group-hover:text-white"
+            whileHover={{ 
+              scale: 1.02, 
+              backgroundColor: `${theme.accent}15`,
+              borderColor: `${theme.accent}40` 
+            }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center justify-center rounded-full px-6 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all duration-300 border border-transparent shadow-sm"
+            style={{ 
+              color: theme.accent,
+              backgroundColor: `${theme.accent}08`, 
+            }}
           >
-            <ArrowRight className="h-5 w-5" />
+            Explore Menu
           </motion.div>
         </div>
       </div>
     </motion.div>
+
   );
 }
