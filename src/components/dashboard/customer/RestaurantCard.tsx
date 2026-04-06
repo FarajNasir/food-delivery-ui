@@ -2,156 +2,133 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Star, Clock, Truck, Sparkles, Store, ArrowRight } from "lucide-react";
-import type { Restaurant } from "@/data/restaurants";
-import type { PublicFeaturedRestaurant } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import type { RestaurantItem, FeaturedItem } from "@/types/api.types";
 
 interface RestaurantCardProps {
-  restaurant: Restaurant | PublicFeaturedRestaurant;
+  restaurant: RestaurantItem | FeaturedItem | any; // Keep any for mock compatibility during transition
   theme: {
     gradientFrom: string;
-    gradientVia: string;
-    gradientTo: string;
     primary: string;
     accent: string;
   };
   featured?: boolean;
-  priority?: boolean;
 }
 
 export default function RestaurantCard({
   restaurant,
   theme,
   featured = false,
-  priority = false,
 }: RestaurantCardProps) {
   const router = useRouter();
 
-  // Handle both mock and API types
+  // Unified mapping for both API and older Mock data
   const id = "entityId" in restaurant ? restaurant.entityId : restaurant.id;
   const name = restaurant.name;
-  const image = "logoUrl" in restaurant ? restaurant.logoUrl : restaurant.image;
-  const location = "location" in restaurant ? restaurant.location : "";
-  
-  // Mock-only fields (or future DB fields)
-  const cuisine = "cuisine" in restaurant ? restaurant.cuisine : "";
-  const description = "description" in restaurant ? restaurant.description : "";
-  const rating = "rating" in restaurant ? restaurant.rating : null;
-  const reviews = "reviews" in restaurant ? restaurant.reviews : null;
-  const deliveryTime = "deliveryTime" in restaurant ? restaurant.deliveryTime : null;
-  const deliveryFee = "deliveryFee" in restaurant ? restaurant.deliveryFee : null;
-  const promo = "promo" in restaurant ? restaurant.promo : null;
+  const image = "logoUrl" in restaurant ? restaurant.logoUrl : (restaurant as any).image;
+  const cuisine = (restaurant as any).cuisine || "";
+  const rating = (restaurant as any).rating || null;
+  const deliveryTime = (restaurant as any).deliveryTime || null;
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -8, transition: { duration: 0.3, ease: "easeOut" } }}
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
-      className="group/rest bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 cursor-pointer flex flex-col focus:outline-none focus:ring-2 focus:ring-offset-2 transform-gpu"
-      style={{ "--tw-ring-color": theme.accent, WebkitMaskImage: '-webkit-radial-gradient(white, black)' } as React.CSSProperties}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          router.push(`/dashboard/customer/restaurant/${id}`);
-        }
-      }}
+      className={cn(
+        "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
+        "hover:shadow-elevated hover:border-primary/20 shadow-soft transform-gpu"
+      )}
     >
-      {/* Image */}
-      <div className={`relative ${featured ? "h-48 sm:h-56 lg:h-64" : "h-44 sm:h-48"} w-full bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden`}>
+      {/* Visual Depth Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+      {/* Image Container */}
+      <div className={cn(
+        "relative w-full overflow-hidden shrink-0 bg-muted/20",
+        featured ? "h-56 sm:h-64" : "h-48"
+      )}>
         {image ? (
           <Image
             src={image}
             alt={name}
             fill
-            priority={priority}
-            className="object-cover transition-transform duration-500 ease-out group-hover/rest:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-300 gap-2">
-             <Store className="w-10 h-10" />
-             <span className="text-[10px] font-bold uppercase tracking-widest">No Image</span>
-          </div>
-        )}
-        
-        {/* Subtle dynamic gradient overlay for text readability if badges are present */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
-
-        {(featured || ("type" in restaurant && restaurant.type === "restaurant")) && (
-          <div
-            className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-white px-2.5 py-1 rounded-full shadow-md backdrop-blur-sm z-10"
-            style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` }}
-          >
-            <Sparkles className="w-3 h-3 fill-white/80" />
-            Featured
+          <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground/30">
+            <Store className="h-12 w-12" />
           </div>
         )}
 
-        {promo && (
-          <div className="absolute top-3 right-3 text-[10px] sm:text-[11px] font-bold bg-white text-gray-800 px-2.5 py-1 rounded-full shadow-md z-10">
-            {promo}
+        {/* Glass Badge - Top Left */}
+        {(featured || (restaurant as any).type === "restaurant") && (
+          <div className="absolute left-4 top-4 z-10">
+            <div 
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight text-white shadow-lg backdrop-blur-xl"
+              style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent}cc)` }}
+            >
+              <Sparkles className="h-3.5 w-3.5 fill-white/80" />
+              <span>HANDPICKED</span>
+            </div>
           </div>
         )}
 
+        {/* Glass Rating - Bottom Left */}
         {rating && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/10 z-10 transition-transform duration-300 group-hover/rest:-translate-y-1">
-            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-            <span className="text-white text-[11px] sm:text-xs font-bold leading-none">{rating}</span>
-            {reviews !== null && <span className="text-white/70 text-[10px] font-medium leading-none ml-0.5">({reviews})</span>}
+          <div className="absolute bottom-4 left-4 z-10">
+            <div className="glass-premium flex items-center gap-1 rounded-full px-3 py-1.5 shadow-xl">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-[12px] font-black text-gray-900">{rating}</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Info */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col">
+      {/* Content Area */}
+      <div className="flex flex-1 flex-col p-6">
         <div className="mb-4">
-          <h3 className="font-heading font-black text-gray-900 text-base sm:text-lg leading-tight line-clamp-1 group-hover/rest:text-gray-700 transition-colors mb-1.5">
-            {name}
-          </h3>
-          
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">
-            {cuisine && (
-              <span style={{ color: theme.accent }}>{cuisine}</span>
-            )}
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-heading text-lg font-black leading-tight text-gray-900 line-clamp-1 group-hover:text-primary transition-colors duration-300">
+              {name}
+            </h3>
           </div>
           
-          {description && (
-            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed font-medium">
-              {description}
-            </p>
-          )}
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              {cuisine || "Global Dining"}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500 font-medium group-hover/rest:text-gray-700 transition-colors">
+        {/* Separator / Metrics */}
+        <div className="mt-auto flex items-center justify-between pt-5 border-t border-border/40">
+          <div className="flex items-center gap-4 text-[12px] font-bold text-muted-foreground">
             {deliveryTime && (
-              <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                {deliveryTime}
-              </span>
+              <div className="flex items-center gap-1.5 group-hover:text-gray-900 transition-colors">
+                <Clock className="h-4 w-4 text-primary" />
+                <span>{deliveryTime} mins</span>
+              </div>
             )}
-            {deliveryFee && (
-              <span className="flex items-center gap-1">
-                <Truck className="w-3.5 h-3.5" />
-                {deliveryFee}
-              </span>
-            )}
-            {!deliveryTime && !deliveryFee && (
-               <span className="text-gray-400 flex items-center gap-1 font-bold opacity-0 hidden">
-                 {/* Empty space placeholder */}
-               </span>
-            )}
+            <div className="flex items-center gap-1.5 group-hover:text-gray-900 transition-colors">
+              <Truck className="h-4 w-4 text-primary" />
+              <span>Fast Refill</span>
+            </div>
           </div>
-          
-          <div
-            className="flex items-center flex-shrink-0 gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 text-white shadow-md group-hover/rest:shadow-lg group-hover/rest:scale-105"
-            style={{ background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` }}
+
+          <motion.div
+            whileHover={{ x: 4 }}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/40 transition-all duration-300 group-hover:bg-primary group-hover:text-white"
           >
-            <span>Explore Menu</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </div>
+            <ArrowRight className="h-5 w-5" />
+          </motion.div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -4,26 +4,23 @@ import React, { useState, useEffect } from "react";
 import {
   Utensils, Package, Truck, CheckCircle2,
   Clock, ChevronRight, AlertCircle, Loader2,
-  Store, X
+  Store, X, Bell, Zap
 } from "lucide-react";
-import { useOwnerOrders, OwnerOrder } from "@/context/OwnerOrderContext";
+import { useOwnerStore, type OwnerOrder } from "@/store/useOwnerStore";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const formatTimeAgo = (dateString: string) => {
-  const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
-  if (diff < 1) return "Just now";
-  if (diff < 60) return `${diff}m ago`;
-  const hrs = Math.floor(diff / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return new Date(dateString).toLocaleDateString();
-};
+/**
+ * LiveOrdersView.tsx - Premium kitchen management dashboard for owners.
+ * Features staggered animations, real-time sync, and glassmorphism UI.
+ */
 
 const PIPELINE = [
   { id: "PENDING_CONFIRMATION", label: "New",      icon: AlertCircle, color: "text-amber-500",   bg: "bg-amber-500" },
   { id: "PAID",                 label: "Paid",     icon: CheckCircle2,color: "text-blue-500",    bg: "bg-blue-500"  },
   { id: "PREPARING",            label: "Kitchen",  icon: Utensils,    color: "text-purple-500",  bg: "bg-purple-500"},
-  { id: "OUT_FOR_DELIVERY",     label: "On Road",  icon: Truck,       color: "text-orange-500",  bg: "bg-orange-500"},
+  { id: "OUT_FOR_DELIVERY",     label: "Dispatched",icon: Truck,      color: "text-orange-500",  bg: "bg-orange-500"},
 ];
 
 const STATUS_BAR: Record<string, string> = {
@@ -35,10 +32,10 @@ const STATUS_BAR: Record<string, string> = {
 };
 
 const NEXT_STATUS: Record<string, { label: string; status: string; color: string }> = {
-  PENDING_CONFIRMATION: { label: "Accept Order",      status: "CONFIRMED",        color: "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" },
-  PAID:                 { label: "Send to Kitchen",   status: "PREPARING",        color: "bg-blue-600 hover:bg-blue-700 shadow-blue-100" },
-  PREPARING:            { label: "Mark Ready",        status: "OUT_FOR_DELIVERY", color: "bg-purple-600 hover:bg-purple-700 shadow-purple-100" },
-  OUT_FOR_DELIVERY:     { label: "Mark Delivered",    status: "DELIVERED",        color: "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" },
+  PENDING_CONFIRMATION: { label: "Accept Order",      status: "CONFIRMED",        color: "bg-emerald-600 shadow-emerald-200" },
+  PAID:                 { label: "Send to Kitchen",   status: "PREPARING",        color: "bg-blue-600 shadow-blue-200" },
+  PREPARING:            { label: "Dispatch Food",     status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
+  OUT_FOR_DELIVERY:     { label: "Mark Delivered",    status: "DELIVERED",        color: "bg-emerald-600 shadow-emerald-200" },
 };
 
 // ── Order Card ────────────────────────────────────────────────────────────────
@@ -50,140 +47,123 @@ function OrderCard({
   onUpdate: (id: string, status: string) => Promise<boolean>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [timeAgo, setTimeAgo] = useState(formatTimeAgo(order.createdAt));
-
-  useEffect(() => {
-    const t = setInterval(() => setTimeAgo(formatTimeAgo(order.createdAt)), 60000);
-    return () => clearInterval(t);
-  }, [order.createdAt]);
-
   const isPending = order.status === "PENDING_CONFIRMATION";
   const nextAction = NEXT_STATUS[order.status];
-
   const stepIndex = PIPELINE.findIndex((s) => s.id === order.status);
 
-  const handle = async (status: string) => {
+  const handleUpdate = async (status: string) => {
     setBusy(true);
     await onUpdate(order.id, status);
     setBusy(false);
   };
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ y: -4 }}
       className={cn(
-        "bg-white rounded-xl border shadow-sm overflow-hidden transition-all",
-        isPending ? "border-amber-200 shadow-amber-50" : "border-gray-100"
+        "bg-white rounded-3xl border shadow-soft overflow-hidden transition-all duration-300",
+        isPending ? "border-amber-200 ring-4 ring-amber-50" : "border-border/40"
       )}
     >
-      {/* status bar */}
-      <div className={cn("h-0.5 w-full", STATUS_BAR[order.status] ?? "bg-gray-200")} />
+      <div className={cn("h-1.5 w-full", STATUS_BAR[order.status] ?? "bg-slate-100")} />
 
-      <div className="p-4">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-bold text-gray-900">#{order.id.slice(0, 8)}</span>
-              <span
-                className={cn(
-                  "text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md border",
-                  isPending
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-gray-50 text-gray-500 border-gray-100"
-                )}
-              >
-                {order.status.replace(/_/g, " ")}
-              </span>
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
+              {isPending && (
+                <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full animate-pulse">
+                  <Zap className="w-2 h-2 fill-amber-600" />
+                  Urgent
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
-              <Clock className="w-3 h-3 text-gray-400" />
-              <span className="text-[11px] text-gray-400 font-medium">{timeAgo}</span>
-              <span className="text-gray-200">·</span>
-              <Store className="w-3 h-3 text-gray-400" />
-              <span className="text-[11px] text-gray-400 font-medium truncate max-w-[160px]">
-                {order.restaurant.name}
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold uppercase tracking-widest">
+                {formatDistanceToNow(new Date(order.createdAt))} ago
               </span>
             </div>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-base font-bold text-gray-900">£{parseFloat(order.totalAmount).toFixed(2)}</p>
-            <p className="text-[10px] text-gray-400 font-medium">{order.items.length} item{order.items.length !== 1 ? "s" : ""}</p>
+          <div className="text-right">
+            <p className="text-lg font-black text-gray-900 tracking-tight">£{parseFloat(order.totalAmount).toFixed(2)}</p>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+               {order.items.length} Item{order.items.length !== 1 ? 's' : ''}
+            </p>
           </div>
         </div>
 
-        {/* Pipeline stepper */}
-        <div className="flex items-center gap-1 mb-3 py-2">
+        {/* Stepper */}
+        <div className="flex items-center gap-1 py-4 border-y border-slate-50 mb-4">
           {PIPELINE.map((step, idx) => {
             const done = idx <= stepIndex;
             const Icon = step.icon;
             return (
               <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center transition-all",
-                      done ? `${step.bg} text-white` : "bg-gray-100 text-gray-300"
-                    )}
-                  >
-                    <Icon className="w-3 h-3" />
+                <div className="flex flex-col items-center gap-1.5 shrink-0">
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
+                    done ? `${step.bg} text-white shadow-lg` : "bg-muted/30 text-muted-foreground"
+                  )}>
+                    <Icon className="w-4 h-4" />
                   </div>
-                  <span
-                    className={cn(
-                      "text-[8px] font-bold uppercase tracking-widest",
-                      done ? "text-gray-700" : "text-gray-300"
-                    )}
-                  >
+                  <span className={cn(
+                    "text-[8px] font-black uppercase tracking-widest",
+                    done ? "text-gray-900" : "text-muted-foreground/40"
+                  )}>
                     {step.label}
                   </span>
                 </div>
                 {idx < PIPELINE.length - 1 && (
-                  <div
-                    className={cn(
-                      "flex-1 h-px mb-4 transition-all",
-                      idx < stepIndex ? step.bg : "bg-gray-100"
-                    )}
-                  />
+                  <div className={cn(
+                    "flex-1 h-px mt-[-18px] transition-all duration-700",
+                    idx < stepIndex ? step.bg : "bg-muted/30"
+                  )} />
                 )}
               </React.Fragment>
             );
           })}
         </div>
 
-        {/* Items */}
-        <div className="bg-gray-50 rounded-lg p-3 mb-3 border border-gray-100">
-          <div className="space-y-1.5">
+        {/* Items Grid */}
+        <div className="bg-slate-50/50 rounded-2xl p-4 mb-5 border border-slate-100/50">
+          <div className="space-y-2">
             {order.items.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded bg-white border border-gray-200 flex items-center justify-center text-[9px] font-bold text-gray-700 flex-shrink-0">
+              <div key={idx} className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white border border-slate-200 text-[10px] font-black text-primary shadow-sm">
                     {item.quantity}
                   </span>
-                  <span className="font-medium text-gray-700">{item.menuItem.name}</span>
+                  <span className="text-xs font-bold text-gray-700">{item.menuItem.name}</span>
                 </div>
-                <span className="text-gray-400 font-semibold">£{parseFloat(item.price).toFixed(2)}</span>
+                <span className="text-[11px] font-black text-muted-foreground">£{parseFloat(item.price).toFixed(2)}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Actions */}
-        <div className={cn("flex gap-2", isPending ? "" : "justify-end")}>
+        <div className="flex gap-2">
           {nextAction && (
             <button
               disabled={busy}
-              onClick={() => handle(nextAction.status)}
+              onClick={() => handleUpdate(nextAction.status)}
               className={cn(
-                "flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white shadow-lg transition-all flex items-center justify-center gap-2",
+                "flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white shadow-elevated transition-all flex items-center justify-center gap-2",
                 nextAction.color,
-                "hover:scale-[1.01] active:scale-95 disabled:opacity-60 disabled:pointer-events-none"
+                "hover:scale-[1.02] active:scale-95 disabled:opacity-50"
               )}
             >
-              {busy ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
                   {nextAction.label}
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-4 h-4" />
                 </>
               )}
             </button>
@@ -192,102 +172,125 @@ function OrderCard({
           {isPending && (
             <button
               disabled={busy}
-              onClick={() => handle("CANCELLED")}
-              className="px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest text-red-500 border border-red-100 bg-white hover:bg-red-50 transition-all disabled:opacity-60"
+              onClick={() => handleUpdate("CANCELLED")}
+              className="px-5 py-3.5 rounded-2xl text-red-500 border border-red-50 bg-white hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+// ── Main Dashboard View ─────────────────────────────────────────────────────────
+export default function LiveOrdersView() {
+  const { orders, updateOrderStatus, refreshOrders, isLoading, subscribeToUpdates } = useOwnerStore();
+
+  useEffect(() => {
+    refreshOrders();
+    const unsubscribe = subscribeToUpdates();
+    return () => unsubscribe();
+  }, [refreshOrders, subscribeToUpdates]);
+
+  const activeOrders = orders.filter((o) =>
+    ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return (
+    <div className="w-full space-y-8 pb-12 selection:bg-primary/20">
+      
+      {/* Header with Stats */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Utensils className="w-5 h-5 text-primary" />
+             </div>
+             <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Kitchen Dashboard</h1>
+          </div>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+            Managing <span className="text-gray-900 font-black">{activeOrders.length}</span> Active Tickets
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border border-border/40">
+             <div className="relative">
+                <Bell className="w-5 h-5 text-slate-500" />
+                {activeOrders.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
+             </div>
+             <div className="h-4 w-px bg-border/40" />
+             <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Sync Active</span>
+             </div>
+          </div>
+          <button 
+            onClick={() => refreshOrders()}
+            className="p-3 rounded-2xl bg-white border border-border/40 shadow-soft hover:shadow-elevated transition-all active:rotate-180 duration-500"
+          >
+            <RotateCcw className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <AnimatePresence mode="wait">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-32 space-y-4">
+             <div className="w-12 h-12 rounded-full border-4 border-muted/30 border-t-primary animate-spin" />
+             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground shimmer px-4 py-1 rounded-lg">Syncing Orders...</p>
+          </div>
+        ) : activeOrders.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="py-32 text-center bg-white/40 glass-premium rounded-[3rem] border border-dashed border-border"
+          >
+            <div className="w-20 h-20 bg-muted/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inset">
+              <Clock className="w-10 h-10 text-muted-foreground/30" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">Kitchen is Quiet</h3>
+            <p className="text-sm text-muted-foreground font-medium mt-2">All orders have been dispatched. Enjoy the calm!</p>
+          </motion.div>
+        ) : (
+          <motion.div 
+            layout
+            className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {activeOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onUpdate={updateOrderStatus}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// ── Main View ─────────────────────────────────────────────────────────────────
-export default function LiveOrdersView() {
-  const { orders, updateOrderStatus, refreshOrders, loading } = useOwnerOrders();
-
-  useEffect(() => {
-    refreshOrders();
-    const onFocus = () => refreshOrders();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [refreshOrders]);
-
-  const activeOrders = orders
-    .filter((o) =>
-      ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
-    )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const pending   = activeOrders.filter((o) => o.status === "PENDING_CONFIRMATION").length;
-  const inKitchen = activeOrders.filter((o) => ["PAID","PREPARING"].includes(o.status)).length;
-  const onRoad    = activeOrders.filter((o) => o.status === "OUT_FOR_DELIVERY").length;
-
+// Simple internal helper for refresh
+function RotateCcw(props: any) {
   return (
-    <div className="w-full space-y-4 pb-10">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <Utensils className="w-4 h-4 text-blue-600" />
-            Live Orders
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Manage your kitchen in real-time.</p>
-        </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-gray-100 shadow-sm">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Live Sync</span>
-        </div>
-      </div>
-
-      {/* Summary chips */}
-      {!loading && activeOrders.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {[
-            { label: "Pending",    count: pending,   color: "bg-amber-50 text-amber-700 border-amber-200"   },
-            { label: "In Kitchen", count: inKitchen, color: "bg-purple-50 text-purple-700 border-purple-200"},
-            { label: "On Road",    count: onRoad,    color: "bg-orange-50 text-orange-700 border-orange-200"},
-          ].map(({ label, count, color }) => (
-            <div
-              key={label}
-              className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest", color)}
-            >
-              {label}
-              <span className="font-black">{count}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Content */}
-      {loading ? (
-        <div className="py-24 flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-4 border-gray-100 border-t-blue-500 animate-spin" />
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-            Syncing kitchen...
-          </p>
-        </div>
-      ) : activeOrders.length === 0 ? (
-        <div className="py-24 text-center bg-white rounded-xl border-2 border-dashed border-gray-100">
-          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
-            <Clock className="w-6 h-6 text-gray-200" />
-          </div>
-          <p className="text-sm font-semibold text-gray-500">Kitchen is idle</p>
-          <p className="text-xs text-gray-400 mt-0.5">All orders have been dispatched.</p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {activeOrders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onUpdate={updateOrderStatus}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      {...props}
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
   );
 }
