@@ -125,18 +125,20 @@ export default function Footer() {
               </li>
 
               {/* Phone — clickable */}
-              <li className="flex items-center gap-2">
-                <Phone
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: site.theme.accent }}
-                />
-                <a
-                  href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
-                  className="hover:text-white transition-colors"
-                >
-                  {contact.managerPhone}
-                </a>
-              </li>
+              {contact.managerPhone && (
+                <li className="flex items-center gap-2">
+                  <Phone
+                    className="w-4 h-4 shrink-0"
+                    style={{ color: site.theme.accent }}
+                  />
+                  <a
+                    href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
+                    className="hover:text-white transition-colors"
+                  >
+                    {contact.managerPhone}
+                  </a>
+                </li>
+              )}
 
               {/* Email — clickable */}
               <li className="flex items-center gap-2">
@@ -185,6 +187,15 @@ export default function Footer() {
                   {contact.facebook.label}
                 </a>
               </li>
+
+              {/* Explicit Facebook Help message for sites without phone support */}
+              {!contact.managerPhone && (
+                <li className="pt-2">
+                  <p className="text-[11px] leading-relaxed opacity-70 font-medium italic">
+                    Need help? Please message our Facebook page for support.
+                  </p>
+                </li>
+              )}
             </ul>
           </div>
         </div>
