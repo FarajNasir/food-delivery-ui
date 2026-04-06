@@ -98,12 +98,12 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       minutes: "30",
     },
     contact: {
-      managerPhone: "07340 646827",
+      managerPhone: "",
       email: "Kilkeeleatsinfo@gmail.com",
       facebook: { label: "Kilkeel Eats Delivery", handle: "Kilkeel Eats Delivery" },
       instagram: { label: "kilkeel_eats", handle: "kilkeel_eats" },
       notice:
-        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Kilkeel Eats' or contact the manager directly with any queries.",
+        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Kilkeel Eats' for assistance. Our support team is available via Messenger.",
     },
   },
   downpatrickeats: {
