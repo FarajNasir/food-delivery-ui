@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AuthChangeEvent, RealtimeChannel, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 export interface Order {
@@ -40,6 +41,7 @@ const supabase = createClient();
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -56,48 +58,97 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    let channel: RealtimeChannel | null = null;
 
-    // ── Supabase Realtime Subscription ──────────────────────────
-    const channel = supabase
-      .channel("orders_realtime_customer")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload: { eventType: string; new: Order; }) => {
-          console.log("🔔 Realtime update received:", payload);
-          
-          if (payload.eventType === "INSERT") {
-            const newOrder = payload.new as Order;
-            setOrders((prev) => {
-              if (prev.find(o => o.id === newOrder.id)) return prev;
-              return [newOrder, ...prev];
-            });
-          } 
-          else if (payload.eventType === "UPDATE") {
-            const updatedOrder = payload.new as Order;
-            setOrders((prev) => 
-              prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
-            );
-            
-            // Check for status specific toasts
-            if (updatedOrder.status === "CONFIRMED") {
-              toast.success("Restaurant confirmed your order!", { icon: "✅" });
-            } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-              toast.info("Your food is on the way!", { icon: "🛵" });
+    const setupRealtime = async () => {
+      await fetchOrders();
+
+      if (channel) supabase.removeChannel(channel);
+
+      channel = supabase
+        .channel("orders_realtime_customer")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "orders" },
+          (payload: { eventType: string; new: Order; }) => {
+            if (payload.eventType === "INSERT") {
+              const newOrder = payload.new as Order;
+              setOrders((prev) => {
+                if (prev.find(o => o.id === newOrder.id)) return prev;
+                return [newOrder, ...prev];
+              });
+            } 
+            else if (payload.eventType === "UPDATE") {
+              const updatedOrder = payload.new as Order;
+              setOrders((prev) => 
+                prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
+              );
+              
+              // 100% Foolproof Guard: Only show toasts if we are actually on the Customer Dashboard AND the user is a customer
+              const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
+              
+              if (isCustomerPage && userRole === "customer") {
+                if (updatedOrder.status === "CONFIRMED") {
+                  toast.success("Restaurant confirmed your order!", { icon: "✅" });
+                } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
+                  toast.info("Your food is on the way!", { icon: "🛵" });
+                }
+              }
             }
           }
+        )
+        .subscribe();
+    };
+
+    const cleanup = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+      setOrders([]);
+    };
+
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        if (session) {
+          try {
+            const authRes = await fetch("/api/auth/me");
+            if (authRes.ok) {
+              const { data: userData } = await authRes.json();
+              setUserRole(userData?.role);
+            }
+          } catch (err) {}
+          setupRealtime();
         }
-      )
-      .subscribe((status: string) => {
-        console.log("📡 Realtime subscription status:", status);
-        if (status === "CHANNEL_ERROR") {
-          console.error("❌ Realtime connection failed. Checking replication settings might be needed.");
+      } else if (event === "SIGNED_OUT") {
+        cleanup();
+        setUserRole(null);
+      }
+    });
+
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          const authRes = await fetch("/api/auth/me");
+          if (authRes.ok) {
+            const { data: userData } = await authRes.json();
+            setUserRole(userData?.role);
+          }
+        } catch (err) {
+          // Fallback to null
         }
-      });
+        setupRealtime();
+      } else {
+        setLoading(false);
+      }
+    };
+
+    init();
 
     return () => {
-      supabase.removeChannel(channel);
+      authListener.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
     };
   }, [fetchOrders]);
 

@@ -59,7 +59,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        (payload: { eventType: string; new: Order; }) => {
+        async (payload: { eventType: string; new: Order; }) => {
           if (payload.eventType === "INSERT") {
             const newOrder = payload.new as Order;
             set((state) => {
@@ -73,10 +73,16 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
               orders: state.orders.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
             }));
             
-            if (updatedOrder.status === "CONFIRMED") {
-              toast.success("Restaurant confirmed your order!", { icon: "✅" });
-            } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-              toast.info("Your food is on the way!", { icon: "🛵" });
+            // 100% Foolproof Guard: Only show customer status toasts if we are physically on the Customer Dashboard
+            const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
+            
+            // Optimization: Only show these customer-facing toasts on customer pages
+            if (isCustomerPage) {
+              if (updatedOrder.status === "CONFIRMED") {
+                toast.success("Restaurant confirmed your order!", { icon: "✅" });
+              } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
+                toast.info("Your food is on the way!", { icon: "🛵" });
+              }
             }
           }
         }
