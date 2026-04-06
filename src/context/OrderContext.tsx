@@ -92,9 +92,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     });
 
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUserId(session.user.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
         try {
           const authRes = await fetch("/api/auth/me");
           if (authRes.ok) {
