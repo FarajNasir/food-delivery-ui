@@ -5,13 +5,13 @@ import { menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 /* ── PATCH /api/owner/menu/[id] ── */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
 
     const body = await req.json();
-    const { id } = params;
+    const { id } = await params;
     const updateData = { ...body };
 
     /* 1. Verify item exists and belongs to a restaurant owned by the user */
@@ -48,12 +48,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* ── DELETE /api/owner/menu/[id] ── */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
 
-    const { id } = params;
+    const { id } = await params;
 
     /* 1. Verify ownership */
     const [item] = await db
