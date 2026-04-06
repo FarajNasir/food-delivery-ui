@@ -63,12 +63,12 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       minutes: "28",
     },
     contact: {
-      managerPhone: "07564 726646",
+      managerPhone: "",
       email: "Newcastleeatsinfo@gmail.com",
       facebook: { label: "Newcastle Eats Delivery", handle: "Newcastle Eats" },
       instagram: { label: "newcastleeats__", handle: "newcastleeats__" },
       notice:
-        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Newcastle Eats' or contact the manager directly with any queries.",
+        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Newcastle Eats' for assistance. Our support team is available via Messenger.",
     },
   },
   kilkeeleats: {
@@ -133,12 +133,12 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       minutes: "25",
     },
     contact: {
-      managerPhone: "07564 726646",
+      managerPhone: "",
       email: "Downpatrickeatsinfo@gmail.com",
       facebook: { label: "Downpatrick Eats Delivery", handle: "Downpatrick Eats Delivery" },
       instagram: { label: "downpatrickeats", handle: "downpatrickeats" },
       notice:
-        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Downpatrick Eats' or contact the manager directly with any queries.",
+        "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Downpatrick Eats' for assistance. Our support team is available via Messenger.",
     },
   },
 };

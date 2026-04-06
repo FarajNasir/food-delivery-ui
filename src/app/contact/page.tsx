@@ -90,14 +90,16 @@ export default function ContactPage() {
             {/* Contact rows */}
             <div className="divide-y divide-gray-100">
               {/* Phone */}
-              <ContactRow
-                icon={<Phone className="w-5 h-5" style={{ color: site.theme.primary }} />}
-                label="Manager (Phone)"
-                value={contact.managerPhone}
-                href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
-                linkLabel="Call now"
-                siteTheme={site.theme}
-              />
+              {contact.managerPhone && (
+                <ContactRow
+                  icon={<Phone className="w-5 h-5" style={{ color: site.theme.primary }} />}
+                  label="Manager (Phone)"
+                  value={contact.managerPhone}
+                  href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
+                  linkLabel="Call now"
+                  siteTheme={site.theme}
+                />
+              )}
 
               {/* Email */}
               <ContactRow
@@ -135,16 +137,31 @@ export default function ContactPage() {
 
           {/* ── Quick action buttons ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a
-              href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
-              className="flex items-center justify-center gap-2.5 h-14 rounded-2xl text-white font-bold text-sm shadow-md transition-all hover:opacity-90 active:scale-[0.98]"
-              style={{
-                background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,
-              }}
-            >
-              <Phone className="w-5 h-5" />
-              Call the Manager
-            </a>
+            {contact.managerPhone ? (
+              <a
+                href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
+                className="flex items-center justify-center gap-2.5 h-14 rounded-2xl text-white font-bold text-sm shadow-md transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{
+                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,
+                }}
+              >
+                <Phone className="w-5 h-5" />
+                Call the Manager
+              </a>
+            ) : (
+              <a
+                href={`https://www.facebook.com/search/top?q=${encodeURIComponent(contact.facebook.handle)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2.5 h-14 rounded-2xl text-white font-bold text-sm shadow-md transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{
+                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,
+                }}
+              >
+                <MessageCircle className="w-5 h-5" />
+                Message us on Facebook
+              </a>
+            )}
             <a
               href={`mailto:${contact.email}`}
               className="flex items-center justify-center gap-2.5 h-14 rounded-2xl font-bold text-sm shadow-sm border-2 transition-all hover:opacity-80 active:scale-[0.98]"

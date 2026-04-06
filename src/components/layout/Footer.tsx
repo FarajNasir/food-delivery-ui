@@ -2,19 +2,26 @@
 
 import Link from "next/link";
 import { useSite } from "@/context/SiteContext";
-import { MapPin, Phone, Mail } from "lucide-react";
+import { MapPin, Phone, Mail, ExternalLink } from "lucide-react";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+/**
+ * Footer.tsx - Premium site footer with refined typography, 
+ * glassmorphism touches, and high-end micro-interactions.
+ */
 
 export default function Footer() {
   const { site } = useSite();
   const { contact } = site;
 
   const quickLinks = [
-    { label: "Home",         href: "/" },
-    { label: "Restaurants",  href: "/#restaurants" },
+    { label: "Home", href: "/" },
+    { label: "Restaurants", href: "/#restaurants" },
     { label: "How It Works", href: "/#how-it-works" },
-    { label: "Offers",       href: "/#offers" },
-    { label: "Contact",      href: "/contact" },
+    { label: "Offers", href: "/#offers" },
+    { label: "Contact", href: "/contact" },
   ];
 
   const legalLinks = [
@@ -25,68 +32,91 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-[#1C0A00] text-white/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+    <footer className="relative bg-[#020617] text-slate-400 overflow-hidden">
+      {/* Visual background element */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+      <div
+        className="absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[200px] opacity-10 blur-[100px] pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${site.theme.primary} 0%, transparent 70%)` }}
+      />
 
-          {/* ── Brand ── */}
-          <div className="sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+
+          {/* ── Brand & Mission ── */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-heading font-black"
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-heading font-black text-xl shadow-lg transform -rotate-3 hover:rotate-0 transition-transform duration-500"
                 style={{
-                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientTo})`,
+                  background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
                 }}
               >
                 {site.name.charAt(0)}
               </div>
-              <span className="font-heading font-bold text-white text-xl">
+              <span className="font-heading font-black text-white text-2xl tracking-tighter">
                 {site.name}
               </span>
             </div>
-            <p className="text-sm leading-relaxed mb-5 max-w-xs">
-              Bringing the best local food straight to your door in{" "}
-              {site.location}. Fast, fresh, and always delicious.
+            <p className="text-sm leading-relaxed max-w-xs font-medium">
+              Elevating the local dining experience in <span className="text-white font-bold">{site.location}</span>.
+              Authentic flavours, premium service, delivered to your doorstep.
             </p>
 
-            {/* Social icons with real links */}
-            <div className="flex gap-3">
-              {/* Facebook */}
-              <a
-                href={`https://www.facebook.com/search/top?q=${encodeURIComponent(contact.facebook.handle)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={contact.facebook.label}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#1877F2]/80 flex items-center justify-center transition-colors"
-              >
-                <FaFacebook className="w-4 h-4" size={16} />
-              </a>
-              {/* Instagram */}
-              <a
-                href={`https://www.instagram.com/${contact.instagram.handle}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`@${contact.instagram.handle}`}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#E1306C]/80 flex items-center justify-center transition-colors"
-              >
-                <FaInstagram className="w-4 h-4" size={16} />
-              </a>
+            <div className="flex gap-4">
+              {[
+                { icon: FaFacebook, href: `https://www.facebook.com/search/top?q=${encodeURIComponent(contact.facebook.handle)}`, color: "#1877F2" },
+                { icon: FaInstagram, href: `https://www.instagram.com/${contact.instagram.handle}`, color: "#E1306C" }
+              ].map((social, i) => (
+                <motion.a
+                  key={i}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -4, scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="w-10 h-10 rounded-xl bg-slate-800/50 flex items-center justify-center text-slate-300 hover:text-white border transition-colors"
+                  style={{ 
+                    borderColor: `${site.theme.primary}30`,
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = site.theme.primary}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = `${site.theme.primary}30`}
+                >
+                  <social.icon size={18} />
+                </motion.a>
+              ))}
             </div>
           </div>
 
-          {/* ── Quick links ── */}
+          {/* ── Navigation ── */}
           <div>
-            <h4 className="font-heading font-semibold text-white mb-4">
-              Quick Links
+            <h4 className="font-heading font-black text-white text-sm uppercase tracking-[0.2em] mb-6">
+              Navigation
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3">
               {quickLinks.map((l) => (
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="hover:text-white transition-colors"
+                    className="group flex items-center gap-2 hover:text-white transition-colors duration-300"
                   >
-                    {l.label}
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full transition-all duration-300" 
+                      style={{ backgroundColor: `${site.theme.primary}40` }}
+                    />
+                    <span 
+                      className="text-sm font-bold tracking-tight group-hover:translate-x-1 transition-transform"
+                      onMouseEnter={(e) => {
+                        const dot = e.currentTarget.previousElementSibling as HTMLElement;
+                        if (dot) dot.style.backgroundColor = site.theme.primary;
+                      }}
+                      onMouseLeave={(e) => {
+                        const dot = e.currentTarget.previousElementSibling as HTMLElement;
+                        if (dot) dot.style.backgroundColor = `${site.theme.primary}40`;
+                      }}
+                    >
+                      {l.label}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -95,104 +125,112 @@ export default function Footer() {
 
           {/* ── Legal ── */}
           <div>
-            <h4 className="font-heading font-semibold text-white mb-4">
-              Legal
+            <h4 className="font-heading font-black text-white text-sm uppercase tracking-[0.2em] mb-6">
+              Platform
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3">
               {legalLinks.map((l) => (
                 <li key={l}>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <Link href="#" className="text-sm font-bold tracking-tight hover:text-white transition-colors duration-300">
                     {l}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* ── Contact — real details from site config ── */}
-          <div>
-            <h4 className="font-heading font-semibold text-white mb-4">
-              Contact Us
+          {/* ── Contact Details ── */}
+          <div className="bg-slate-800/30 rounded-3xl p-6 border border-slate-700/30">
+            <h4 className="font-heading font-black text-white text-sm uppercase tracking-[0.2em] mb-6">
+              Contact
             </h4>
-            <ul className="space-y-3 text-sm">
-              {/* Location */}
-              <li className="flex items-start gap-2">
-                <MapPin
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: site.theme.accent }}
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3 group">
+                <MapPin 
+                  className="w-5 h-5 shrink-0 transition-transform group-hover:scale-110" 
+                  style={{ color: site.theme.primary }}
                 />
-                <span>{site.location}, Northern Ireland</span>
+                <span className="text-xs font-bold leading-tight">{site.location}, Northern Ireland</span>
               </li>
 
-              {/* Phone — clickable */}
-              <li className="flex items-center gap-2">
-                <Phone
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: site.theme.accent }}
-                />
-                <a
-                  href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
-                  className="hover:text-white transition-colors"
-                >
-                  {contact.managerPhone}
-                </a>
-              </li>
+              {contact.managerPhone && (
+                <li className="flex items-center gap-3 group">
+                  <Phone 
+                    className="w-5 h-5 shrink-0 transition-transform group-hover:scale-110" 
+                    style={{ color: site.theme.primary }}
+                  />
+                  <a
+                    href={`tel:${contact.managerPhone.replace(/\s/g, "")}`}
+                    className="text-xs font-bold hover:text-white transition-colors duration-300"
+                  >
+                    {contact.managerPhone}
+                  </a>
+                </li>
+              )}
 
-              {/* Email — clickable */}
-              <li className="flex items-center gap-2">
-                <Mail
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: site.theme.accent }}
+              <li className="flex items-center gap-3 group">
+                <Mail 
+                  className="w-5 h-5 shrink-0 transition-transform group-hover:scale-110" 
+                  style={{ color: site.theme.primary }}
                 />
                 <a
                   href={`mailto:${contact.email}`}
-                  className="hover:text-white transition-colors break-all"
+                  className="text-xs font-bold hover:text-white transition-colors duration-300 break-all"
                 >
                   {contact.email}
                 </a>
               </li>
 
-              {/* Instagram */}
-              <li className="flex items-center gap-2">
-                <FaInstagram
-                  size={16}
-                  className="shrink-0"
-                  style={{ color: site.theme.accent }}
-                />
-                <a
-                  href={`https://www.instagram.com/${contact.instagram.handle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
-                  @{contact.instagram.handle}
-                </a>
-              </li>
-
-              {/* Facebook */}
-              <li className="flex items-center gap-2">
-                <FaFacebook
-                  size={16}
-                  className="shrink-0"
-                  style={{ color: site.theme.accent }}
+              <li className="flex items-center gap-3 group">
+                <FaFacebook 
+                  size={20}
+                  className="shrink-0 transition-transform group-hover:scale-110" 
+                  style={{ color: site.theme.primary }}
                 />
                 <a
                   href={`https://www.facebook.com/search/top?q=${encodeURIComponent(contact.facebook.handle)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
+                  className="text-xs font-bold hover:text-white transition-colors duration-300"
                 >
                   {contact.facebook.label}
                 </a>
+              </li>
+
+              <li className="pt-2">
+                <div 
+                  className="p-3 rounded-xl border theme-transition"
+                  style={{ 
+                    backgroundColor: `${site.theme.primary}08`, 
+                    borderColor: `${site.theme.primary}20` 
+                  }}
+                >
+                  <p 
+                    className="text-[10px] leading-relaxed font-black uppercase tracking-tight flex items-center gap-1.5"
+                    style={{ color: site.theme.primary }}
+                  >
+                    <ExternalLink size={10} />
+                    Support via Messenger
+                  </p>
+                  <p className="text-[10px] mt-1 text-slate-500 font-medium italic">
+                    Need help? Message our Facebook page.
+                  </p>
+                </div>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* ── Bottom bar ── */}
-        <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/40">
-          <p>© {new Date().getFullYear()} {site.name}. All rights reserved.</p>
-          <p>Made with ♥ in {site.location}</p>
+        {/* ── Bottom Section ── */}
+        <div className="pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[11px] font-bold text-slate-500 tracking-wide uppercase">
+            © {new Date().getFullYear()} {site.name}. Curating local excellence.
+          </p>
+          <div className="flex items-center gap-6">
+            <p className="text-[11px] font-bold text-slate-500 tracking-wide uppercase flex items-center gap-1.5">
+              Made with <span className="text-red-500 animate-pulse">♥</span> in {site.location}
+            </p>
+          </div>
         </div>
       </div>
     </footer>
