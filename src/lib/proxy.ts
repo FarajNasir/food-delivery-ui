@@ -46,3 +46,55 @@ export async function parseBody<T>(
 function formatZodError(err: ZodError): string {
   return err.issues.map((e) => e.message).join(", ");
 }
+
+/* ── Centralized Authentication Guard ── */
+
+import { getCurrentUser, type SessionUser, type UserRole } from "./auth";
+
+/**
+ * Higher-order function to protect API Route Handlers.
+ * - Automatically refreshes the session token.
+ * - Enforces authentication.
+ * - Optional: enforces one or more specific roles.
+ */
+export async function withAuth<T = NextResponse>(
+  req: Request,
+  handler: (user: SessionUser) => Promise<T>,
+  roles?: UserRole[]
+): Promise<T | NextResponse<ApiError>> {
+  try {
+    const path = new URL(req.url).pathname;
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined;
+    
+    console.log(`[withAuth] → ${req.method} ${path} (Token: ${!!token})`);
+    
+    const user = await getCurrentUser(token);
+    
+    if (!user) {
+      console.log(`[withAuth] ✗ No user found for ${path} — returning 401`);
+      return fail("Unauthorized.", 401);
+    }
+
+    console.log(`[withAuth] ✓ Authenticated: ${user.id} (${user.role}) for ${path}`);
+
+    if (roles && !roles.includes(user.role)) {
+      return fail("Forbidden. You don't have permission to access this resource.", 403);
+    }
+
+    return await handler(user);
+  } catch (error) {
+    console.error(`[Auth Guard Error] path: ${new URL(req.url).pathname}`, error);
+    return fail("Internal Server Error.", 500);
+  }
+}
+
+/**
+ * Specialized version of withAuth for restaurant owner routes.
+ */
+export async function withOwnerAuth<T = NextResponse>(
+  req: Request,
+  handler: (user: SessionUser) => Promise<T>
+): Promise<T | NextResponse<ApiError>> {
+  return withAuth(req, handler, ["owner", "admin"]);
+}

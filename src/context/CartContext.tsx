@@ -50,73 +50,93 @@ function saveGuestCart(items: CartItem[]) {
 
 // Removed checkIsLoggedIn to prevent Supabase lock conflicts. Use session from onAuthStateChange instead.
 
+import { useAuthStore } from "@/store/useAuthStore";
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGuest, setIsGuest] = useState(true);
+  const { session, isReady } = useAuthStore();
+  const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
-  const fetchDBCart = useCallback(async () => {
+  const fetchDBCart = useCallback(async (retryCount = 0) => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) {
+        setCartItems(loadGuestCart());
+        setLoading(false);
+        return;
+    }
+
     try {
-      const res = await fetch("/api/cart");
+      const res = await fetch("/api/cart", { 
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${currentSession.access_token}`
+        }
+      });
+      
+      if (res.status === 401) {
+        if (retryCount < 1) {
+          await new Promise(r => setTimeout(r, 500));
+          return fetchDBCart(retryCount + 1);
+        }
+        setCartItems(loadGuestCart());
+        return;
+      }
+
       const data = await res.json();
       if (data.data) {
         setCartItems(data.data.items);
       }
     } catch (err) {
       console.error("Failed to fetch cart:", err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   // ── Sync guest cart → DB on first login ─────────────────────
   const syncGuestCartToDB = useCallback(async () => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) return;
+
     const guestItems = loadGuestCart();
     if (guestItems.length === 0) return;
 
     try {
-      await fetch("/api/cart/sync", {
+      const res = await fetch("/api/cart/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentSession.access_token}`
+        },
         body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
       });
-      localStorage.removeItem(GUEST_CART_KEY);
+      
+      if (res.ok) {
+        localStorage.removeItem(GUEST_CART_KEY);
+      }
     } catch (err) {
       console.error("Failed to sync guest cart:", err);
     }
   }, []);
 
-  // ── Init: determine guest vs. logged-in ─────────────────────
-  // Removed refreshCart to prevent Supabase lock conflicts. Auth is now handled by onAuthStateChange.
-
   useEffect(() => {
-    const supabase = createClient();
+    if (!isReady) return;
 
-    // Listen for auth changes (login/logout) to refresh cart state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      setLoading(true);
-      if (session) {
-        setIsGuest(false);
-        // Sync any leftover guest cart into DB first
-        await syncGuestCartToDB();
-        await fetchDBCart();
-      } else {
-        setIsGuest(true);
-        setCartItems(loadGuestCart());
-        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+    const initCart = async () => {
+        setLoading(true);
+        if (session) {
+            await syncGuestCartToDB();
+            await fetchDBCart();
+        } else {
+            setCartItems(loadGuestCart());
             setLoading(false);
         }
-      }
-      
-      // Ensure loading is off if we didn't hit the SIGNED_OUT/INITIAL_SESSION paths (e.g. on SIGNED_IN)
-      // fetchDBCart handles its own setLoading(false) via finally block in some contexts, 
-      // but here we should be explicit.
-      if (session) setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
-  }, [fetchDBCart, syncGuestCartToDB]);
+
+    initCart();
+  }, [session, isReady, fetchDBCart, syncGuestCartToDB]);
 
   // ── Add item ─────────────────────────────────────────────────
   const addItem = async (item: Omit<CartItem, "id" | "quantity">) => {
@@ -147,9 +167,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItems(newItems);
 
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch("/api/cart", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ menuItemId: item.menuItemId, quantity: 1 }),
       });
       if (!res.ok) throw new Error();
@@ -183,9 +207,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItems(newItems);
 
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch(`/api/cart/${menuItemId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ quantity }),
       });
       if (!res.ok) throw new Error();
@@ -213,7 +241,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const backup = [...cartItems];
     setCartItems([]);
     try {
-      const res = await fetch("/api/cart/clear", { method: "POST" });
+      const currentSession = useAuthStore.getState().session;
+      const res = await fetch("/api/cart/clear", { 
+        method: "POST",
+        headers: {
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        }
+      });
       if (!res.ok) throw new Error();
       toast.success("Order cleared");
     } catch {

@@ -1,8 +1,7 @@
-import { ok, fail } from "@/lib/proxy";
+import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 
@@ -16,77 +15,77 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const user = await getCurrentUser();
-    if (!user) return fail("Unauthorized", 401);
+  return withAuth(req, async (user) => {
+    try {
+      const { id } = await params;
 
-    const order = await db.query.orders.findFirst({
-      where: and(eq(orders.id, id), eq(orders.userId, user.id)),
-      with: {
-        items: {
-          with: {
-            menuItem: true,
+      const order = await db.query.orders.findFirst({
+        where: and(eq(orders.id, id), eq(orders.userId, user.id)),
+        with: {
+          items: {
+            with: {
+              menuItem: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!order) {
-      return fail("Order not found.", 404);
-    }
+      if (!order) {
+        return fail("Order not found.", 404);
+      }
 
-    const isDev = process.env.NODE_ENV === "development";
-    if (order.status !== "CONFIRMED" && !isDev) {
-      return fail(`Payment is only allowed for orders that have been 'CONFIRMED' by the restaurant. Current status: ${order.status}`, 400);
-    }
+      const isDev = process.env.NODE_ENV === "development";
+      if (order.status !== "CONFIRMED" && !isDev) {
+        return fail(`Payment is only allowed for orders that have been 'CONFIRMED' by the restaurant. Current status: ${order.status}`, 400);
+      }
 
-    const host = (await headers()).get("host");
-    const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
-    const baseUrl = `${protocol}://${host}`;
+      const host = (await headers()).get("host");
+      const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+      const baseUrl = `${protocol}://${host}`;
 
-    // Map order items to Stripe line items
-    const lineItems = order.items.map((item) => {
-      const name = item.menuItem?.name || "Food Item";
-      const unitAmount = Math.round(parseFloat(item.price as string) * 100);
-      
-      return {
-        price_data: {
-          currency: (order.currency || "GBP").toLowerCase(),
-          product_data: {
-            name,
-            description: `Order #${order.id.slice(0, 8)}`,
+      // Map order items to Stripe line items
+      const lineItems = order.items.map((item) => {
+        const name = item.menuItem?.name || "Food Item";
+        const unitAmount = Math.round(parseFloat(item.price as string) * 100);
+        
+        return {
+          price_data: {
+            currency: (order.currency || "GBP").toLowerCase(),
+            product_data: {
+              name,
+              description: `Order #${order.id.slice(0, 8)}`,
+            },
+            unit_amount: unitAmount,
           },
-          unit_amount: unitAmount,
+          quantity: item.quantity,
+        };
+      });
+
+      // Create the session with a reasonable timeout (10 seconds)
+      const sessionPromise = stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: lineItems,
+        mode: "payment",
+        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
+        cancel_url: `${baseUrl}/checkout/cancel?order_id=${order.id}`,
+        metadata: {
+          orderId: order.id,
+          userId: user.id,
         },
-        quantity: item.quantity,
-      };
-    });
+      });
 
-    // Create the session with a reasonable timeout (10 seconds)
-    const sessionPromise = stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: lineItems,
-      mode: "payment",
-      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
-      cancel_url: `${baseUrl}/checkout/cancel?order_id=${order.id}`,
-      metadata: {
-        orderId: order.id,
-        userId: user.id,
-      },
-    });
+      // Race against a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Stripe API Timeout")), 15000)
+      );
 
-    // Race against a timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Stripe API Timeout")), 15000)
-    );
+      const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
-    const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
-
-    console.log("Stripe session created successfully:", session.id);
-    return ok({ url: session.url });
-  } catch (err: any) {
-    console.error("[api/orders/[id]/stripe/session POST] ERROR DETAIL:", err.message || err);
-    return fail(`Stripe Error: ${err.message || "Unknown error"}`, 500);
-  }
+      console.log("Stripe session created successfully:", session.id);
+      return ok({ url: session.url });
+    } catch (err: any) {
+      console.error("[api/orders/[id]/stripe/session POST] ERROR DETAIL:", err.message || err);
+      return fail(`Stripe Error: ${err.message || "Unknown error"}`, 500);
+    }
+  });
 }

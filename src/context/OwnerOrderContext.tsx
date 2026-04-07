@@ -38,16 +38,41 @@ interface OwnerOrderContextType {
 const OwnerOrderContext = createContext<OwnerOrderContextType | undefined>(undefined);
 const supabase = createClient();
 
+import { useAuthStore } from "@/store/useAuthStore";
+
 export function OwnerOrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<OwnerOrder[]>([]);
   const [ownedRestaurantIds, setOwnedRestaurantIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | undefined>();
+  const { session, isReady, user } = useAuthStore();
+  const userId = user?.id;
   const ownedRestaurantIdsRef = useRef<string[]>([]);
 
-  const fetchOrders = useCallback(async (targetOrderId?: string, isRetry = false) => {
+  const fetchOrders = useCallback(async (retryCount = 0) => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) {
+        setOrders([]);
+        setLoading(false);
+        return;
+    }
+
     try {
-      const res = await fetch(`/api/owner/orders?t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/owner/orders?t=${Date.now()}`, { 
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${currentSession.access_token}`
+        }
+      });
+      
+      if (res.status === 401) {
+        if (retryCount < 1) {
+          await new Promise(r => setTimeout(r, 500));
+          return fetchOrders(retryCount + 1);
+        }
+        setOrders([]);
+        return;
+      }
+
       const data = await res.json();
       if (data.data) {
         const fetchedOrders = data.data.orders as OwnerOrder[];
@@ -56,28 +81,18 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
           setOwnedRestaurantIds(data.data.ownedRestaurantIds);
           ownedRestaurantIdsRef.current = data.data.ownedRestaurantIds;
         }
-        if (targetOrderId && !fetchedOrders.some(o => o.id === targetOrderId) && !isRetry) {
-          setTimeout(() => fetchOrders(targetOrderId, true), 1500);
-        }
       }
     } catch (err) {
       console.error("Failed to fetch owner orders:", err);
     } finally {
-      if (!isRetry) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let heartbeatInterval: NodeJS.Timeout | null = null;
+    if (!isReady) return;
 
-    const startSession = async () => {
-      await fetchOrders();
-      if (!heartbeatInterval) {
-        heartbeatInterval = setInterval(() => {
-          fetch("/api/user/heartbeat", { method: "POST" }).catch(() => { });
-        }, 30000); // 30s heartbeat
-      }
-    };
+    let heartbeatInterval: NodeJS.Timeout | null = null;
 
     const cleanup = () => {
       if (heartbeatInterval) {
@@ -89,38 +104,51 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
       ownedRestaurantIdsRef.current = [];
     };
 
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      if (session) {
-        setUserId(session.user.id);
-        try {
-          const authRes = await fetch("/api/auth/me");
-          if (authRes.ok) {
-            const { data: userData } = await authRes.json();
-            if (userData?.role === "owner") {
-              startSession();
-            } else {
-              cleanup();
-            }
+    if (session) {
+      setLoading(true);
+      
+      // Verify role and start session
+      fetch("/api/auth/me", {
+        headers: { "Authorization": `Bearer ${session.access_token}` }
+      })
+      .then(res => res.json())
+      .then(async (data) => {
+        if (data.data?.role === "owner" || data.data?.role === "admin") {
+          await fetchOrders();
+          if (!heartbeatInterval) {
+            heartbeatInterval = setInterval(() => {
+              const s = useAuthStore.getState().session;
+              if (s) {
+                fetch("/api/user/heartbeat", { 
+                  method: "POST",
+                  headers: { "Authorization": `Bearer ${s.access_token}` }
+                }).catch(() => { });
+              }
+            }, 30000);
           }
-        } catch (err) {
-          console.error("Auth verify error:", err);
+        } else {
+          cleanup();
           setLoading(false);
         }
-      } else {
-        cleanup();
-        setUserId(undefined);
-        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
-          setLoading(false);
-        }
-      }
-    });
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+    } else {
+      cleanup();
+      setLoading(false);
+    }
 
+    return () => {
+      cleanup();
+    };
+  }, [session, isReady, fetchOrders]);
+
+  useEffect(() => {
     const handleRefresh = () => fetchOrders();
     window.addEventListener("REFRESH_ORDERS", handleRefresh);
 
     return () => {
-      authListener.unsubscribe();
-      cleanup();
       window.removeEventListener("REFRESH_ORDERS", handleRefresh);
     };
   }, [fetchOrders]);
@@ -129,9 +157,13 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
     const previousOrders = [...orders];
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch(`/api/owner/orders/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ status }),
       });
       if (!res.ok) {

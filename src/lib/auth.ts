@@ -24,11 +24,19 @@ export interface SessionUser {
  * Wrapped in React cache() so multiple layouts/pages calling this
  * within the same request share one result — no duplicate DB hits.
  */
-export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
+/**
+ * Validates the session (via JWT or Cookie), then fetches the full user
+ * record from our DB. Role and status always come from the DB.
+ */
+export async function getCurrentUser(token?: string): Promise<SessionUser | null> {
   const supabase = await createClient();
 
-  // Step 1: verify JWT is valid — proves who they are
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  // If a bearer token is provided, verify it directly.
+  // Otherwise, fall back to cookies.
+  const { data: { user: authUser } } = token 
+    ? await supabase.auth.getUser(token)
+    : await supabase.auth.getUser();
+
   if (!authUser) return null;
 
   // Step 2: fetch role + status from DB — decides what they can do
@@ -49,7 +57,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     role:   dbUser.role as UserRole,
     status: dbUser.status,
   };
-});
+}
 
 /** Redirects to /login if not authenticated. */
 export async function requireAuth(): Promise<SessionUser> {

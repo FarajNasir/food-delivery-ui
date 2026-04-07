@@ -39,18 +39,45 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 const supabase = createClient();
 
+import { useAuthStore } from "@/store/useAuthStore";
+
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { session, isReady, user } = useAuthStore();
+  const userId = user?.id;
 
   // Register FCM Token & Listener
   useFcmToken(userId);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (retryCount = 0): Promise<void> => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) {
+        setOrders([]);
+        setLoading(false);
+        return;
+    }
+
     try {
-      const res = await fetch("/api/orders", { cache: "no-store" });
+      const res = await fetch("/api/orders", { 
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${currentSession.access_token}`
+        }
+      });
+      
+      if (res.status === 401) {
+        // With Bearer tokens, 401 usually means genuinely unauthorized.
+        // We still retry once just in case the token was refreshed mid-flight.
+        if (retryCount < 1) {
+          await new Promise(r => setTimeout(r, 500));
+          return fetchOrders(retryCount + 1);
+        }
+        setOrders([]);
+        return;
+      }
+
       const data = await res.json();
       if (data.data) {
         setOrders(data.data.orders);
@@ -63,42 +90,34 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const startSession = async () => {
-      await fetchOrders();
-    };
+    if (!isReady) return;
 
-    const cleanup = () => {
+    if (session) {
+      setLoading(true);
+      
+      // Fetch role info (best-effort)
+      fetch("/api/auth/me", {
+        headers: { "Authorization": `Bearer ${session.access_token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.data?.role) setUserRole(data.data.role);
+      })
+      .catch(() => {});
+
+      fetchOrders();
+    } else {
       setOrders([]);
-    };
+      setUserRole(null);
+      setLoading(false);
+    }
+  }, [session, isReady, fetchOrders]);
 
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      if (session) {
-        setUserId(session.user.id);
-        try {
-          const authRes = await fetch("/api/auth/me");
-          if (authRes.ok) {
-            const { data: userData } = await authRes.json();
-            setUserRole(userData?.role);
-          }
-        } catch (err) {}
-        startSession();
-      } else {
-        cleanup();
-        setUserRole(null);
-        setUserId(undefined);
-        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
-          setLoading(false);
-        }
-      }
-    });
-
-    // Listen for custom refresh events from FCM hook
+  useEffect(() => {
     const handleRefresh = () => fetchOrders();
     window.addEventListener("REFRESH_ORDERS", handleRefresh);
 
     return () => {
-      authListener.unsubscribe();
-      cleanup();
       window.removeEventListener("REFRESH_ORDERS", handleRefresh);
     };
   }, [fetchOrders]);
