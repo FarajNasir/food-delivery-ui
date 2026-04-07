@@ -20,7 +20,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function CheckoutView() {
-  const { cartItems, totalPrice, totalItems, clearCart, refreshCart } = useCart();
+  const { cartItems, totalPrice, totalItems, clearCart } = useCart();
   const { refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
@@ -48,7 +48,6 @@ export default function CheckoutView() {
       if (res.ok) {
         toast.success("Order placed successfully!");
         clearCart();
-        refreshCart();
         await refreshOrders();
         // Redirect to the first order ID created (or the general status list)
         const firstOrder = data.data.orders[0];

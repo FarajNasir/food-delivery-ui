@@ -72,45 +72,25 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     };
 
     const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
-        if (session) {
-          setUserId(session.user.id);
-          try {
-            const authRes = await fetch("/api/auth/me");
-            if (authRes.ok) {
-              const { data: userData } = await authRes.json();
-              setUserRole(userData?.role);
-            }
-          } catch (err) {}
-          startSession();
-        }
-      } else if (event === "SIGNED_OUT") {
-        cleanup();
-        setUserRole(null);
-        setUserId(undefined);
-      }
-    });
-
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
+      if (session) {
+        setUserId(session.user.id);
         try {
           const authRes = await fetch("/api/auth/me");
           if (authRes.ok) {
             const { data: userData } = await authRes.json();
             setUserRole(userData?.role);
           }
-        } catch (err) {
-          // Fallback to null
-        }
+        } catch (err) {}
         startSession();
       } else {
-        setLoading(false);
+        cleanup();
+        setUserRole(null);
+        setUserId(undefined);
+        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+          setLoading(false);
+        }
       }
-    };
-
-    init();
+    });
 
     // Listen for custom refresh events from FCM hook
     const handleRefresh = () => fetchOrders();

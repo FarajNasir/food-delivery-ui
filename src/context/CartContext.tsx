@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export interface CartItem {
   id: string;
@@ -25,7 +26,6 @@ interface CartContextType {
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -48,16 +48,7 @@ function saveGuestCart(items: CartItem[]) {
   } catch {}
 }
 
-// ── Check if user is logged in ───────────────────────────────
-async function checkIsLoggedIn(): Promise<boolean> {
-  try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return !!user;
-  } catch {
-    return false;
-  }
-}
+// Removed checkIsLoggedIn to prevent Supabase lock conflicts. Use session from onAuthStateChange instead.
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -95,12 +86,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Init: determine guest vs. logged-in ─────────────────────
-  const refreshCart = useCallback(async () => {
-    setLoading(true);
-    try {
-      const loggedIn = await checkIsLoggedIn();
-      
-      if (loggedIn) {
+  // Removed refreshCart to prevent Supabase lock conflicts. Auth is now handled by onAuthStateChange.
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Listen for auth changes (login/logout) to refresh cart state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
+      setLoading(true);
+      if (session) {
         setIsGuest(false);
         // Sync any leftover guest cart into DB first
         await syncGuestCartToDB();
@@ -108,44 +102,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       } else {
         setIsGuest(true);
         setCartItems(loadGuestCart());
+        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+            setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Error refreshing cart:", error);
-      setIsGuest(true);
-      setCartItems(loadGuestCart());
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchDBCart, syncGuestCartToDB]);
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    // Initial sync
-    refreshCart();
-
-    // Listen for auth changes (login/logout) to refresh cart state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any) => {
-      if (event === "SIGNED_OUT") {
-        setIsGuest(true);
-        setCartItems(loadGuestCart());
-      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        await refreshCart();
-      }
+      
+      // Ensure loading is off if we didn't hit the SIGNED_OUT/INITIAL_SESSION paths (e.g. on SIGNED_IN)
+      // fetchDBCart handles its own setLoading(false) via finally block in some contexts, 
+      // but here we should be explicit.
+      if (session) setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [refreshCart]);
+  }, [fetchDBCart, syncGuestCartToDB]);
 
   // ── Add item ─────────────────────────────────────────────────
   const addItem = async (item: Omit<CartItem, "id" | "quantity">) => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Defensive check: if no verified user, always act as guest
-    if (isGuest || !user) {
+    // If we are currently a guest, use localStorage
+    if (isGuest) {
       // Guest: pure localStorage
       const current = loadGuestCart();
       const existingIdx = current.findIndex(i => i.menuItemId === item.menuItemId);
@@ -157,9 +133,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       saveGuestCart(current);
       setCartItems([...current]);
       toast.success(`'${item.name}' added to cart`);
-      
-      // If we thought we weren't a guest but getUser failed, sync state now
-      if (!isGuest && !user) setIsGuest(true);
       return;
     }
 
@@ -192,20 +165,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const updateQuantity = async (menuItemId: string, quantity: number) => {
     if (quantity < 0) return;
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Defensive check: if no verified user, always act as guest
-    if (isGuest || !user) {
+    // If guest mode
+    if (isGuest) {
       const current = loadGuestCart()
         .map(i => i.menuItemId === menuItemId ? { ...i, quantity } : i)
         .filter(i => i.quantity > 0);
       saveGuestCart(current);
       setCartItems(current);
       if (quantity === 0) toast.info("Item removed from cart");
-      
-      // Sync state if it was stale
-      if (!isGuest && !user) setIsGuest(true);
       return;
     }
 
@@ -269,7 +236,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       updateQuantity,
       clearCart,
-      refreshCart,
     }}>
       {children}
     </CartContext.Provider>

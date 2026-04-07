@@ -8,6 +8,9 @@ import {
   Package, Truck, AlertCircle, Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const STATUS_CONFIG: Record<
   string,
@@ -68,6 +71,43 @@ export default function CustomerOrdersPage() {
   const { orders, loading, updateOrderStatus } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
+  const router = useRouter();
+  const [isPaying, setIsPaying] = React.useState<string | null>(null);
+
+  const handlePayment = async (orderId: string) => {
+    try {
+      setIsPaying(orderId);
+      const res = await fetch(`/api/orders/${orderId}/stripe/session`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      
+      const sessionUrl = data.url || data.data?.url;
+
+      if (sessionUrl) {
+        window.location.href = sessionUrl;
+      } else {
+        toast.error(data.message || data.error || "Failed to initialize payment session");
+      }
+    } catch (err) {
+      console.error("[handlePayment]", err);
+      toast.error("A network error occurred. Please try again.");
+    } finally {
+      setIsPaying(null);
+    }
+  };
+
+  const handleMockPayment = async (orderId: string) => {
+    try {
+      setIsPaying(orderId);
+      await updateOrderStatus(orderId, "PAID", "pi_mock_" + Date.now());
+      toast.success("Mock Payment successful! (Dev Only)");
+    } catch (err) {
+      toast.error("Mock payment failed");
+    } finally {
+      setIsPaying(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -188,30 +228,54 @@ export default function CustomerOrdersPage() {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-3">
-                    {order.status === "CONFIRMED" && (
-                      <button
-                        onClick={() =>
-                          updateOrderStatus(order.id, "PAID", "pi_mock_" + Date.now())
-                        }
-                        className="w-full py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0"
-                        style={{
-                          background: `linear-gradient(135deg, ${gradientFrom}, ${accent})`,
-                        }}
-                      >
-                        Complete Secure Payment
-                      </button>
+                    {(order.status === "CONFIRMED" || (process.env.NODE_ENV === "development" && order.status === "PENDING_CONFIRMATION")) && (
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handlePayment(order.id)}
+                          disabled={!!isPaying}
+                          className="w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 disabled:opacity-50"
+                          style={{
+                            background: `linear-gradient(135deg, ${gradientFrom}, ${accent})`,
+                          }}
+                        >
+                          {isPaying === order.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CreditCard className="w-4 h-4" />
+                          )}
+                          {isPaying === order.id ? "Initializing..." : "Complete Secure Payment"}
+                        </button>
+                        
+                        {process.env.NODE_ENV === "development" && (
+                          <button
+                            onClick={() => handleMockPayment(order.id)}
+                            disabled={!!isPaying}
+                            className="w-full text-[10px] font-black uppercase tracking-widest text-blue-500 hover:underline transition-all py-1"
+                          >
+                            [ DEV ONLY: SKIP TO PAID STATUS ]
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     {order.status === "PAID" && (
-                      <div className="flex items-center justify-center gap-3 py-3 bg-blue-50/50 rounded-xl border border-blue-100/50">
-                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                          <CheckCircle2 className="w-3 h-3 text-white" />
+                      <div className="flex items-center justify-center gap-3 py-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-xs font-bold text-blue-700 uppercase tracking-widest">
+                        <span className="text-xs font-black text-blue-700 uppercase tracking-widest">
                           Payment Confirmed
                         </span>
                       </div>
                     )}
+
+                    {/* View Details Link */}
+                    <button 
+                      onClick={() => router.push(`/dashboard/customer/status/${order.id}`)}
+                      className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors py-2"
+                    >
+                      View Real-time Tracking →
+                    </button>
                   </div>
                 </div>
               </div>

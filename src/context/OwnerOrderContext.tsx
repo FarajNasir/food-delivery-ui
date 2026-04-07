@@ -74,7 +74,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
       await fetchOrders();
       if (!heartbeatInterval) {
         heartbeatInterval = setInterval(() => {
-          fetch("/api/user/heartbeat", { method: "POST" }).catch(() => {});
+          fetch("/api/user/heartbeat", { method: "POST" }).catch(() => { });
         }, 30000); // 30s heartbeat
       }
     };
@@ -90,33 +90,8 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
     };
 
     const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
-        if (session) {
-          setUserId(session.user.id);
-          try {
-            const authRes = await fetch("/api/auth/me");
-            if (authRes.ok) {
-              const { data: userData } = await authRes.json();
-              if (userData?.role === "owner") {
-                startSession();
-              } else {
-                cleanup();
-              }
-            }
-          } catch (err) {
-            console.error("Auth verify error:", err);
-          }
-        }
-      } else if (event === "SIGNED_OUT") {
-        cleanup();
-        setUserId(undefined);
-      }
-    });
-
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
+      if (session) {
+        setUserId(session.user.id);
         try {
           const authRes = await fetch("/api/auth/me");
           if (authRes.ok) {
@@ -124,20 +99,21 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
             if (userData?.role === "owner") {
               startSession();
             } else {
-              setLoading(false);
+              cleanup();
             }
-          } else {
-            setLoading(false);
           }
         } catch (err) {
+          console.error("Auth verify error:", err);
           setLoading(false);
         }
       } else {
-        setLoading(false);
+        cleanup();
+        setUserId(undefined);
+        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+          setLoading(false);
+        }
       }
-    };
-
-    init();
+    });
 
     const handleRefresh = () => fetchOrders();
     window.addEventListener("REFRESH_ORDERS", handleRefresh);
