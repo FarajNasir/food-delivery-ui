@@ -12,7 +12,7 @@ import { toast } from "sonner";
 export default function CustomerCart() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
-  const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading, isGuest, refreshCart } = useCart();
+  const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading, isGuest } = useCart();
   const [checkingOut, setCheckingOut] = React.useState(false);
   const router = useRouter();
 
@@ -27,8 +27,8 @@ export default function CustomerCart() {
   }, [cartItems]);
 
   useEffect(() => {
-    refreshCart();
-  }, [refreshCart]);
+    // refreshCart removed
+  }, []);
 
   const handleCheckout = () => {
     router.push("/dashboard/customer/checkout");

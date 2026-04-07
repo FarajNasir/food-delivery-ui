@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export interface CartItem {
   id: string;
@@ -24,7 +26,6 @@ interface CartContextType {
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -47,81 +48,99 @@ function saveGuestCart(items: CartItem[]) {
   } catch {}
 }
 
-// ── Check if user is logged in ───────────────────────────────
-async function checkIsLoggedIn(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/auth/me");
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+// Removed checkIsLoggedIn to prevent Supabase lock conflicts. Use session from onAuthStateChange instead.
+
+import { useAuthStore } from "@/store/useAuthStore";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGuest, setIsGuest] = useState(true);
+  const { session, isReady } = useAuthStore();
+  const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
-  const fetchDBCart = useCallback(async () => {
+  const fetchDBCart = useCallback(async (retryCount = 0) => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) {
+        setCartItems(loadGuestCart());
+        setLoading(false);
+        return;
+    }
+
     try {
-      const res = await fetch("/api/cart");
+      const res = await fetch("/api/cart", { 
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${currentSession.access_token}`
+        }
+      });
+      
+      if (res.status === 401) {
+        if (retryCount < 1) {
+          await new Promise(r => setTimeout(r, 500));
+          return fetchDBCart(retryCount + 1);
+        }
+        setCartItems(loadGuestCart());
+        return;
+      }
+
       const data = await res.json();
       if (data.data) {
         setCartItems(data.data.items);
       }
     } catch (err) {
       console.error("Failed to fetch cart:", err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   // ── Sync guest cart → DB on first login ─────────────────────
   const syncGuestCartToDB = useCallback(async () => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) return;
+
     const guestItems = loadGuestCart();
     if (guestItems.length === 0) return;
 
     try {
-      await fetch("/api/cart/sync", {
+      const res = await fetch("/api/cart/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentSession.access_token}`
+        },
         body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
       });
-      localStorage.removeItem(GUEST_CART_KEY);
+      
+      if (res.ok) {
+        localStorage.removeItem(GUEST_CART_KEY);
+      }
     } catch (err) {
       console.error("Failed to sync guest cart:", err);
     }
   }, []);
 
-  // ── Init: determine guest vs. logged-in ─────────────────────
-  const refreshCart = useCallback(async () => {
-    setLoading(true);
-    try {
-      const loggedIn = await checkIsLoggedIn();
-      
-      if (loggedIn) {
-        setIsGuest(false);
-        // Sync any leftover guest cart into DB first
-        await syncGuestCartToDB();
-        await fetchDBCart();
-      } else {
-        setIsGuest(true);
-        setCartItems(loadGuestCart());
-      }
-    } catch (error) {
-      console.error("Error refreshing cart:", error);
-      setIsGuest(true);
-      setCartItems(loadGuestCart());
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchDBCart, syncGuestCartToDB]);
-
   useEffect(() => {
-    refreshCart();
-  }, [refreshCart]);
+    if (!isReady) return;
+
+    const initCart = async () => {
+        setLoading(true);
+        if (session) {
+            await syncGuestCartToDB();
+            await fetchDBCart();
+        } else {
+            setCartItems(loadGuestCart());
+            setLoading(false);
+        }
+    };
+
+    initCart();
+  }, [session, isReady, fetchDBCart, syncGuestCartToDB]);
 
   // ── Add item ─────────────────────────────────────────────────
   const addItem = async (item: Omit<CartItem, "id" | "quantity">) => {
+    // If we are currently a guest, use localStorage
     if (isGuest) {
       // Guest: pure localStorage
       const current = loadGuestCart();
@@ -148,9 +167,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItems(newItems);
 
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch("/api/cart", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ menuItemId: item.menuItemId, quantity: 1 }),
       });
       if (!res.ok) throw new Error();
@@ -166,6 +189,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const updateQuantity = async (menuItemId: string, quantity: number) => {
     if (quantity < 0) return;
 
+    // If guest mode
     if (isGuest) {
       const current = loadGuestCart()
         .map(i => i.menuItemId === menuItemId ? { ...i, quantity } : i)
@@ -183,9 +207,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItems(newItems);
 
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch(`/api/cart/${menuItemId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ quantity }),
       });
       if (!res.ok) throw new Error();
@@ -213,7 +241,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const backup = [...cartItems];
     setCartItems([]);
     try {
-      const res = await fetch("/api/cart/clear", { method: "POST" });
+      const currentSession = useAuthStore.getState().session;
+      const res = await fetch("/api/cart/clear", { 
+        method: "POST",
+        headers: {
+            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        }
+      });
       if (!res.ok) throw new Error();
       toast.success("Order cleared");
     } catch {
@@ -236,7 +270,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       updateQuantity,
       clearCart,
-      refreshCart,
     }}>
       {children}
     </CartContext.Provider>

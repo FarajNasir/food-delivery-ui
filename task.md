@@ -73,6 +73,17 @@ Use this file to track **what was done**, **whatâ€™s in progress**, and **whatâ€
 | Owner Dashboard | Done | Professional UI cleanup: removed redundant sections, improved settings & hours |
 | Live Order Desk | Done | Added Live Order Management for Owner (Live, History, and Rejections) |
 
+###2026-04-06 (monday)
+
+| Area | Status | Notes |
+|------|--------|--------|
+ owner ui | done  | 
+ menu settings  | done  | 
+| Firebase | Done | Firebase setup for push notifications |
+| Notifications | Done | Real-time status updates and rejection notifications for users |
+| Heartbeat | Done | Heartbeat monitoring for user sessions |
+
+
 ---
 
 ## Upcoming / backlog

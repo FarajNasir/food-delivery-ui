@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { useFcmToken } from "@/hooks/useFcmToken";
 
 export interface Order {
   id: string;
@@ -37,13 +39,45 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 const supabase = createClient();
 
+import { useAuthStore } from "@/store/useAuthStore";
+
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const { session, isReady, user } = useAuthStore();
+  const userId = user?.id;
 
-  const fetchOrders = useCallback(async () => {
+  // Register FCM Token & Listener
+  useFcmToken(userId);
+
+  const fetchOrders = useCallback(async (retryCount = 0): Promise<void> => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) {
+        setOrders([]);
+        setLoading(false);
+        return;
+    }
+
     try {
-      const res = await fetch("/api/orders", { cache: "no-store" });
+      const res = await fetch("/api/orders", { 
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${currentSession.access_token}`
+        }
+      });
+      
+      if (res.status === 401) {
+        // With Bearer tokens, 401 usually means genuinely unauthorized.
+        // We still retry once just in case the token was refreshed mid-flight.
+        if (retryCount < 1) {
+          await new Promise(r => setTimeout(r, 500));
+          return fetchOrders(retryCount + 1);
+        }
+        setOrders([]);
+        return;
+      }
+
       const data = await res.json();
       if (data.data) {
         setOrders(data.data.orders);
@@ -56,56 +90,41 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    if (!isReady) return;
 
-    // ── Supabase Realtime Subscription ──────────────────────────
-    const channel = supabase
-      .channel("orders_realtime_customer")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload: { eventType: string; new: Order; }) => {
-          console.log("🔔 Realtime update received:", payload);
-          
-          if (payload.eventType === "INSERT") {
-            const newOrder = payload.new as Order;
-            setOrders((prev) => {
-              if (prev.find(o => o.id === newOrder.id)) return prev;
-              return [newOrder, ...prev];
-            });
-          } 
-          else if (payload.eventType === "UPDATE") {
-            const updatedOrder = payload.new as Order;
-            setOrders((prev) => 
-              prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
-            );
-            
-            // Check for status specific toasts
-            if (updatedOrder.status === "CONFIRMED") {
-              toast.success("Restaurant confirmed your order!", { icon: "✅" });
-            } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-              toast.info("Your food is on the way!", { icon: "🛵" });
-            }
-          }
-        }
-      )
-      .subscribe((status: string) => {
-        console.log("📡 Realtime subscription status:", status);
-        if (status === "CHANNEL_ERROR") {
-          console.error("❌ Realtime connection failed. Checking replication settings might be needed.");
-        }
-      });
+    if (session) {
+      setLoading(true);
+      
+      // Fetch role info (best-effort)
+      fetch("/api/auth/me", {
+        headers: { "Authorization": `Bearer ${session.access_token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.data?.role) setUserRole(data.data.role);
+      })
+      .catch(() => {});
+
+      fetchOrders();
+    } else {
+      setOrders([]);
+      setUserRole(null);
+      setLoading(false);
+    }
+  }, [session, isReady, fetchOrders]);
+
+  useEffect(() => {
+    const handleRefresh = () => fetchOrders();
+    window.addEventListener("REFRESH_ORDERS", handleRefresh);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("REFRESH_ORDERS", handleRefresh);
     };
   }, [fetchOrders]);
 
   const updateOrderStatus = async (id: string, status: string, paymentIntentId?: string) => {
-    // 1. Store previous state for rollback
     const previousOrders = [...orders];
 
-    // 2. Optimistically update local state
     setOrders((prev) => 
       prev.map((o) => (o.id === id ? { ...o, status, paymentIntentId } : o))
     );
@@ -120,15 +139,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
 
       if (!res.ok) {
-        // Rollback on failure
         setOrders(previousOrders);
         toast.error(data.message || "Failed to update order status");
         return;
       }
-      
-      // Realtime will handle the sync, but we already updated optimistically
     } catch (err) {
-      // Rollback on network error
       setOrders(previousOrders);
       toast.error("Network error: Failed to update order status");
     }

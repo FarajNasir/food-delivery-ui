@@ -4,18 +4,20 @@ import React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
-import { 
-  Clock, 
-  CheckCircle2, 
-  Package, 
-  Truck, 
-  ChevronLeft, 
+import {
+  Clock,
+  CheckCircle2,
+  Package,
+  Truck,
+  ChevronLeft,
   ShoppingBag,
   Store,
   CreditCard,
   AlertCircle
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; description: string; step: number }> = {
   PENDING_CONFIRMATION: {
@@ -74,14 +76,41 @@ export default function OrderStatusPage() {
   const { orders, loading, updateOrderStatus } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
-  
+  const [isPaying, setIsPaying] = React.useState(false);
+
+  const handlePayment = async () => {
+    if (!order) return;
+
+    try {
+      setIsPaying(true);
+      const res = await fetch(`/api/orders/${order.id}/stripe/session`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      const sessionUrl = data.url || data.data?.url;
+
+      if (sessionUrl) {
+        window.location.href = sessionUrl;
+      } else {
+        toast.error(data.message || data.error || "Failed to initialize payment session");
+      }
+    } catch (err) {
+      console.error("[handlePayment]", err);
+      toast.error("A network error occurred. Please try again.");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+
   const order = orders.find(o => o.id === id);
   const config = order ? (STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING_CONFIRMATION) : null;
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50/30 font-black text-gray-400 uppercase tracking-widest text-xs">
-         Locating Order...
+        Locating Order...
       </div>
     );
   }
@@ -104,7 +133,7 @@ export default function OrderStatusPage() {
   return (
     <div className="max-w-4xl mx-auto py-10 px-4 space-y-10">
       <div className="flex items-center gap-6">
-        <Link 
+        <Link
           href="/dashboard/customer/orders"
           className="w-12 h-12 rounded-full border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all active:scale-95"
         >
@@ -121,117 +150,126 @@ export default function OrderStatusPage() {
       <div className="grid lg:grid-cols-3 gap-10">
         {/* Progress Tracker */}
         <div className="lg:col-span-2 space-y-10">
-          
+
           <div className="bg-white rounded-[3rem] p-10 border border-gray-100 shadow-sm relative overflow-hidden">
-             {/* Large status icon in bg */}
-             <div 
-               className="absolute top-0 right-0 w-64 h-64 -mr-32 -mt-32 rounded-full blur-[100px] opacity-10"
-               style={{ backgroundColor: config?.color }}
-             />
+            {/* Large status icon in bg */}
+            <div
+              className="absolute top-0 right-0 w-64 h-64 -mr-32 -mt-32 rounded-full blur-[100px] opacity-10"
+              style={{ backgroundColor: config?.color }}
+            />
 
-             <div className="space-y-10 relative">
-               <div className="flex flex-col items-center text-center space-y-6">
-                 <div 
-                   className="w-24 h-24 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500 animate-in fade-in zoom-in"
-                   style={{ backgroundColor: `${config?.color}15`, border: `2px solid ${config?.color}30` }}
-                 >
-                   {config && <config.icon className="w-12 h-12" style={{ color: config.color }} />}
-                 </div>
-                 
-                 <div>
-                   <h2 className="text-2xl font-black text-gray-00 mb-2">{config?.label}</h2>
-                   <p className="text-sm font-medium text-gray-400 max-w-md">{config?.description}</p>
-                 </div>
-               </div>
+            <div className="space-y-10 relative">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div
+                  className="w-24 h-24 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500 animate-in fade-in zoom-in"
+                  style={{ backgroundColor: `${config?.color}15`, border: `2px solid ${config?.color}30` }}
+                >
+                  {config && <config.icon className="w-12 h-12" style={{ color: config.color }} />}
+                </div>
 
-               {/* Simple Step Bar */}
-               <div className="flex justify-between items-center px-4">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <div 
-                      key={s} 
-                      className={`h-2 flex-1 mx-1 rounded-full transition-all duration-500 ${
-                        s <= (config?.step || 0) ? 'shadow-sm' : 'bg-gray-50 opacity-50'
+                <div>
+                  <h2 className="text-2xl font-black text-gray-00 mb-2">{config?.label}</h2>
+                  <p className="text-sm font-medium text-gray-400 max-w-md">{config?.description}</p>
+                </div>
+              </div>
+
+              {/* Simple Step Bar */}
+              <div className="flex justify-between items-center px-4">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <div
+                    key={s}
+                    className={`h-2 flex-1 mx-1 rounded-full transition-all duration-500 ${s <= (config?.step || 0) ? 'shadow-sm' : 'bg-gray-50 opacity-50'
                       }`}
-                      style={{ 
-                        backgroundColor: s <= (config?.step || 0) ? config?.color : undefined
-                      }}
-                    />
-                  ))}
-               </div>
+                    style={{
+                      backgroundColor: s <= (config?.step || 0) ? config?.color : undefined
+                    }}
+                  />
+                ))}
+              </div>
 
-               {/* Action: Payment */}
-               {order.status === "CONFIRMED" && (
-                 <div className="flex flex-col items-center pt-6 animate-bounce">
-                    <button
-                      onClick={() => updateOrderStatus(order.id, "PAID", "pi_mock_" + Date.now())}
-                      className="px-10 py-5 rounded-[1.5rem] text-white font-black text-[10px] uppercase tracking-widest shadow-2xl transition-all"
-                      style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
-                    >
-                      Process Payment for £{parseFloat(order.totalAmount).toFixed(2)}
-                    </button>
-                 </div>
-               )}
-             </div>
+              {/* Action: Payment (Visible ONLY if CONFIRMED) */}
+              {(order.status === "CONFIRMED") && (
+                <div className="flex flex-col items-center pt-6 animate-bounce">
+                  <button
+                    onClick={handlePayment}
+                    disabled={isPaying}
+                    className="px-10 py-5 rounded-[1.5rem] text-white font-black text-[10px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+                    style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                  >
+                    {isPaying ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    )}
+                    {isPaying ? "Wait..." : `Pay £${parseFloat(order.totalAmount).toFixed(2)} Now`}
+                  </button>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">
+                    Secure Payment via Stripe
+                  </p>
+
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Details */}
           <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-6">
-             <h3 className="text-sm font-black uppercase tracking-widest text-gray-400">Order Details</h3>
-             <div className="space-y-4">
-                <div className="flex items-center gap-4 py-2 border-b border-gray-50">
-                   <Store className="w-5 h-5 text-gray-300" />
-                   <div>
-                      <p className="text-sm font-black text-gray-900">{order.restaurant?.name || "Restaurant"}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Preparation Venue</p>
-                   </div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-gray-400">Order Details</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 py-2 border-b border-gray-50">
+                <Store className="w-5 h-5 text-gray-300" />
+                <div>
+                  <p className="text-sm font-black text-gray-900">{order.restaurant?.name || "Restaurant"}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Preparation Venue</p>
                 </div>
-                
-                <div className="space-y-4">
-                   <div className="bg-gray-50/50 rounded-2xl p-6 space-y-3">
-                      {order.items?.map((item: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center text-sm">
-                           <span className="font-bold text-gray-700">
-                             <span className="text-xs opacity-50 mr-2">{item.quantity}x</span>
-                             {item.menuItem?.name}
-                           </span>
-                           <span className="text-xs font-black text-gray-400">£{parseFloat(item.price).toFixed(2)}</span>
-                        </div>
-                      ))}
-                      <div className="h-px bg-gray-100 my-2" />
-                      <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Subtotal</span>
-                         <span className="text-xl font-black text-gray-900">£{parseFloat(order.totalAmount).toFixed(2)}</span>
-                      </div>
-                   </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-gray-50/50 rounded-2xl p-6 space-y-3">
+                  {order.items?.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <span className="font-bold text-gray-700">
+                        <span className="text-xs opacity-50 mr-2">{item.quantity}x</span>
+                        {item.menuItem?.name}
+                      </span>
+                      <span className="text-xs font-black text-gray-400">£{parseFloat(item.price).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="h-px bg-gray-100 my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Subtotal</span>
+                    <span className="text-xl font-black text-gray-900">£{parseFloat(order.totalAmount).toFixed(2)}</span>
+                  </div>
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Support Sidebar / Helper */}
         <div className="space-y-6">
-           <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                 <ShoppingBag className="w-6 h-6 text-white" />
-              </div>
-              <div className="space-y-2">
-                 <h3 className="text-lg font-black">Help & Support</h3>
-                 <p className="text-xs font-medium text-white/50 leading-relaxed">
-                   Something wrong with your order? Our support team is here 24/7.
-                 </p>
-              </div>
-              <button className="w-full py-4 bg-white text-gray-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all">
-                Chat with Support
-              </button>
-           </div>
-           
-           <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm text-center space-y-4">
-              <Clock className="w-8 h-8 text-gray-200 mx-auto" />
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                Estimated Delivery<br/>
-                <span className="text-gray-900 text-lg">25 - 40 Mins</span>
+          <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+              <ShoppingBag className="w-6 h-6 text-white" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-black">Help & Support</h3>
+              <p className="text-xs font-medium text-white/50 leading-relaxed">
+                Something wrong with your order? Our support team is here 24/7.
               </p>
-           </div>
+            </div>
+            <button className="w-full py-4 bg-white text-gray-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all">
+              Chat with Support
+            </button>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm text-center space-y-4">
+            <Clock className="w-8 h-8 text-gray-200 mx-auto" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Estimated Delivery<br />
+              <span className="text-gray-900 text-lg">25 - 40 Mins</span>
+            </p>
+          </div>
         </div>
       </div>
     </div>

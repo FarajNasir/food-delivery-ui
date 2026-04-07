@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   phone:     varchar("phone", { length: 30  }).notNull(),
   status:    userStatusEnum("status").default("active").notNull(),
   role:      userRoleEnum("role").default("customer").notNull(),
+  lastActive: timestamp("last_active"),
+  fcmToken:   varchar("fcm_token", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
