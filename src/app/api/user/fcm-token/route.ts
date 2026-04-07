@@ -7,9 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "FCM token required" }, { status: 400 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     await db
       .update(users)
