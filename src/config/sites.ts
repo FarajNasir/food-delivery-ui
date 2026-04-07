@@ -33,6 +33,11 @@ export interface SiteConfig {
     minutes: string;
   };
   contact: ContactInfo;
+  coordinates?: { lat: number; lng: number };
+  deliveryPricing?: {
+    type: "fixed_areas" | "distance_slabs" | "standard";
+    rules: any;
+  };
 }
 
 export const SITES: Record<SiteKey, SiteConfig> = {
@@ -70,6 +75,19 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       notice:
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Newcastle Eats' for assistance. Our support team is available via Messenger.",
     },
+    coordinates: { lat: 54.2104, lng: -5.8916 },
+    deliveryPricing: {
+      type: "fixed_areas",
+      rules: [
+        { name: "Newcastle", fee: 5.0 },
+        { name: "Bryansford / Maghera", fee: 6.0 },
+        { name: "Dundrum / Castlewellan", fee: 7.0 },
+        { name: "Annsborough", fee: 8.0 },
+        { name: "Clough", fee: 9.0 },
+        { name: "Annalong / Kilcoo", fee: 10.0 },
+        { name: "Ballykilner", fee: 11.0 },
+      ],
+    },
   },
   kilkeeleats: {
     key: "kilkeeleats",
@@ -105,6 +123,10 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       notice:
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Kilkeel Eats' for assistance. Our support team is available via Messenger.",
     },
+    deliveryPricing: {
+      type: "standard",
+      rules: { standardFee: 3.5 },
+    },
   },
   downpatrickeats: {
     key: "downpatrickeats",
@@ -139,6 +161,20 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       instagram: { label: "downpatrickeats", handle: "downpatrickeats" },
       notice:
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Downpatrick Eats' for assistance. Our support team is available via Messenger.",
+    },
+    coordinates: { lat: 54.3235, lng: -5.7107 },
+    deliveryPricing: {
+      type: "distance_slabs",
+      rules: [
+        { maxMiles: 2, fee: 4.0 },
+        { maxMiles: 3, fee: 4.5 },
+        { maxMiles: 4, fee: 5.0 },
+        { maxMiles: 5, fee: 6.0 },
+        { maxMiles: 6, fee: 7.0 },
+        { maxMiles: 7, fee: 7.5 },
+        { maxMiles: 8, fee: 8.0 },
+        { maxMiles: 999, fee: 8.5 },
+      ],
     },
   },
 };

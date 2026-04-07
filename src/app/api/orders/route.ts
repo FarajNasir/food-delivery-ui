@@ -40,6 +40,14 @@ export async function POST(req: Request) {
 
     const createdOrders = [];
 
+    const { 
+      deliveryAddress, 
+      deliveryArea, 
+      deliveryFee, 
+      distanceMiles,
+      customerPhone
+    } = await req.json().catch(() => ({}));
+
     for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
       const totalAmount = items.reduce((sum, item) => {
         return sum + (parseFloat(item.price as string) * item.quantity);
@@ -49,6 +57,11 @@ export async function POST(req: Request) {
         userId: user.id,
         restaurantId,
         totalAmount: totalAmount.toFixed(2),
+        deliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+        deliveryAddress,
+        deliveryArea,
+        distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
+        customerPhone,
         status: "PENDING_CONFIRMATION",
       }).returning();
 
