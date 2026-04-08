@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 import { 
   ShoppingBag, 
@@ -113,9 +114,13 @@ export default function CheckoutView() {
 
     try {
       setIsPlacingOrder(true);
+      const session = useAuthStore.getState().session;
       const res = await fetch("/api/orders", { 
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": session ? `Bearer ${session.access_token}` : ""
+        },
         body: JSON.stringify({
           deliveryAddress: address,
           deliveryArea: deliveryArea,

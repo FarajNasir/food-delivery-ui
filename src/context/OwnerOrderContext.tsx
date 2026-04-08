@@ -48,42 +48,58 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
   const userId = user?.id;
   const ownedRestaurantIdsRef = useRef<string[]>([]);
 
-  const fetchOrders = useCallback(async (retryCount = 0) => {
-    const currentSession = useAuthStore.getState().session;
-    if (!currentSession) {
+  const fetchOrders = useCallback(async (tokenOverride?: string, retryCount = 0) => {
+    const sessionToUse = tokenOverride 
+      ? { access_token: tokenOverride } 
+      : useAuthStore.getState().session;
+
+    if (!sessionToUse?.access_token) {
+        console.log("[OwnerOrderContext] No session available for fetching owner orders.");
         setOrders([]);
         setLoading(false);
         return;
     }
 
+    console.log(`[OwnerOrderContext] Fetching owner orders (retry: ${retryCount})...`);
+
     try {
       const res = await fetch(`/api/owner/orders?t=${Date.now()}`, { 
         cache: "no-store",
         headers: {
-            "Authorization": `Bearer ${currentSession.access_token}`
+            "Authorization": `Bearer ${sessionToUse.access_token}`
         }
       });
       
       if (res.status === 401) {
+        console.warn(`[OwnerOrderContext] 401 Unauthorized received (retry: ${retryCount})`);
         if (retryCount < 1) {
           await new Promise(r => setTimeout(r, 500));
-          return fetchOrders(retryCount + 1);
+          return fetchOrders(tokenOverride, retryCount + 1);
         }
-        setOrders([]);
+        
+        console.warn("[OwnerOrderContext] Session unauthorized after retry. Stopping fetch.");
         return;
       }
 
       const data = await res.json();
-      if (data.data) {
-        const fetchedOrders = data.data.orders as OwnerOrder[];
-        setOrders(fetchedOrders);
-        if (data.data.ownedRestaurantIds) {
-          setOwnedRestaurantIds(data.data.ownedRestaurantIds);
-          ownedRestaurantIdsRef.current = data.data.ownedRestaurantIds;
+      const fetchedOrders = data.data?.orders || (Array.isArray(data.data) ? data.data : null);
+
+      if (Array.isArray(fetchedOrders)) {
+        console.log(`[OwnerOrderContext] Successfully fetched ${fetchedOrders.length} orders.`);
+        setOrders(fetchedOrders as OwnerOrder[]);
+        
+        // Handle metadata
+        const restaurantIds = data.data?.ownedRestaurantIds || [];
+        if (restaurantIds.length > 0) {
+          setOwnedRestaurantIds(restaurantIds);
+          ownedRestaurantIdsRef.current = restaurantIds;
         }
+      } else {
+        console.warn("[OwnerOrderContext] No valid orders array found in response:", data);
+        if (data.success) setOrders([]);
       }
     } catch (err) {
-      console.error("Failed to fetch owner orders:", err);
+      console.error("[OwnerOrderContext] Failed to fetch owner orders:", err);
     } finally {
       setLoading(false);
     }
@@ -105,6 +121,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
     };
 
     if (session) {
+      console.log("[OwnerOrderContext] Auth detected, initiating fetch sequence...");
       setLoading(true);
       
       // Verify role and start session
@@ -114,7 +131,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
       .then(res => res.json())
       .then(async (data) => {
         if (data.data?.role === "owner" || data.data?.role === "admin") {
-          await fetchOrders();
+          await fetchOrders(session.access_token);
           if (!heartbeatInterval) {
             heartbeatInterval = setInterval(() => {
               const s = useAuthStore.getState().session;
@@ -127,6 +144,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
             }, 30000);
           }
         } else {
+          console.log("[OwnerOrderContext] Non-owner role, skipping fetch.");
           cleanup();
           setLoading(false);
         }
@@ -135,6 +153,7 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
         setLoading(false);
       });
     } else {
+      console.log("[OwnerOrderContext] No session, clearing state.");
       cleanup();
       setLoading(false);
     }

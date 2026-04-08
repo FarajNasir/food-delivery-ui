@@ -3,17 +3,25 @@
 import { useEffect, useState, useCallback } from "react";
 import { getToken, onMessage, MessagePayload } from "firebase/messaging";
 import { messaging, VAPID_KEY } from "@/lib/firebase";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 
 export const useFcmToken = (userId: string | undefined) => {
   const [token, setToken] = useState<string | null>(null);
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<NotificationPermission>("default");
+  const { session } = useAuthStore();
 
   const registerToken = useCallback(async (fcmToken: string) => {
+    const currentSession = useAuthStore.getState().session;
+    if (!currentSession) return;
+
     try {
       const response = await fetch("/api/user/fcm-token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${currentSession.access_token}`
+        },
         body: JSON.stringify({ token: fcmToken }),
       });
       if (!response.ok) throw new Error("Failed to register FCM token");

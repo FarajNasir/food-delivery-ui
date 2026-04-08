@@ -59,65 +59,86 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
-  const fetchDBCart = useCallback(async (retryCount = 0) => {
-    const currentSession = useAuthStore.getState().session;
-    if (!currentSession) {
+  const fetchDBCart = useCallback(async (tokenOverride?: string, retryCount = 0) => {
+    const sessionToUse = tokenOverride 
+      ? { access_token: tokenOverride } 
+      : useAuthStore.getState().session;
+
+    if (!sessionToUse?.access_token) {
+        console.log("[CartContext] No session available for fetching DB cart.");
         setCartItems(loadGuestCart());
         setLoading(false);
         return;
     }
 
+    console.log(`[CartContext] Fetching DB cart (retry: ${retryCount})...`);
+
     try {
       const res = await fetch("/api/cart", { 
         cache: "no-store",
         headers: {
-            "Authorization": `Bearer ${currentSession.access_token}`
+            "Authorization": `Bearer ${sessionToUse.access_token}`
         }
       });
       
       if (res.status === 401) {
+        console.warn(`[CartContext] 401 Unauthorized received (retry: ${retryCount})`);
         if (retryCount < 1) {
           await new Promise(r => setTimeout(r, 500));
-          return fetchDBCart(retryCount + 1);
+          return fetchDBCart(tokenOverride, retryCount + 1);
         }
+        console.warn("[CartContext] Session unauthorized after retry. Falling back to guest cart.");
         setCartItems(loadGuestCart());
         return;
       }
 
       const data = await res.json();
-      if (data.data) {
-        setCartItems(data.data.items);
+      
+      const fetchedItems = data.data?.items || (Array.isArray(data.data) ? data.data : null);
+
+      if (Array.isArray(fetchedItems)) {
+        console.log(`[CartContext] Successfully fetched ${fetchedItems.length} items from DB.`);
+        setCartItems(fetchedItems);
+      } else {
+        console.warn("[CartContext] No valid items array found in response:", data);
+        if (data.success) setCartItems(loadGuestCart());
       }
     } catch (err) {
-      console.error("Failed to fetch cart:", err);
+      console.error("[CartContext] Failed to fetch cart:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   // ── Sync guest cart → DB on first login ─────────────────────
-  const syncGuestCartToDB = useCallback(async () => {
-    const currentSession = useAuthStore.getState().session;
-    if (!currentSession) return;
+  const syncGuestCartToDB = useCallback(async (tokenOverride?: string) => {
+    const sessionToUse = tokenOverride 
+      ? { access_token: tokenOverride } 
+      : useAuthStore.getState().session;
+
+    if (!sessionToUse?.access_token) return;
 
     const guestItems = loadGuestCart();
     if (guestItems.length === 0) return;
+
+    console.log(`[CartContext] Syncing ${guestItems.length} guest items to DB...`);
 
     try {
       const res = await fetch("/api/cart/sync", {
         method: "POST",
         headers: { 
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${currentSession.access_token}`
+            "Authorization": `Bearer ${sessionToUse.access_token}`
         },
         body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
       });
       
       if (res.ok) {
+        console.log("[CartContext] Guest cart synced successfully.");
         localStorage.removeItem(GUEST_CART_KEY);
       }
     } catch (err) {
-      console.error("Failed to sync guest cart:", err);
+      console.error("[CartContext] Failed to sync guest cart:", err);
     }
   }, []);
 
@@ -127,9 +148,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const initCart = async () => {
         setLoading(true);
         if (session) {
-            await syncGuestCartToDB();
-            await fetchDBCart();
+            console.log("[CartContext] Auth detected, initiating sync and fetch...");
+            await syncGuestCartToDB(session.access_token);
+            await fetchDBCart(session.access_token);
         } else {
+            console.log("[CartContext] No session, loading guest cart.");
             setCartItems(loadGuestCart());
             setLoading(false);
         }

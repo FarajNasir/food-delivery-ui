@@ -51,39 +51,56 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   // Register FCM Token & Listener
   useFcmToken(userId);
 
-  const fetchOrders = useCallback(async (retryCount = 0): Promise<void> => {
-    const currentSession = useAuthStore.getState().session;
-    if (!currentSession) {
+  const fetchOrders = useCallback(async (tokenOverride?: string, retryCount = 0): Promise<void> => {
+    const sessionToUse = tokenOverride 
+      ? { access_token: tokenOverride } 
+      : useAuthStore.getState().session;
+
+    if (!sessionToUse?.access_token) {
+        console.log("[OrderContext] No session available for fetching orders.");
         setOrders([]);
         setLoading(false);
         return;
     }
 
+    console.log(`[OrderContext] Fetching orders (retry: ${retryCount})...`);
+
     try {
       const res = await fetch("/api/orders", { 
         cache: "no-store",
         headers: {
-            "Authorization": `Bearer ${currentSession.access_token}`
+            "Authorization": `Bearer ${sessionToUse.access_token}`
         }
       });
       
       if (res.status === 401) {
+        console.warn(`[OrderContext] 401 Unauthorized received (retry: ${retryCount})`);
         // With Bearer tokens, 401 usually means genuinely unauthorized.
         // We still retry once just in case the token was refreshed mid-flight.
         if (retryCount < 1) {
           await new Promise(r => setTimeout(r, 500));
-          return fetchOrders(retryCount + 1);
+          return fetchOrders(tokenOverride, retryCount + 1);
         }
-        setOrders([]);
+        
+        console.warn("[OrderContext] Session unauthorized after retry. Stopping fetch.");
         return;
       }
 
       const data = await res.json();
-      if (data.data) {
-        setOrders(data.data.orders);
+      
+      // Robust parsing: handle { data: { orders: [] } } and { data: [] }
+      const fetchedOrders = data.data?.orders || (Array.isArray(data.data) ? data.data : null);
+
+      if (Array.isArray(fetchedOrders)) {
+        console.log(`[OrderContext] Successfully fetched ${fetchedOrders.length} orders.`);
+        setOrders(fetchedOrders);
+      } else {
+        console.warn("[OrderContext] No valid orders array found in response:", data);
+        // Only clear if we are certain it's valid empty data or if success is true
+        if (data.success) setOrders([]);
       }
     } catch (err) {
-      console.error("Failed to fetch orders:", err);
+      console.error("[OrderContext] Failed to fetch orders:", err);
     } finally {
       setLoading(false);
     }
@@ -93,6 +110,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!isReady) return;
 
     if (session) {
+      console.log("[OrderContext] Auth detected, initiating fetch sequence...");
       setLoading(true);
       
       // Fetch role info (best-effort)
@@ -105,8 +123,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {});
 
-      fetchOrders();
+      fetchOrders(session.access_token);
     } else {
+      console.log("[OrderContext] No session, clearing orders.");
       setOrders([]);
       setUserRole(null);
       setLoading(false);
@@ -130,9 +149,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     );
 
     try {
+      const currentSession = useAuthStore.getState().session;
       const res = await fetch(`/api/orders/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
+        },
         body: JSON.stringify({ status, paymentIntentId }),
       });
       

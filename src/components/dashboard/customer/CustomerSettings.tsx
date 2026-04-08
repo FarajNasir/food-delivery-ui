@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 
 function Toggle({ on, onToggle, accentColor }: { on: boolean; onToggle: () => void; accentColor: string }) {
@@ -36,7 +37,7 @@ export default function CustomerSettings() {
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    await authApi.logout();
+    await useAuthStore.getState().logout();
     toast.success("Logged out.");
     router.push("/login");
   };
