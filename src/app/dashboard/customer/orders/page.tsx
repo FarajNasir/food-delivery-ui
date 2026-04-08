@@ -228,7 +228,7 @@ export default function CustomerOrdersPage() {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-3">
-                    {(order.status === "CONFIRMED" || (process.env.NODE_ENV === "development" && order.status === "PENDING_CONFIRMATION")) && (
+                    {order.status === "CONFIRMED" && (
                       <div className="space-y-3">
                         <button
                           onClick={() => handlePayment(order.id)}

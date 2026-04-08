@@ -1,79 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Search, ChevronDown, ChevronLeft, ChevronRight,
-  ChevronsUpDown, ChevronUp, Eye,
+  ChevronsUpDown, ChevronUp, Eye, ShoppingBag, DollarSign, Clock
 } from "lucide-react";
 import PageHeader from "@/components/dashboard/shared/PageHeader";
+import StatCard from "@/components/dashboard/shared/StatCard";
+import { useAdminOrders, type AdminOrder } from "@/context/AdminOrderContext";
+import { format } from "date-fns";
 
-type OrderStatus = "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
-type SortField = "id" | "createdAt" | "total";
+type OrderStatus = "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "paid";
+type SortField = "id" | "createdAt" | "totalAmount";
 type SortOrder = "asc" | "desc";
 
-interface Order {
-  id:         string;
-  customer:   string;
-  restaurant: string;
-  items:      number;
-  total:      string;
-  status:     OrderStatus;
-  createdAt:  string;
-  address:    string;
-}
-
-const MOCK_ORDERS: Order[] = [
-  { id: "#1042", customer: "John Mullan",        restaurant: "The Anchor Bar",   items: 3, total: "£18.50", status: "delivered",        createdAt: "Today 14:32",  address: "12 Castle St, Kilkeel" },
-  { id: "#1041", customer: "Sarah Quinn",         restaurant: "Pizza Palace",      items: 2, total: "£24.00", status: "preparing",        createdAt: "Today 14:15",  address: "7 Shore Rd, Kilkeel" },
-  { id: "#1040", customer: "Peter Fitzpatrick",   restaurant: "Burger Barn",       items: 1, total: "£15.99", status: "out_for_delivery", createdAt: "Today 13:50",  address: "4 Mourne View, Newcastle" },
-  { id: "#1039", customer: "Marie O'Brien",       restaurant: "Sushi Station",     items: 5, total: "£31.00", status: "delivered",        createdAt: "Today 13:20",  address: "19 Main St, Downpatrick" },
-  { id: "#1038", customer: "Conor McAlister",     restaurant: "Noodle House",      items: 2, total: "£22.50", status: "confirmed",        createdAt: "Today 12:45",  address: "3 Bridge Rd, Kilkeel" },
-  { id: "#1037", customer: "Siobhan Murphy",      restaurant: "The Anchor Bar",    items: 4, total: "£42.00", status: "delivered",        createdAt: "Today 12:10",  address: "88 Sea Rd, Newcastle" },
-  { id: "#1036", customer: "Declan Walsh",        restaurant: "Pizza Palace",      items: 1, total: "£11.99", status: "cancelled",        createdAt: "Today 11:55",  address: "5 Hill View, Kilkeel" },
-  { id: "#1035", customer: "Aoife Brennan",       restaurant: "Burger Barn",       items: 3, total: "£29.50", status: "delivered",        createdAt: "Today 11:30",  address: "22 Church St, Downpatrick" },
-  { id: "#1034", customer: "Niall O'Connor",      restaurant: "Sushi Station",     items: 2, total: "£18.00", status: "pending",          createdAt: "Today 11:05",  address: "10 Park Ave, Newcastle" },
-  { id: "#1033", customer: "Fiona McGrath",       restaurant: "Noodle House",      items: 6, total: "£55.00", status: "delivered",        createdAt: "Today 10:40",  address: "33 Lough Rd, Kilkeel" },
-];
-
-const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: string }> = {
-  pending:          { label: "Pending",          color: "#6b7280", bg: "#f3f4f6" },
-  confirmed:        { label: "Confirmed",        color: "#3b82f6", bg: "#eff6ff" },
-  preparing:        { label: "Preparing",        color: "#f59e0b", bg: "#fffbeb" },
-  out_for_delivery: { label: "Out for Delivery", color: "#8b5cf6", bg: "#f5f3ff" },
-  delivered:        { label: "Delivered",        color: "#22c55e", bg: "#f0fdf4" },
-  cancelled:        { label: "Cancelled",        color: "#ef4444", bg: "#fef2f2" },
+export const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+  PENDING_CONFIRMATION: { label: "Pending",          color: "#6b7280", bg: "#f3f4f6" },
+  CONFIRMED:            { label: "Confirmed",        color: "#3b82f6", bg: "#eff6ff" },
+  PAID:                 { label: "Paid",             color: "#3b82f6", bg: "#eff6ff" },
+  PREPARING:            { label: "Preparing",        color: "#f59e0b", bg: "#fffbeb" },
+  OUT_FOR_DELIVERY:     { label: "Out for Delivery", color: "#8b5cf6", bg: "#f5f3ff" },
+  DELIVERED:            { label: "Delivered",        color: "#22c55e", bg: "#f0fdf4" },
+  CANCELLED:            { label: "Cancelled",        color: "#ef4444", bg: "#fef2f2" },
 };
 
-const ALL_STATUSES: { value: string; label: string }[] = [
-  { value: "all",              label: "All Orders" },
-  { value: "pending",          label: "Pending" },
-  { value: "confirmed",        label: "Confirmed" },
-  { value: "preparing",        label: "Preparing" },
-  { value: "out_for_delivery", label: "Out for Delivery" },
-  { value: "delivered",        label: "Delivered" },
-  { value: "cancelled",        label: "Cancelled" },
+const ALL_STATUSES = [
+  { value: "all",                  label: "All Orders" },
+  { value: "PENDING_CONFIRMATION", label: "Pending" },
+  { value: "CONFIRMED",            label: "Confirmed" },
+  { value: "PAID",                 label: "Paid" },
+  { value: "PREPARING",            label: "Preparing" },
+  { value: "OUT_FOR_DELIVERY",     label: "Out for Delivery" },
+  { value: "DELIVERED",            label: "Delivered" },
+  { value: "CANCELLED",            label: "Cancelled" },
 ];
 
 const PAGE_SIZE = 8;
 
 export default function AdminOrders() {
+  const { orders, stats, loading } = useAdminOrders();
   const [search,    setSearch]    = useState("");
   const [status,    setStatus]    = useState("all");
   const [sort,      setSort]      = useState<SortField>("createdAt");
   const [order,     setOrder]     = useState<SortOrder>("desc");
   const [page,      setPage]      = useState(1);
-  const [detailRow, setDetailRow] = useState<Order | null>(null);
+  const [detailRow, setDetailRow] = useState<AdminOrder | null>(null);
 
-  /* ── Filter + sort (client-side with mock data) ── */
-  const filtered = MOCK_ORDERS
-    .filter((o) => {
-      const q = search.toLowerCase();
-      const matchSearch = !q || o.id.toLowerCase().includes(q)
-        || o.customer.toLowerCase().includes(q)
-        || o.restaurant.toLowerCase().includes(q);
-      const matchStatus = status === "all" || o.status === status;
-      return matchSearch && matchStatus;
-    });
+  /* ── Filter + sort ── */
+  const filtered = useMemo(() => {
+    return orders
+      .filter((o) => {
+        const q = search.toLowerCase();
+        const matchSearch = !q || o.id.toLowerCase().includes(q)
+          || o.user.name.toLowerCase().includes(q)
+          || o.restaurant.name.toLowerCase().includes(q);
+        const matchStatus = status === "all" || o.status === status;
+        return matchSearch && matchStatus;
+      })
+      .sort((a, b) => {
+        const factor = order === "asc" ? 1 : -1;
+        if (sort === "totalAmount") {
+          return (parseFloat(a.totalAmount) - parseFloat(b.totalAmount)) * factor;
+        }
+        const valA = a[sort] || "";
+        const valB = b[sort] || "";
+        return valA < valB ? -1 * factor : valA > valB ? 1 * factor : 0;
+      });
+  }, [orders, search, status, sort, order]);
 
   const total      = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -95,6 +88,29 @@ export default function AdminOrders() {
   return (
     <div>
       <PageHeader title="Orders" subtitle="Monitor and manage all platform orders" />
+
+      {/* Stats row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard
+          label="Total Revenue"
+          value={`£${parseFloat(stats.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+          icon={DollarSign}
+          color="green"
+        />
+        <StatCard
+          label="Total Orders"
+          value={String(stats.totalOrders)}
+          icon={ShoppingBag}
+          color="blue"
+        />
+        <StatCard
+          label="Pending Units"
+          value={String(stats.pendingOrders)}
+          icon={Clock}
+          color="amber"
+          trend={stats.pendingOrders > 0 ? { value: "Needs attention", positive: false } : undefined}
+        />
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -142,8 +158,8 @@ export default function AdminOrders() {
                 </th>
                 <th className="px-5 py-3 text-left font-semibold text-gray-500">Status</th>
                 <th className="px-5 py-3 text-right font-semibold text-gray-500">
-                  <button className="flex items-center gap-1 ml-auto" onClick={() => toggleSort("total")}>
-                    Total <SortIcon field="total" />
+                  <button className="flex items-center gap-1 ml-auto" onClick={() => toggleSort("totalAmount")}>
+                    Total <SortIcon field="totalAmount" />
                   </button>
                 </th>
                 <th className="px-5 py-3" />
@@ -157,22 +173,28 @@ export default function AdminOrders() {
                   </td>
                 </tr>
               ) : sliced.map((o) => {
-                const meta = STATUS_META[o.status];
+                const meta = STATUS_META[o.status] || { label: o.status, color: "#000", bg: "#f3f4f6" };
                 return (
                   <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5 font-mono font-semibold text-gray-800">{o.id}</td>
-                    <td className="px-5 py-3.5 text-gray-900">{o.customer}</td>
-                    <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{o.restaurant}</td>
-                    <td className="px-5 py-3.5 text-gray-500 hidden lg:table-cell">{o.createdAt}</td>
+                    <td className="px-5 py-3.5 font-mono font-semibold text-gray-800 text-[10px] break-all max-w-[100px]">
+                      #{o.id.slice(0, 8)}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-900">{o.user.name}</td>
+                    <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{o.restaurant.name}</td>
+                    <td className="px-5 py-3.5 text-gray-500 hidden lg:table-cell">
+                      {format(new Date(o.createdAt), "MMM d, HH:mm")}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span
-                        className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        className="px-2.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
                         style={{ color: meta.color, background: meta.bg }}
                       >
                         {meta.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">{o.total}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
+                      £{parseFloat(o.totalAmount).toFixed(2)}
+                    </td>
                     <td className="px-5 py-3.5">
                       <button
                         onClick={() => setDetailRow(o)}
@@ -219,26 +241,29 @@ export default function AdminOrders() {
           <div className="relative ml-auto w-full max-w-sm h-full bg-white shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
-                <p className="font-bold text-gray-900">{detailRow.id}</p>
-                <p className="text-xs text-gray-500">{detailRow.createdAt}</p>
+                <p className="font-bold text-gray-900 text-xs truncate max-w-[200px]">{detailRow.id}</p>
+                <p className="text-[10px] text-gray-500">
+                  {format(new Date(detailRow.createdAt), "pppp")}
+                </p>
               </div>
               <button onClick={() => setDetailRow(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
                 <span className="text-gray-500 text-lg leading-none">×</span>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
-              <Detail label="Customer"   value={detailRow.customer} />
-              <Detail label="Restaurant" value={detailRow.restaurant} />
-              <Detail label="Address"    value={detailRow.address} />
-              <Detail label="Items"      value={String(detailRow.items)} />
-              <Detail label="Total"      value={detailRow.total} />
+              <Detail label="Customer"   value={detailRow.user.name} />
+              <Detail label="Email"      value={detailRow.user.email} />
+              <Detail label="Phone"      value={detailRow.user.phone} />
+              <Detail label="Restaurant" value={detailRow.restaurant.name} />
+              <Detail label="Address"    value={detailRow.deliveryAddress || "N/A"} />
+              <Detail label="Total"      value={`£${parseFloat(detailRow.totalAmount).toFixed(2)}`} />
               <div>
                 <p className="text-xs text-gray-500 mb-1">Status</p>
                 <span
                   className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ color: STATUS_META[detailRow.status].color, background: STATUS_META[detailRow.status].bg }}
+                  style={{ color: (STATUS_META[detailRow.status] || STATUS_META.PENDING_CONFIRMATION).color, background: (STATUS_META[detailRow.status] || STATUS_META.PENDING_CONFIRMATION).bg }}
                 >
-                  {STATUS_META[detailRow.status].label}
+                  {(STATUS_META[detailRow.status] || { label: detailRow.status }).label}
                 </span>
               </div>
             </div>

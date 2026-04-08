@@ -34,8 +34,7 @@ export async function POST(
         return fail("Order not found.", 404);
       }
 
-      const isDev = process.env.NODE_ENV === "development";
-      if (order.status !== "CONFIRMED" && !isDev) {
+      if (order.status !== "CONFIRMED") {
         return fail(`Payment is only allowed for orders that have been 'CONFIRMED' by the restaurant. Current status: ${order.status}`, 400);
       }
 
