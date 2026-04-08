@@ -6,6 +6,7 @@ import { CartProvider } from "@/context/CartContext";
 import { OrderProvider } from "@/context/OrderContext";
 import { OwnerOrderProvider } from "@/context/OwnerOrderContext";
 import SiteTitle from "@/components/layout/SiteTitle";
+import LocationManager from "@/components/shared/LocationManager";
 import { Toaster } from "sonner";
 
 /*
@@ -50,6 +51,7 @@ export default function RootLayout({
             <OrderProvider>
               <OwnerOrderProvider>
                 <SiteTitle />
+                <LocationManager />
                 {children}
                 <Toaster
                   position="top-center"

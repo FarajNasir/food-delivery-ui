@@ -9,8 +9,12 @@ import { SITES, type SiteConfig, DEFAULT_SITE, type SiteKey } from "@/config/sit
 interface ConfigState {
   site: SiteConfig;
   isLoading: boolean;
+  userCoords: { lat: number; lng: number } | null;
+  locationDismissed: boolean;
   setSite: (siteKey: SiteKey) => void;
   updateLocation: (location: string) => void;
+  setUserCoords: (coords: { lat: number; lng: number } | null) => void;
+  setLocationDismissed: (dismissed: boolean) => void;
 }
 
 export const useConfigStore = create<ConfigState>()(
@@ -18,6 +22,8 @@ export const useConfigStore = create<ConfigState>()(
     (set) => ({
       site: SITES[DEFAULT_SITE],
       isLoading: false,
+      userCoords: null,
+      locationDismissed: false,
       
       setSite: (siteKey: SiteKey) => {
         const newSite = SITES[siteKey];
@@ -31,10 +37,17 @@ export const useConfigStore = create<ConfigState>()(
           site: { ...state.site, location }
         }));
       },
+
+      setUserCoords: (userCoords) => set({ userCoords }),
+      setLocationDismissed: (locationDismissed) => set({ locationDismissed }),
     }),
     {
       name: "site-config",
-      partialize: (state) => ({ site: state.site }),
+      partialize: (state) => ({ 
+        site: state.site,
+        userCoords: state.userCoords,
+        locationDismissed: state.locationDismissed
+      }),
     }
   )
 );
