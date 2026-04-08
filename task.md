@@ -84,6 +84,24 @@ Use this file to track **what was done**, **whatâ€™s in progress**, and **whatâ€
 | Heartbeat | Done | Heartbeat monitoring for user sessions |
 
 
+###2026-04-07 (tuesday)
+
+| Area | Status | Notes |
+Stripe Payment Gateway Integration	|Completed	|Successfully implemented secure online payments using Stripe(Need keys) 
+Delivery Charges Calculation (Dawnpatrick)	|Completed	|Integrated OSM distance-based calculation for accurate delivery fees
+User Location Selection (Newspatric)	|Completed|Enabled users to select and update their location within the platf
+
+###2026-04-08 (wednesday)
+
+| Area | Status | Notes |
+|------|--------|--------|
+| Admin order| Done | admin can see all orders |
+| Feedback | Done | user give the feedback it is saved as inactive after admin aaproval it can show ban/approval 
+|Notification| not implemented | need keys to proceed further 
+
+
+
+
 ---
 
 ## Upcoming / backlog
