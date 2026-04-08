@@ -138,9 +138,11 @@ export async function GET(req: Request) {
             with: {
               menuItem: true
             }
-          }
+          },
+          review: true
         },
         orderBy: [desc(orders.createdAt)]
+
       });
 
       return ok({ orders: results });
