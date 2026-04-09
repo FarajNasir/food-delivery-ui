@@ -10,7 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 
 export default function LoginPage() {
   return (
@@ -60,15 +64,23 @@ function LoginContent() {
       return;
     }
 
+    // IMPORTANT: Sync the global auth state IMMEDIATELY after login
+    // This ensures contexts like OrderContext see the session before redirect
+    await useAuthStore.getState().sync();
+
     // Sync any guest cart items into the DB
     try {
       const guestCartRaw = localStorage.getItem("guest_cart");
       if (guestCartRaw) {
         const guestItems = JSON.parse(guestCartRaw) as { menuItemId: string; quantity: number }[];
         if (guestItems.length > 0) {
+          const { data: { session } } = await supabase.auth.getSession();
           await fetch("/api/cart/sync", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": session ? `Bearer ${session.access_token}` : ""
+            },
             body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
           });
           localStorage.removeItem("guest_cart");

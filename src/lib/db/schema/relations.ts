@@ -3,6 +3,7 @@ import { users } from "./users";
 import { restaurants } from "./restaurants";
 import { menuItems } from "./menuItems";
 import { orders, orderItems } from "./orders";
+import { reviews } from "./reviews";
 
 /**
  * ── Restaurant Relations ─────────────────────────────────────
@@ -14,7 +15,9 @@ export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   }),
   orders: many(orders),
   menuItems: many(menuItems),
+  reviews: many(reviews),
 }));
+
 
 /**
  * ── Menu Item Relations ─────────────────────────────────────
@@ -39,7 +42,12 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [restaurants.id],
   }),
   items: many(orderItems),
+  review: one(reviews, {
+    fields: [orders.id],
+    references: [reviews.orderId],
+  }),
 }));
+
 
 /**
  * ── Order Item Relations ─────────────────────────────────────
@@ -54,3 +62,22 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     references: [menuItems.id],
   }),
 }));
+
+/**
+ * ── Review Relations ─────────────────────────────────────
+ */
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  user: one(users, {
+    fields: [reviews.userId],
+    references: [users.id],
+  }),
+  restaurant: one(restaurants, {
+    fields: [reviews.restaurantId],
+    references: [restaurants.id],
+  }),
+  order: one(orders, {
+    fields: [reviews.orderId],
+    references: [orders.id],
+  }),
+}));
+

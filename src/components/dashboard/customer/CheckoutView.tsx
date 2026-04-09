@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 import { 
   ShoppingBag, 
@@ -24,6 +25,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { getOSRMDistance, calculateDeliveryFee } from "@/lib/delivery";
+import { useConfigStore } from "@/store/useConfigStore";
 
 export default function CheckoutView() {
   const { cartItems, totalPrice, totalItems, clearCart } = useCart();
@@ -31,6 +33,9 @@ export default function CheckoutView() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
+
+  const userCoords = useConfigStore((state) => state.userCoords);
+  const setUserCoords = useConfigStore((state) => state.setUserCoords);
 
   const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
   const [isCalculating, setIsCalculating] = React.useState(false);
@@ -43,6 +48,24 @@ export default function CheckoutView() {
   const [deliveryFee, setDeliveryFee] = React.useState(0);
 
   const isCashSite = site.key === "newcastleeats" || site.key === "downpatrickeats";
+
+  // Auto-calculate if coordinates are already available
+  React.useEffect(() => {
+    if (site.key === "downpatrickeats" && userCoords && site.coordinates && distance === null && !isCalculating) {
+      const calcDistance = async () => {
+        setIsCalculating(true);
+        const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
+        if (miles !== null) {
+          setDistance(miles);
+          const fee = calculateDeliveryFee(site, { miles });
+          setDeliveryFee(fee);
+          toast.success(`Distance auto-calculated: ${miles} miles`);
+        }
+        setIsCalculating(false);
+      };
+      calcDistance();
+    }
+  }, [site, userCoords, distance, isCalculating]);
 
   // Group items by restaurant
   const groupedItems = React.useMemo(() => {
@@ -64,6 +87,7 @@ export default function CheckoutView() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        setUserCoords({ lat: latitude, lng: longitude });
         
         if (site.coordinates) {
           const miles = await getOSRMDistance(site.coordinates, { lat: latitude, lng: longitude });
@@ -113,9 +137,13 @@ export default function CheckoutView() {
 
     try {
       setIsPlacingOrder(true);
+      const session = useAuthStore.getState().session;
       const res = await fetch("/api/orders", { 
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": session ? `Bearer ${session.access_token}` : ""
+        },
         body: JSON.stringify({
           deliveryAddress: address,
           deliveryArea: deliveryArea,

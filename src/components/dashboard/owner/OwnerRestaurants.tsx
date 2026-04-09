@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/dashboard/shared/PageHeader";
 
+import { useAuthStore } from "@/store/useAuthStore";
+
 type RestaurantStatus = "active" | "inactive" | "suspended";
 type SortField        = "name" | "createdAt";
 type SortOrder        = "asc" | "desc";
@@ -43,11 +45,23 @@ export default function OwnerRestaurants() {
 
   useEffect(() => {
     async function fetchRestaurants() {
+      const session = useAuthStore.getState().session;
+      if (!session) return;
+
       try {
         setIsLoading(true);
-        const res = await fetch("/api/owner/restaurants");
-        const json = await res.json();
+        const res = await fetch("/api/owner/restaurants", {
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`
+          }
+        });
+        
+        if (res.status === 401) {
+          setError("Unauthorized. Please log in again.");
+          return;
+        }
 
+        const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to fetch");
 
         // Format dates if needed

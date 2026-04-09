@@ -1,23 +1,17 @@
-import { ShoppingBag, Users, Truck, UtensilsCrossed } from "lucide-react";
-import type { SessionUser } from "@/lib/auth";
+"use client";
+
+import { ShoppingBag, Users, Truck, UtensilsCrossed, DollarSign } from "lucide-react";
 import StatCard from "@/components/dashboard/shared/StatCard";
 import PageHeader from "@/components/dashboard/shared/PageHeader";
+import { useAdminOrders } from "@/context/AdminOrderContext";
+import { STATUS_META } from "./AdminOrders";
 
-const recentOrders = [
-  { id: "#1042", customer: "John Mullan",    restaurant: "The Anchor Bar",    status: "Delivered",    amount: "£18.50" },
-  { id: "#1041", customer: "Sarah Quinn",    restaurant: "Pizza Palace",       status: "Preparing",    amount: "£24.00" },
-  { id: "#1040", customer: "Peter Fitzpatrick", restaurant: "Burger Barn",     status: "Out for delivery", amount: "£15.99" },
-  { id: "#1039", customer: "Marie O'Brien", restaurant: "Sushi Station",       status: "Delivered",    amount: "£31.00" },
-];
+export default function AdminOverview() {
+  const { orders, stats, loading } = useAdminOrders();
 
-const statusColor: Record<string, string> = {
-  "Delivered":          "bg-green-100 text-green-700",
-  "Preparing":          "bg-amber-100 text-amber-700",
-  "Out for delivery":   "bg-blue-100 text-blue-700",
-  "Pending":            "bg-gray-100 text-gray-600",
-};
+  // Show only 5 latest orders on overview
+  const recentOrders = orders.slice(0, 5);
 
-export default function AdminOverview({ user }: { user: SessionUser }) {
   return (
     <div>
       <PageHeader
@@ -26,19 +20,39 @@ export default function AdminOverview({ user }: { user: SessionUser }) {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Orders Today"   value="98"  icon={ShoppingBag}     color="blue"  trend={{ value: "14% vs yesterday", positive: true }} />
-        <StatCard label="Restaurants"    value="35"  icon={UtensilsCrossed} color="green" />
-        <StatCard label="Active Drivers" value="12"  icon={Truck}           color="amber" />
-        <StatCard label="Customers"      value="420" icon={Users}           color="purple" />
+        <StatCard 
+          label="Total Revenue"   
+          value={`£${parseFloat(stats.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}  
+          icon={DollarSign}     
+          color="green" 
+        />
+        <StatCard 
+          label="Total Orders"    
+          value={String(stats.totalOrders)}  
+          icon={ShoppingBag} 
+          color="blue" 
+        />
+        <StatCard 
+          label="Pending Units" 
+          value={String(stats.pendingOrders)}  
+          icon={Truck}           
+          color="amber" 
+        />
+        <StatCard 
+          label="Customers"      
+          value="420" // Note: This could be dynamically fetched too if needed
+          icon={Users}           
+          color="purple" 
+        />
       </div>
 
       {/* Recent orders */}
       <h2 className="text-base font-semibold text-gray-900 mb-3">Recent Orders</h2>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-left">
+              <tr className="border-b border-gray-100 text-left bg-gray-50/50">
                 <th className="px-5 py-3 font-semibold text-gray-500">Order</th>
                 <th className="px-5 py-3 font-semibold text-gray-500">Customer</th>
                 <th className="px-5 py-3 font-semibold text-gray-500 hidden md:table-cell">Restaurant</th>
@@ -47,19 +61,37 @@ export default function AdminOverview({ user }: { user: SessionUser }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 font-mono text-gray-700">{order.id}</td>
-                  <td className="px-5 py-3.5 text-gray-900">{order.customer}</td>
-                  <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{order.restaurant}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[order.status]}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-gray-900">{order.amount}</td>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400">Loading data...</td>
                 </tr>
-              ))}
+              ) : recentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400">No orders found.</td>
+                </tr>
+              ) : recentOrders.map((order) => {
+                const meta = STATUS_META[order.status] || { label: order.status, color: "#000", bg: "#f3f4f6" };
+                return (
+                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5 font-mono text-gray-700 text-[10px]">
+                      #{order.id.slice(0, 8)}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-900">{order.user.name}</td>
+                    <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{order.restaurant.name}</td>
+                    <td className="px-5 py-3.5">
+                      <span 
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{ color: meta.color, background: meta.bg }}
+                      >
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
+                      £{parseFloat(order.totalAmount).toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

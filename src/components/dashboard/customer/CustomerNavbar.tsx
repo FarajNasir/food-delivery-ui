@@ -12,6 +12,7 @@ import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import type { SessionUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 
 export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
@@ -51,7 +52,7 @@ export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
   }, []);
 
   const handleLogout = async () => {
-    await authApi.logout();
+    await useAuthStore.getState().logout();
     toast.success("Logged out.");
     router.push("/login");
   };

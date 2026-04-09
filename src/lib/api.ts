@@ -108,6 +108,9 @@ export const authApi = {
   logout() {
     return post<null>("/api/auth/logout", {});
   },
+  getMe() {
+    return get<AuthUser>("/api/auth/me");
+  },
 };
 
 /* ── Admin: Restaurant Management API ── */

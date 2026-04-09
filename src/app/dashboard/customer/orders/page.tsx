@@ -10,7 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquare, Star } from "lucide-react";
+import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
 
 const STATUS_CONFIG: Record<
   string,
@@ -68,11 +69,15 @@ const STATUS_CONFIG: Record<
 };
 
 export default function CustomerOrdersPage() {
-  const { orders, loading, updateOrderStatus } = useOrders();
+  const { orders, loading, updateOrderStatus, refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
   const [isPaying, setIsPaying] = React.useState<string | null>(null);
+  const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+
+
 
   const handlePayment = async (orderId: string) => {
     try {
@@ -92,18 +97,6 @@ export default function CustomerOrdersPage() {
     } catch (err) {
       console.error("[handlePayment]", err);
       toast.error("A network error occurred. Please try again.");
-    } finally {
-      setIsPaying(null);
-    }
-  };
-
-  const handleMockPayment = async (orderId: string) => {
-    try {
-      setIsPaying(orderId);
-      await updateOrderStatus(orderId, "PAID", "pi_mock_" + Date.now());
-      toast.success("Mock Payment successful! (Dev Only)");
-    } catch (err) {
-      toast.error("Mock payment failed");
     } finally {
       setIsPaying(null);
     }
@@ -228,7 +221,7 @@ export default function CustomerOrdersPage() {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-3">
-                    {(order.status === "CONFIRMED" || (process.env.NODE_ENV === "development" && order.status === "PENDING_CONFIRMATION")) && (
+                    {order.status === "CONFIRMED" && (
                       <div className="space-y-3">
                         <button
                           onClick={() => handlePayment(order.id)}
@@ -245,18 +238,9 @@ export default function CustomerOrdersPage() {
                           )}
                           {isPaying === order.id ? "Initializing..." : "Complete Secure Payment"}
                         </button>
-                        
-                        {process.env.NODE_ENV === "development" && (
-                          <button
-                            onClick={() => handleMockPayment(order.id)}
-                            disabled={!!isPaying}
-                            className="w-full text-[10px] font-black uppercase tracking-widest text-blue-500 hover:underline transition-all py-1"
-                          >
-                            [ DEV ONLY: SKIP TO PAID STATUS ]
-                          </button>
-                        )}
                       </div>
                     )}
+
 
                     {order.status === "PAID" && (
                       <div className="flex items-center justify-center gap-3 py-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
@@ -269,7 +253,37 @@ export default function CustomerOrdersPage() {
                       </div>
                     )}
 
+                    {order.status === "DELIVERED" && (
+                      <div className="space-y-3">
+                        {!order.review ? (
+                          <button
+                            onClick={() => {
+                              setSelectedOrderForFeedback(order);
+                              setIsFeedbackOpen(true);
+                            }}
+                            className="w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+                            style={{
+                              background: `linear-gradient(135deg, ${gradientFrom}, ${accent})`,
+                            }}
+                          >
+                            <Star className="w-4 h-4 fill-white" />
+                            Rate Your Experience
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-3 py-4 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
+                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
+                              <Star className="w-4 h-4 text-white fill-white" />
+                            </div>
+                            <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">
+                              {order.review.status === 'active' ? `Rated ${order.review.rating}/5` : 'Review Pending'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* View Details Link */}
+
                     <button 
                       onClick={() => router.push(`/dashboard/customer/status/${order.id}`)}
                       className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors py-2"
@@ -283,6 +297,17 @@ export default function CustomerOrdersPage() {
           })}
         </div>
       )}
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackOpen}
+        onClose={() => {
+          setIsFeedbackOpen(false);
+          setSelectedOrderForFeedback(null);
+        }}
+        order={selectedOrderForFeedback}
+        site={site}
+        onSuccess={refreshOrders}
+      />
     </div>
 
   );

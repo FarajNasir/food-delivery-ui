@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Utensils, Package, Truck, CheckCircle2,
   Clock, ChevronRight, AlertCircle, Loader2,
@@ -186,13 +186,24 @@ function OrderCard({
 
 // ── Main Dashboard View ─────────────────────────────────────────────────────────
 export default function LiveOrdersView() {
-  const { orders, updateOrderStatus, refreshOrders, isLoading, subscribeToUpdates } = useOwnerStore();
+  const { orders, updateOrderStatus, refreshOrders, isLoading } = useOwnerStore();
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
+  const prevPendingCount = useRef(0);
 
   useEffect(() => {
     refreshOrders();
-    const unsubscribe = subscribeToUpdates();
-    return () => unsubscribe();
-  }, [refreshOrders, subscribeToUpdates]);
+  }, [refreshOrders]);
+
+  useEffect(() => {
+    const currentPending = orders.filter(o => o.status === 'PENDING_CONFIRMATION');
+    if (currentPending.length > prevPendingCount.current) {
+      setNewOrderAlert(true);
+      const timer = setTimeout(() => setNewOrderAlert(false), 8000);
+      prevPendingCount.current = currentPending.length;
+      return () => clearTimeout(timer);
+    }
+    prevPendingCount.current = currentPending.length;
+  }, [orders]);
 
   const activeOrders = orders.filter((o) =>
     ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
@@ -200,6 +211,36 @@ export default function LiveOrdersView() {
 
   return (
     <div className="w-full space-y-8 pb-12 selection:bg-primary/20">
+      
+      {/* New Order Sticky Alert */}
+      <AnimatePresence>
+        {newOrderAlert && (
+          <motion.div
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -100, opacity: 0 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4"
+          >
+            <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between border-2 border-emerald-400">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center animate-bounce">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black uppercase tracking-tight">New Order Received!</h4>
+                  <p className="text-[10px] font-bold opacity-80 uppercase">Please check and confirm now.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setNewOrderAlert(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header with Stats */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
@@ -216,15 +257,20 @@ export default function LiveOrdersView() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border border-border/40">
+          <div className={cn(
+            "glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all duration-1000",
+            newOrderAlert ? "border-emerald-500 bg-emerald-50/50" : "border-border/40"
+          )}>
             <div className="relative">
-              <Bell className="w-5 h-5 text-slate-500" />
-              {activeOrders.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
+              <Bell className={cn("w-5 h-5 transition-colors", newOrderAlert ? "text-emerald-500" : "text-slate-500")} />
+              {(activeOrders.length > 0) && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
             </div>
             <div className="h-4 w-px bg-border/40" />
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Sync Active</span>
+              <div className={cn("w-2 h-2 rounded-full animate-pulse", newOrderAlert ? "bg-emerald-500" : "bg-emerald-500/50")} />
+              <span className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", newOrderAlert ? "text-emerald-700" : "text-slate-500")}>
+                {newOrderAlert ? "Order Detected!" : "Live Sync Active"}
+              </span>
             </div>
           </div>
           <button

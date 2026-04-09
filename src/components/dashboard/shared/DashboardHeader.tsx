@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Menu, LogOut, Bell } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 
 const roleBadge: Record<string, string> = {
@@ -25,7 +26,7 @@ export default function DashboardHeader({
   const router = useRouter();
 
   const handleLogout = async () => {
-    await authApi.logout();
+    await useAuthStore.getState().logout();
     toast.success("Logged out.");
     router.push("/login");
   };
