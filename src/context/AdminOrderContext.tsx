@@ -1,25 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-
-export interface AdminOrder {
-  id: string;
-  status: string;
-  totalAmount: string;
-  createdAt: string;
-  deliveryAddress: string | null;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-  };
-  restaurant: {
-    id: string;
-    name: string;
-  };
-}
+import { useAdminStore, AdminOrder } from "@/store/useAdminStore";
+import { useFcmToken } from "@/hooks/useFcmToken";
 
 interface AdminStats {
   totalRevenue: string;
@@ -37,70 +21,25 @@ interface AdminOrderContextType {
 const AdminOrderContext = createContext<AdminOrderContextType | undefined>(undefined);
 
 export function AdminOrderProvider({ children }: { children: React.ReactNode }) {
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [stats, setStats] = useState<AdminStats>({
-    totalRevenue: "0",
-    totalOrders: 0,
-    pendingOrders: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { 
+    orders, 
+    stats, 
+    isLoading: loading, 
+    refreshOrders 
+  } = useAdminStore();
+  
   const { session, isReady, user } = useAuthStore();
+  const userId = user?.id;
 
-  const fetchOrders = useCallback(async () => {
-    const currentSession = useAuthStore.getState().session;
-    if (!currentSession) {
-      setLoading(false);
-      return;
-    }
+  // Real-time updates for Admin
+  useFcmToken(userId);
 
-    try {
-      const res = await fetch(`/api/admin/orders?t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data.error || "Unknown error";
-        console.warn(`[AdminOrderContext] Fetch skipped/failed (${res.status}):`, msg);
-        setLoading(false);
-        return;
-      }
-
-      if (data.data) {
-        setOrders(data.data.orders);
-        setStats(data.data.stats);
-      }
-    } catch (err) {
-      console.error("[AdminOrderContext] Fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Initial fetch when auth is ready
   useEffect(() => {
     if (isReady && session) {
-      setLoading(true);
-      fetchOrders();
-    } else if (isReady) {
-      setLoading(false);
+      console.log("[AdminOrderContext] Syncing with admin store...");
+      refreshOrders();
     }
-  }, [isReady, session, fetchOrders]);
-
-  // Listen for REFRESH_ORDERS event (triggered by FCM or manual actions)
-  useEffect(() => {
-    const handleRefresh = () => {
-      console.log("[AdminOrderContext] Refreshing orders via global event...");
-      fetchOrders();
-    };
-    window.addEventListener("REFRESH_ORDERS", handleRefresh);
-
-    return () => {
-      window.removeEventListener("REFRESH_ORDERS", handleRefresh);
-    };
-  }, [fetchOrders]);
+  }, [isReady, session, refreshOrders]);
 
   return (
     <AdminOrderContext.Provider
@@ -108,7 +47,7 @@ export function AdminOrderProvider({ children }: { children: React.ReactNode }) 
         orders,
         stats,
         loading,
-        refreshOrders: fetchOrders,
+        refreshOrders,
       }}
     >
       {children}

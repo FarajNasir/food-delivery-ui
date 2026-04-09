@@ -11,9 +11,15 @@ interface LocationPermissionModalProps {
   site: SiteConfig;
   isOpen: boolean;
   onClose: () => void;
+  isMandatory?: boolean;
 }
 
-export default function LocationPermissionModal({ site, isOpen, onClose }: LocationPermissionModalProps) {
+export default function LocationPermissionModal({ 
+  site, 
+  isOpen, 
+  onClose,
+  isMandatory = false 
+}: LocationPermissionModalProps) {
   const setUserCoords = useConfigStore((state) => state.setUserCoords);
   const setLocationDismissed = useConfigStore((state) => state.setLocationDismissed);
 
@@ -54,8 +60,8 @@ export default function LocationPermissionModal({ site, isOpen, onClose }: Locat
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={isMandatory ? undefined : onClose}
+            className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isMandatory ? 'cursor-default' : 'cursor-pointer'}`}
           />
 
           {/* Modal Container */}
@@ -78,12 +84,14 @@ export default function LocationPermissionModal({ site, isOpen, onClose }: Locat
               <div className="relative bg-white/20 p-4 rounded-full backdrop-blur-md border border-white/30">
                 <MapPin className="w-10 h-10 text-white" />
               </div>
-              <button 
-                onClick={onClose}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/10 flex items-center justify-center text-white/80 hover:bg-black/20 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              {!isMandatory && (
+                <button 
+                  onClick={onClose}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/10 flex items-center justify-center text-white/80 hover:bg-black/20 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
             {/* Content */}
@@ -93,7 +101,9 @@ export default function LocationPermissionModal({ site, isOpen, onClose }: Locat
                   Enable Location for {site.location}?
                 </h2>
                 <p className="text-gray-500 font-medium">
-                  We use your location to calculate accurate delivery fees and show you the best deals nearby.
+                  {isMandatory 
+                    ? `Location access is required for ${site.location} to ensure the best local deals and accurate delivery.`
+                    : "We use your location to calculate accurate delivery fees and show you the best deals nearby."}
                 </p>
               </div>
 
@@ -115,12 +125,14 @@ export default function LocationPermissionModal({ site, isOpen, onClose }: Locat
                   <Navigation className="w-5 h-5 group-hover:rotate-12 transition-all" />
                   Allow Location Access
                 </button>
-                <button
-                  onClick={handleDecline}
-                  className="w-full py-4 rounded-2xl text-gray-400 font-black text-sm uppercase tracking-widest hover:text-gray-600 hover:bg-gray-50 transition-all"
-                >
-                  Maybe Later
-                </button>
+                {!isMandatory && (
+                  <button
+                    onClick={handleDecline}
+                    className="w-full py-4 rounded-2xl text-gray-400 font-black text-sm uppercase tracking-widest hover:text-gray-600 hover:bg-gray-50 transition-all"
+                  >
+                    Maybe Later
+                  </button>
+                )}
               </div>
 
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center justify-center gap-1">

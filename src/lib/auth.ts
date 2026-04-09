@@ -59,6 +59,20 @@ export async function getCurrentUser(token?: string): Promise<SessionUser | null
   };
 }
 
+/**
+ * Lightweight token verification. 
+ * Returns only the user ID from the Supabase session, 
+ * skipping the secondary DB lookup for role/status.
+ */
+export async function getAuthId(token?: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: { user } } = token 
+    ? await supabase.auth.getUser(token)
+    : await supabase.auth.getUser();
+
+  return user?.id ?? null;
+}
+
 /** Redirects to /login if not authenticated. */
 export async function requireAuth(): Promise<SessionUser> {
   const user = await getCurrentUser();

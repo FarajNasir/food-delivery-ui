@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { ownerService } from "@/services/owner.service";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 /**
@@ -10,42 +9,55 @@ import { toast } from "sonner";
 
 export interface OwnerOrder {
   id: string;
+  userId: string;
+  restaurantId: string;
   status: string;
   totalAmount: string;
   createdAt: string;
-  restaurant: { name: string };
+  updatedAt: string;
   items: {
+    id: string;
     quantity: number;
     price: string;
-    menuItem: { name: string };
+    menuItem: {
+      name: string;
+      imageUrl?: string;
+    };
   }[];
+  restaurant: {
+    name: string;
+  };
 }
 
 interface OwnerState {
   orders: OwnerOrder[];
+  ownedRestaurantIds: string[];
   isLoading: boolean;
   
   // Actions
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (id: string, status: string) => Promise<boolean>;
-  subscribeToUpdates: (restaurantId?: string) => () => void;
+  updateSingleOrder: (order: Partial<OwnerOrder> & { id: string }) => void;
 }
-
-const supabase = createClient();
 
 export const useOwnerStore = create<OwnerState>()((set, get) => ({
   orders: [],
+  ownedRestaurantIds: [],
   isLoading: false,
 
   refreshOrders: async () => {
     set({ isLoading: true });
     try {
-      const { success, data, error } = await ownerService.getLiveOrders();
-      if (success && data?.orders) {
-        set({ orders: data.orders });
-      } else if (!success) {
-        toast.error(error || "Failed to sync kitchen data");
-      }
+      const response = await ownerService.getLiveOrders();
+      // Adjusting to handle both direct array and { orders, ownedRestaurantIds }
+      const data = response.data as any;
+      const fetchedOrders = data?.orders || (Array.isArray(data) ? data : []);
+      const fetchedRestaurantIds = data?.ownedRestaurantIds || [];
+      
+      set({ 
+        orders: fetchedOrders,
+        ownedRestaurantIds: fetchedRestaurantIds
+      });
     } finally {
       set({ isLoading: false });
     }
@@ -70,33 +82,21 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     return true;
   },
 
-  subscribeToUpdates: (restaurantId) => {
-    const channel = supabase
-      .channel("owner_live_orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload: any) => {
-          // If we have a specific restaurantId, filter the realtime event
-          if (restaurantId && payload.new.restaurantId !== restaurantId) return;
-
-          if (payload.eventType === "INSERT") {
-            // New order - refresh to get full relations (items/restaurant)
-            get().refreshOrders();
-            toast.info("🔔 New order received!", { icon: "🔥" });
-          } 
-          else if (payload.eventType === "UPDATE") {
-            const updatedOrder = payload.new as OwnerOrder;
-            set((state) => ({
-              orders: state.orders.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
-            }));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  updateSingleOrder: (updatedOrder) => {
+    set((state) => {
+      const exists = state.orders.find((o) => o.id === updatedOrder.id);
+      if (exists) {
+        return {
+          orders: state.orders.map((o) =>
+            o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
+          ),
+        };
+      }
+      // If it's a new order (Partial won't have all required fields so we might need to refresh)
+      if (updatedOrder.status === 'PENDING_CONFIRMATION') {
+        get().refreshOrders();
+      }
+      return state;
+    });
   },
 }));
