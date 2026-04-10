@@ -23,6 +23,7 @@ export async function GET(req: Request) {
           imageUrl: menuItems.imageUrl,
           restaurantName: restaurants.name,
           restaurantId: restaurants.id,
+          restaurantLocation: restaurants.location,
         })
         .from(cartItems)
         .innerJoin(menuItems, eq(cartItems.menuItemId, menuItems.id))

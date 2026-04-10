@@ -8,11 +8,13 @@ import {
   Search, ShoppingBag, ChevronDown, MapPin,
   User, Tag, ShoppingBag as OrdersIcon, Settings, LogOut, Store,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import type { SessionUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
 export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
@@ -56,6 +58,8 @@ export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
     toast.success("Logged out.");
     router.push("/login");
   };
+
+  const { totalItems } = useCart();
 
   const initials = user ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "";
   const firstName = user ? user.name.split(" ")[0] : "";
@@ -183,10 +187,28 @@ export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
             {/* Cart / Bag */}
             <Link
               href="/dashboard/customer/cart"
-              className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
+              className="relative p-2 rounded-xl transition-colors hover:bg-gray-100"
               title="My Bag"
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag
+                className="w-5 h-5 transition-colors"
+                style={{ color: totalItems > 0 ? gradientFrom : "#6b7280" }}
+              />
+              <AnimatePresence>
+                {totalItems > 0 && (
+                  <motion.span
+                    key={totalItems}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                    className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-black flex items-center justify-center leading-none shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                  >
+                    {totalItems > 99 ? "99+" : totalItems}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </Link>
 
             {/* Profile dropdown — only for logged-in users */}

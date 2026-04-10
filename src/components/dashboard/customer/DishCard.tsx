@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, UtensilsCrossed, Tag, Info, ArrowRight, ShoppingCart } from "lucide-react";
 import type { AdminMenuItemResponse, PublicFeaturedDish } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
+import { useSite } from "@/context/SiteContext";
 
 interface DishCardProps {
   dish: AdminMenuItemResponse | PublicFeaturedDish;
@@ -27,6 +28,7 @@ export default function DishCard({
 }: DishCardProps) {
   const router = useRouter();
   const { addItem } = useCart();
+  const { site } = useSite();
 
   // Normalize data
   const id = "entityId" in dish ? dish.entityId : dish.id;
@@ -142,8 +144,9 @@ export default function DishCard({
                   name: name,
                   price: price,
                   imageUrl: imageUrl || "",
-                  restaurantId: "restaurantId" in dish ? dish.restaurantId : id, // Note: featured dish should probably contain restaurantId. Using id fallback.
-                  restaurantName: restaurantName || "Restaurant"
+                  restaurantId: "restaurantId" in dish ? dish.restaurantId : id,
+                  restaurantName: restaurantName || "Restaurant",
+                  restaurantLocation: site.location,
                 });
               }
             }}

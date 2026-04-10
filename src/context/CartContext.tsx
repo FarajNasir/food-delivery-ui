@@ -14,6 +14,7 @@ export interface CartItem {
   imageUrl: string;
   restaurantName: string;
   restaurantId: string;
+  restaurantLocation?: string;
 }
 
 interface CartContextType {

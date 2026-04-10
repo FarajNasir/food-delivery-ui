@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Navigation, X, ShieldCheck, ChevronRight } from "lucide-react";
+import { MapPin, Navigation, X, ShieldCheck } from "lucide-react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { toast } from "sonner";
 import { SiteConfig } from "@/config/sites";
@@ -14,11 +14,11 @@ interface LocationPermissionModalProps {
   isMandatory?: boolean;
 }
 
-export default function LocationPermissionModal({ 
-  site, 
-  isOpen, 
+export default function LocationPermissionModal({
+  site,
+  isOpen,
   onClose,
-  isMandatory = false 
+  isMandatory = false,
 }: LocationPermissionModalProps) {
   const setUserCoords = useConfigStore((state) => state.setUserCoords);
   const setLocationDismissed = useConfigStore((state) => state.setLocationDismissed);
@@ -54,63 +54,61 @@ export default function LocationPermissionModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={isMandatory ? undefined : onClose}
-            className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isMandatory ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isMandatory ? "cursor-default" : "cursor-pointer"}`}
           />
 
-          {/* Modal Container */}
+          {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
           >
-            {/* Header / Graphic */}
-            <div 
-              className="h-32 w-full flex items-center justify-center relative overflow-hidden"
-              style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientTo})` }}
-            >
-              <div className="absolute inset-0 opacity-10">
-                <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <path d="M0 100 C 20 0 50 0 100 100 Z" fill="white" />
-                </svg>
-              </div>
-              <div className="relative bg-white/20 p-4 rounded-full backdrop-blur-md border border-white/30">
-                <MapPin className="w-10 h-10 text-white" />
-              </div>
+            {/* Header */}
+            <div className="p-8 text-center bg-gray-50/50 border-b border-gray-100 relative">
               {!isMandatory && (
-                <button 
+                <button
                   onClick={onClose}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/10 flex items-center justify-center text-white/80 hover:bg-black/20 transition-all"
+                  className="absolute top-6 right-6 p-2 rounded-full bg-white border border-gray-100 text-gray-400 hover:text-gray-600 shadow-sm transition-all focus:outline-none"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
+
+              <div
+                className="w-16 h-16 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-4"
+                style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientTo})` }}
+              >
+                <MapPin className="w-8 h-8 text-white" />
+              </div>
+
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">
+                Enable Location for {site.location}
+              </h2>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+                {isMandatory ? "Location access required" : "For the best nearby deals"}
+              </p>
             </div>
 
             {/* Content */}
-            <div className="p-8 space-y-6 text-center">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-black text-gray-900 leading-tight">
-                  Enable Location for {site.location}?
-                </h2>
-                <p className="text-gray-500 font-medium">
-                  {isMandatory 
-                    ? `Location access is required for ${site.location} to ensure the best local deals and accurate delivery.`
-                    : "We use your location to calculate accurate delivery fees and show you the best deals nearby."}
-                </p>
-              </div>
+            <div className="p-8 space-y-6">
+              <p className="text-sm font-medium text-gray-500 text-center leading-relaxed">
+                {isMandatory
+                  ? `Location access is required for ${site.location} to ensure accurate delivery and the best local deals.`
+                  : "We use your location to calculate accurate delivery fees and show you the best deals nearby."}
+              </p>
 
-              {/* Technical assurance */}
-              <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl justify-center">
-                <ShieldCheck className="w-5 h-5 text-green-500" />
-                <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">
+              {/* Privacy badge */}
+              <div className="flex items-center gap-2 bg-gray-50 px-4 py-3 rounded-2xl justify-center">
+                <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
                   Your privacy is our priority
                 </span>
               </div>
@@ -119,25 +117,27 @@ export default function LocationPermissionModal({
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleAllow}
-                  className="w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 group"
-                  style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
+                  className="w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                  style={{
+                    background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
+                  }}
                 >
-                  <Navigation className="w-5 h-5 group-hover:rotate-12 transition-all" />
+                  <Navigation className="w-4 h-4" />
                   Allow Location Access
                 </button>
+
                 {!isMandatory && (
                   <button
                     onClick={handleDecline}
-                    className="w-full py-4 rounded-2xl text-gray-400 font-black text-sm uppercase tracking-widest hover:text-gray-600 hover:bg-gray-50 transition-all"
+                    className="w-full py-3 rounded-2xl text-gray-400 font-black text-sm uppercase tracking-widest hover:text-gray-600 hover:bg-gray-50 transition-all"
                   >
                     Maybe Later
                   </button>
                 )}
               </div>
 
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center justify-center gap-1">
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center">
                 You can change this in your browser settings anytime
-                <ChevronRight className="w-3 h-3" />
               </p>
             </div>
           </motion.div>

@@ -2,6 +2,7 @@
 
 import { ShoppingCart, Minus, Plus } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useSite } from "@/context/SiteContext";
 
 interface DishActionsProps {
   dish: {
@@ -21,6 +22,7 @@ interface DishActionsProps {
 
 export default function DishActions({ dish, siteTheme }: DishActionsProps) {
   const { cartItems, addItem, updateQuantity } = useCart();
+  const { site } = useSite();
   const { gradientFrom, accent } = siteTheme;
 
   const cartItem = cartItems.find(i => i.menuItemId === dish.id);
@@ -37,7 +39,8 @@ export default function DishActions({ dish, siteTheme }: DishActionsProps) {
           price: dish.price,
           imageUrl: dish.imageUrl || "",
           restaurantId: dish.restaurantId,
-          restaurantName: dish.restaurantName || "Restaurant"
+          restaurantName: dish.restaurantName || "Restaurant",
+          restaurantLocation: site.location,
         })}
         className="flex-1 flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-white font-bold uppercase tracking-wider shadow-md transition-all hover:opacity-90 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
