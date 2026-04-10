@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export interface CartItem {
   id: string;
@@ -49,8 +48,6 @@ function saveGuestCart(items: CartItem[]) {
   } catch {}
 }
 
-// Removed checkIsLoggedIn to prevent Supabase lock conflicts. Use session from onAuthStateChange instead.
-
 import { useAuthStore } from "@/store/useAuthStore";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -60,41 +57,56 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
+  // Get a fresh token from Supabase — forces a refresh if the current one is expired.
+  const getFreshToken = async (): Promise<string | null> => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      // Sync the refreshed session back into the store
+      useAuthStore.getState().setSession(session);
+      return session.access_token;
+    }
+    return null;
+  };
+
   const fetchDBCart = useCallback(async (tokenOverride?: string, retryCount = 0) => {
-    const sessionToUse = tokenOverride 
-      ? { access_token: tokenOverride } 
+    const sessionToUse = tokenOverride
+      ? { access_token: tokenOverride }
       : useAuthStore.getState().session;
 
     if (!sessionToUse?.access_token) {
-        console.log("[CartContext] No session available for fetching DB cart.");
-        setCartItems(loadGuestCart());
-        setLoading(false);
-        return;
+      console.log("[CartContext] No session available for fetching DB cart.");
+      setCartItems(loadGuestCart());
+      setLoading(false);
+      return;
     }
 
     console.log(`[CartContext] Fetching DB cart (retry: ${retryCount})...`);
 
     try {
-      const res = await fetch("/api/cart", { 
+      const res = await fetch("/api/cart", {
         cache: "no-store",
         headers: {
-            "Authorization": `Bearer ${sessionToUse.access_token}`
+          "Authorization": `Bearer ${sessionToUse.access_token}`
         }
       });
-      
+
       if (res.status === 401) {
         console.warn(`[CartContext] 401 Unauthorized received (retry: ${retryCount})`);
         if (retryCount < 1) {
-          await new Promise(r => setTimeout(r, 500));
-          return fetchDBCart(tokenOverride, retryCount + 1);
+          // Try to get a fresh token from Supabase before retrying
+          const freshToken = await getFreshToken();
+          if (freshToken) {
+            return fetchDBCart(freshToken, retryCount + 1);
+          }
         }
-        console.warn("[CartContext] Session unauthorized after retry. Falling back to guest cart.");
+        // Only fall back to guest if we genuinely have no valid session
+        console.warn("[CartContext] Could not refresh session. Falling back to guest cart.");
         setCartItems(loadGuestCart());
         return;
       }
 
       const data = await res.json();
-      
       const fetchedItems = data.data?.items || (Array.isArray(data.data) ? data.data : null);
 
       if (Array.isArray(fetchedItems)) {

@@ -5,66 +5,72 @@ import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
 import {
   ShoppingBag, Clock, CheckCircle2, CreditCard,
-  Package, Truck, AlertCircle, Store
+  Package, Truck, AlertCircle, ChevronRight, Star, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, MessageSquare, Star } from "lucide-react";
 import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
 
 const STATUS_CONFIG: Record<
   string,
-  { label: string; icon: any; color: string; hex: string; description: string }
+  { label: string; icon: any; color: string; hex: string; bg: string; description: string }
 > = {
   PENDING_CONFIRMATION: {
     label: "Awaiting Confirmation",
     icon: Clock,
-    color: "bg-amber-50 text-amber-700 border-amber-200",
+    color: "text-amber-700",
+    bg: "bg-amber-50",
     hex: "#F59E0B",
-    description: "Waiting for restaurant to confirm...",
+    description: "Waiting for the restaurant to confirm your order",
   },
   CONFIRMED: {
     label: "Confirmed",
     icon: CheckCircle2,
-    color: "bg-green-50 text-green-700 border-green-200",
+    color: "text-green-700",
+    bg: "bg-green-50",
     hex: "#22C55E",
-    description: "Restaurant confirmed — proceed with payment.",
+    description: "Confirmed — ready to proceed with payment",
   },
   PAID: {
     label: "Paid",
     icon: CreditCard,
-    color: "bg-blue-50 text-blue-700 border-blue-200",
+    color: "text-blue-700",
+    bg: "bg-blue-50",
     hex: "#3B82F6",
-    description: "Payment received — preparing your food.",
+    description: "Payment received — kitchen is on it",
   },
   PREPARING: {
     label: "Preparing",
     icon: Package,
-    color: "bg-purple-50 text-purple-700 border-purple-200",
+    color: "text-purple-700",
+    bg: "bg-purple-50",
     hex: "#A855F7",
-    description: "Chef is working on your meal!",
+    description: "Chef is working on your meal",
   },
   OUT_FOR_DELIVERY: {
     label: "Out for Delivery",
     icon: Truck,
-    color: "bg-orange-50 text-orange-700 border-orange-200",
+    color: "text-orange-700",
+    bg: "bg-orange-50",
     hex: "#F97316",
-    description: "Your food is on the way!",
+    description: "Your food is on the way",
   },
   DELIVERED: {
     label: "Delivered",
     icon: CheckCircle2,
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    color: "text-emerald-700",
+    bg: "bg-emerald-50",
     hex: "#10B981",
-    description: "Enjoy your meal! 🎉",
+    description: "Enjoy your meal!",
   },
   CANCELLED: {
     label: "Cancelled",
     icon: AlertCircle,
-    color: "bg-red-50 text-red-700 border-red-200",
+    color: "text-red-700",
+    bg: "bg-red-50",
     hex: "#EF4444",
-    description: "This order was cancelled.",
+    description: "This order was cancelled",
   },
 };
 
@@ -77,25 +83,18 @@ export default function CustomerOrdersPage() {
   const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
-
-
   const handlePayment = async (orderId: string) => {
     try {
       setIsPaying(orderId);
-      const res = await fetch(`/api/orders/${orderId}/stripe/session`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/orders/${orderId}/stripe/session`, { method: "POST" });
       const data = await res.json();
-      
       const sessionUrl = data.url || data.data?.url;
-
       if (sessionUrl) {
         window.location.href = sessionUrl;
       } else {
         toast.error(data.message || data.error || "Failed to initialize payment session");
       }
-    } catch (err) {
-      console.error("[handlePayment]", err);
+    } catch {
       toast.error("A network error occurred. Please try again.");
     } finally {
       setIsPaying(null);
@@ -104,192 +103,198 @@ export default function CustomerOrdersPage() {
 
   if (loading) {
     return (
-      <div className="py-24 flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-4 border-gray-100 border-t-blue-500 rounded-full animate-spin" />
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fetching orders...</p>
+      <div className="py-32 flex flex-col items-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: gradientFrom }} />
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Loading orders…</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 pb-12">
-      {/* Header */}
-      <div className="px-2">
-        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Orders</h1>
-        <p className="text-sm font-medium text-gray-500 mt-1">Track your meals or browse your order history.</p>
+    <div className="w-full max-w-3xl mx-auto pb-16 space-y-8">
+
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight" style={{ color: "var(--dash-text-primary)" }}>
+          My Orders
+        </h1>
+        <p className="text-sm font-medium text-gray-400 mt-1">
+          Track your meals or browse your order history.
+        </p>
       </div>
 
       {/* Empty state */}
       {orders.length === 0 ? (
-        <div className="py-32 text-center bg-white rounded-2xl border border-gray-100 shadow-sm">
-          <div className="w-16 h-16 mx-auto bg-gray-50 rounded-full flex items-center justify-center mb-4">
-            <ShoppingBag className="w-8 h-8 text-gray-300" />
+        <div className="py-32 flex flex-col items-center gap-4 rounded-3xl bg-white border border-gray-100">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: `${gradientFrom}12` }}
+          >
+            <ShoppingBag className="w-7 h-7" style={{ color: gradientFrom }} />
           </div>
-          <p className="text-base font-bold text-gray-900">No orders yet</p>
-          <p className="text-sm text-gray-400 mt-1">Hungry? Discover something delicious nearby!</p>
+          <div className="text-center">
+            <p className="text-base font-black text-gray-800">No orders yet</p>
+            <p className="text-sm text-gray-400 font-medium mt-1">Hungry? Find something delicious nearby.</p>
+          </div>
+          <button
+            onClick={() => router.push("/dashboard/customer")}
+            className="mt-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:opacity-90 transition-all"
+            style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+          >
+            Browse Restaurants
+          </button>
         </div>
       ) : (
-        <div className="grid gap-5">
+        <div className="space-y-4">
           {orders.map((order: any) => {
             const config = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION;
             const Icon = config.icon;
+            const date = new Date(order.createdAt).toLocaleDateString("en-GB", {
+              day: "numeric", month: "short", year: "numeric",
+            });
 
             return (
               <div
                 key={order.id}
-                className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
+                className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
               >
-                {/* thin status bar */}
-                <div
-                  className="h-1 w-full"
-                  style={{ backgroundColor: config.hex }}
-                />
+                {/* Coloured accent bar */}
+                <div className="h-[3px]" style={{ background: config.hex }} />
 
-                <div className="p-6">
-                  {/* Top row */}
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
-                    <div className="flex items-start gap-4">
+                <div className="p-6 space-y-5">
+
+                  {/* ── Top: status + restaurant + price ── */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {/* Status icon */}
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                        style={{ backgroundColor: `${config.hex}10` }}
+                        className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0", config.bg)}
                       >
-                        <Icon className="w-6 h-6" style={{ color: config.hex }} />
+                        <Icon className="w-5 h-5" style={{ color: config.hex }} />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                            Order #{order.id?.slice(0, 8)}
-                          </span>
+
+                      <div className="min-w-0">
+                        {/* Status badge + order id */}
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span
-                            className={cn(
-                              "text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border",
-                              config.color
-                            )}
+                            className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full", config.bg, config.color)}
                           >
                             {config.label}
                           </span>
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                            #{order.id?.slice(0, 8)}
+                          </span>
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                          {order.restaurant?.name || "Restaurant"}
-                        </h3>
-                        <p className="text-xs text-gray-500 font-medium">
-                          {config.description}
+
+                        {/* Restaurant */}
+                        <p className="font-black text-gray-900 text-base leading-tight truncate">
+                          {order.restaurant?.name ?? "Restaurant"}
                         </p>
+
+                        {/* Description + date */}
+                        <p className="text-xs font-medium text-gray-400 mt-0.5">{config.description}</p>
                       </div>
                     </div>
-                    <div className="md:text-right border-t md:border-t-0 pt-4 md:pt-0 border-gray-50">
+
+                    {/* Price + date */}
+                    <div className="text-right shrink-0">
                       <p className="text-xl font-black text-gray-900">
                         £{parseFloat(order.totalAmount).toFixed(2)}
                       </p>
-                      <p className="text-xs text-gray-400 flex items-center md:justify-end gap-1.5 mt-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 flex items-center gap-1 justify-end">
                         <Clock className="w-3 h-3" />
-                        {new Date(order.createdAt).toLocaleDateString("en-GB", {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
+                        {date}
                       </p>
                     </div>
                   </div>
 
-                  {/* Items */}
-                  <div className="bg-[#FAFAFA] rounded-xl p-4 border border-gray-100/60 mb-5">
-                    <div className="space-y-2.5">
-                      {order.items?.map((item: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600 font-medium flex items-center">
-                            <span className="w-6 h-6 flex items-center justify-center bg-white border border-gray-100 rounded text-[10px] font-bold text-gray-500 mr-3">
+                  {/* ── Items list ── */}
+                  {order.items?.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <div className="h-px bg-gray-50" />
+                      {order.items.map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="text-[10px] font-black text-gray-400 bg-gray-50 border border-gray-100 rounded-lg w-7 h-6 flex items-center justify-center"
+                            >
                               {item.quantity}×
                             </span>
-                            {item.menuItem?.name || "Item"}
-                          </span>
-                          <span className="text-gray-500 font-bold">
+                            <span className="text-sm font-semibold text-gray-700">
+                              {item.menuItem?.name ?? "Item"}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-500">
                             £{parseFloat(item.price).toFixed(2)}
                           </span>
                         </div>
                       ))}
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100/80">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                        Order Total
-                      </span>
-                      <span className="text-lg font-black text-gray-900">
-                        £{parseFloat(order.totalAmount).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-3">
-                    {order.status === "CONFIRMED" && (
-                      <div className="space-y-3">
-                        <button
-                          onClick={() => handlePayment(order.id)}
-                          disabled={!!isPaying}
-                          className="w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 disabled:opacity-50"
-                          style={{
-                            background: `linear-gradient(135deg, ${gradientFrom}, ${accent})`,
-                          }}
-                        >
-                          {isPaying === order.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <CreditCard className="w-4 h-4" />
-                          )}
-                          {isPaying === order.id ? "Initializing..." : "Complete Secure Payment"}
-                        </button>
-                      </div>
-                    )}
-
-
-                    {order.status === "PAID" && (
-                      <div className="flex items-center justify-center gap-3 py-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
-                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-sm">
-                          <CheckCircle2 className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-xs font-black text-blue-700 uppercase tracking-widest">
-                          Payment Confirmed
+                      <div className="h-px bg-gray-50 !mt-3" />
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          Order Total
+                        </span>
+                        <span className="text-base font-black" style={{ color: accent }}>
+                          £{parseFloat(order.totalAmount).toFixed(2)}
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {/* ── Actions ── */}
+                  <div className="space-y-2 pt-1">
+
+                    {/* Pay now */}
+                    {order.status === "CONFIRMED" && (
+                      <button
+                        onClick={() => handlePayment(order.id)}
+                        disabled={!!isPaying}
+                        className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:translate-y-0"
+                        style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                      >
+                        {isPaying === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                        {isPaying === order.id ? "Initializing…" : "Complete Secure Payment"}
+                      </button>
                     )}
 
-                    {order.status === "DELIVERED" && (
-                      <div className="space-y-3">
-                        {!order.review ? (
-                          <button
-                            onClick={() => {
-                              setSelectedOrderForFeedback(order);
-                              setIsFeedbackOpen(true);
-                            }}
-                            className="w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
-                            style={{
-                              background: `linear-gradient(135deg, ${gradientFrom}, ${accent})`,
-                            }}
-                          >
-                            <Star className="w-4 h-4 fill-white" />
-                            Rate Your Experience
-                          </button>
-                        ) : (
-                          <div className="flex items-center justify-center gap-3 py-4 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
-                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
-                              <Star className="w-4 h-4 text-white fill-white" />
-                            </div>
-                            <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">
-                              {order.review.status === 'active' ? `Rated ${order.review.rating}/5` : 'Review Pending'}
-                            </span>
-                          </div>
-                        )}
+                    {/* Payment confirmed */}
+                    {order.status === "PAID" && (
+                      <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-50 text-blue-700">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Payment Confirmed</span>
                       </div>
                     )}
 
-                    {/* View Details Link */}
+                    {/* Rate experience */}
+                    {order.status === "DELIVERED" && (
+                      !order.review ? (
+                        <button
+                          onClick={() => { setSelectedOrderForFeedback(order); setIsFeedbackOpen(true); }}
+                          className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                          style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                        >
+                          <Star className="w-4 h-4 fill-white" />
+                          Rate Your Experience
+                        </button>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 text-emerald-700">
+                          <Star className="w-4 h-4 fill-emerald-500 text-emerald-500" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">
+                            {order.review.status === "active" ? `Rated ${order.review.rating}/5` : "Review Pending"}
+                          </span>
+                        </div>
+                      )
+                    )}
 
-                    <button 
+                    {/* Track order */}
+                    <button
                       onClick={() => router.push(`/dashboard/customer/status/${order.id}`)}
-                      className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors py-2"
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all"
                     >
-                      View Real-time Tracking →
+                      View Real-time Tracking
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </button>
+
                   </div>
                 </div>
               </div>
@@ -297,18 +302,14 @@ export default function CustomerOrdersPage() {
           })}
         </div>
       )}
-      {/* Feedback Modal */}
-      <FeedbackModal 
+
+      <FeedbackModal
         isOpen={isFeedbackOpen}
-        onClose={() => {
-          setIsFeedbackOpen(false);
-          setSelectedOrderForFeedback(null);
-        }}
+        onClose={() => { setIsFeedbackOpen(false); setSelectedOrderForFeedback(null); }}
         order={selectedOrderForFeedback}
         site={site}
         onSuccess={refreshOrders}
       />
     </div>
-
   );
 }

@@ -126,26 +126,79 @@ export async function POST(req: Request) {
 /**
  * GET /api/orders
  * Fetches all orders for the current customer with restaurant and item details.
+ * Uses explicit joins instead of db.query relational layer for reliability.
  */
 export async function GET(req: Request) {
   return withAuth(req, async (user) => {
     try {
-      const results = await db.query.orders.findMany({
-        where: eq(orders.userId, user.id),
-        with: {
-          restaurant: true,
-          items: {
-            with: {
-              menuItem: true
-            }
-          },
-          review: true
-        },
-        orderBy: [desc(orders.createdAt)]
+      // Step 1: fetch orders + restaurant name
+      const orderRows = await db
+        .select({
+          id:             orders.id,
+          userId:         orders.userId,
+          restaurantId:   orders.restaurantId,
+          restaurantName: restaurants.name,
+          status:         orders.status,
+          totalAmount:    orders.totalAmount,
+          deliveryFee:    orders.deliveryFee,
+          deliveryAddress:orders.deliveryAddress,
+          deliveryArea:   orders.deliveryArea,
+          customerPhone:  orders.customerPhone,
+          currency:       orders.currency,
+          paymentIntentId:orders.paymentIntentId,
+          createdAt:      orders.createdAt,
+          updatedAt:      orders.updatedAt,
+        })
+        .from(orders)
+        .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+        .where(eq(orders.userId, user.id))
+        .orderBy(desc(orders.createdAt));
 
-      });
+      if (orderRows.length === 0) return ok({ orders: [] });
 
-      return ok({ orders: results });
+      // Step 2: fetch all order items for those orders in one query
+      const orderIds = orderRows.map((o) => o.id);
+      const itemRows = await db
+        .select({
+          id:          orderItems.id,
+          orderId:     orderItems.orderId,
+          menuItemId:  orderItems.menuItemId,
+          quantity:    orderItems.quantity,
+          price:       orderItems.price,
+          itemName:    menuItems.name,
+          itemImageUrl:menuItems.imageUrl,
+        })
+        .from(orderItems)
+        .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+        .where(inArray(orderItems.orderId, orderIds));
+
+      // Step 3: assemble
+      const result = orderRows.map((order) => ({
+        id:             order.id,
+        userId:         order.userId,
+        restaurantId:   order.restaurantId,
+        status:         order.status,
+        totalAmount:    order.totalAmount,
+        deliveryFee:    order.deliveryFee,
+        deliveryAddress:order.deliveryAddress,
+        deliveryArea:   order.deliveryArea,
+        customerPhone:  order.customerPhone,
+        currency:       order.currency,
+        paymentIntentId:order.paymentIntentId,
+        createdAt:      order.createdAt,
+        updatedAt:      order.updatedAt,
+        restaurant: { name: order.restaurantName },
+        items: itemRows
+          .filter((i) => i.orderId === order.id)
+          .map((i) => ({
+            id:       i.id,
+            quantity: i.quantity,
+            price:    i.price,
+            menuItem: { id: i.menuItemId, name: i.itemName, imageUrl: i.itemImageUrl },
+          })),
+      }));
+
+      return ok({ orders: result });
     } catch (err) {
       console.error("[api/orders GET]", err);
       return fail("Failed to fetch orders.", 500);

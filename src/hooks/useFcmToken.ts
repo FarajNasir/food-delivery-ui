@@ -38,31 +38,33 @@ export const useFcmToken = (userId: string | undefined) => {
 
     const retrieveToken = async () => {
       try {
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        if (!("serviceWorker" in navigator)) return;
 
-          if (Notification.permission === "granted") {
-            const currentToken = await getToken(messaging!, {
-              vapidKey: VAPID_KEY,
-              serviceWorkerRegistration: registration
-            });
-            if (currentToken) {
-              setToken(currentToken);
-              registerToken(currentToken);
-            }
-          } else if (Notification.permission !== "denied") {
-            const permission = await Notification.requestPermission();
-            setNotificationPermissionStatus(permission);
-            if (permission === "granted") {
-              const currentToken = await getToken(messaging!, {
-                vapidKey: VAPID_KEY,
-                serviceWorkerRegistration: registration
-              });
-              if (currentToken) {
-                setToken(currentToken);
-                registerToken(currentToken);
-              }
-            }
+        await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+
+        // Wait for an active service worker before calling getToken.
+        // Without this, getToken throws an AbortError because the SW
+        // is still in the "installing" state when subscribe() is called.
+        const registration = await navigator.serviceWorker.ready;
+
+        const getAndRegisterToken = async () => {
+          const currentToken = await getToken(messaging!, {
+            vapidKey: VAPID_KEY,
+            serviceWorkerRegistration: registration,
+          });
+          if (currentToken) {
+            setToken(currentToken);
+            registerToken(currentToken);
+          }
+        };
+
+        if (Notification.permission === "granted") {
+          await getAndRegisterToken();
+        } else if (Notification.permission !== "denied") {
+          const permission = await Notification.requestPermission();
+          setNotificationPermissionStatus(permission);
+          if (permission === "granted") {
+            await getAndRegisterToken();
           }
         }
       } catch (error) {

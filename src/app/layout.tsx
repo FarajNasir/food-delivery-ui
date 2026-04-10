@@ -56,7 +56,6 @@ export default function RootLayout({
                 <Toaster
                   position="top-center"
                   richColors
-                  closeButton
                   toastOptions={{
                     style: { fontSize: "14px" },
                   }}

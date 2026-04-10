@@ -3,12 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, ArrowRight, Minus, Plus, Trash2, ChevronRight, Store, MapPin, AlertTriangle } from "lucide-react";
+import { ShoppingBag, ArrowRight, Minus, Plus, Trash2, ChevronRight, Store, MapPin, AlertTriangle, Sparkles } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
 import { useConfigStore } from "@/store/useConfigStore";
 import LocationPermissionModal from "@/components/shared/LocationPermissionModal";
+import DishCard, { SkeletonDishCard } from "@/components/dashboard/customer/DishCard";
+import { featuredApi, type PublicFeaturedDish } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function CustomerCart() {
@@ -27,6 +29,19 @@ export default function CustomerCart() {
       return () => clearTimeout(t);
     }
   }, []);
+
+  const [featuredDishes, setFeaturedDishes] = useState<PublicFeaturedDish[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
+  useEffect(() => {
+    setFeaturedLoading(true);
+    featuredApi.listDishes(site.location).then((res) => {
+      if (res.success && res.data) {
+        setFeaturedDishes(res.data.items.slice(0, 3));
+      }
+      setFeaturedLoading(false);
+    });
+  }, [site.location]);
 
   // Group items by restaurant
   const groupedItems = React.useMemo(() => {
@@ -281,42 +296,26 @@ export default function CustomerCart() {
         onClose={() => setLocationModalOpen(false)}
       />
 
-      {/* Suggested / popular picks */}
-      <div
-        className="rounded-[2.5rem] p-6 shadow-sm"
-        style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
-      >
-        <h2 className="text-sm font-black uppercase tracking-widest mb-6 px-2 opacity-50" style={{ color: "var(--dash-text-primary)" }}>
-          Popular additions
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {[
-            { name: "Margherita Pizza", place: "Pizza Palace", price: "£12.99", emoji: "🍕" },
-            { name: "Smash Burger",     place: "The Anchor",   price: "£10.50", emoji: "🍔" },
-            { name: "Chicken Tikka",   place: "Curry House",  price: "£11.00", emoji: "🍛" },
-          ].map((item) => (
-            <Link
-              key={item.name}
-              href="/"
-              className="flex flex-col gap-3 p-4 rounded-3xl transition-all hover:shadow-md hover:scale-[1.02] active:scale-95 text-center sm:text-left"
-              style={{ background: "var(--dash-bg)", border: "1px solid var(--dash-card-border)" }}
-            >
-              <span className="text-4xl filter drop-shadow-sm">{item.emoji}</span>
-              <div>
-                <p className="text-xs font-black leading-tight truncate mb-0.5" style={{ color: "var(--dash-text-primary)" }}>
-                  {item.name}
-                </p>
-                <p className="text-[10px] font-bold opacity-50 truncate" style={{ color: "var(--dash-text-secondary)" }}>
-                  {item.place}
-                </p>
-              </div>
-              <p className="text-xs font-black mt-auto" style={{ color: "var(--dash-accent)" }}>
-                {item.price}
-              </p>
-            </Link>
-          ))}
+      {/* Featured dishes — real data from API */}
+      {(featuredLoading || featuredDishes.length > 0) && (
+        <div
+          className="rounded-[2.5rem] p-6 shadow-sm"
+          style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
+        >
+          <h2 className="text-sm font-black uppercase tracking-widest mb-6 px-2 flex items-center gap-2" style={{ color: "var(--dash-text-primary)", opacity: 0.5 }}>
+            <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400 opacity-100" style={{ opacity: 1 }} />
+            You might also like
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {featuredLoading
+              ? [1, 2, 3].map((n) => <SkeletonDishCard key={n} />)
+              : featuredDishes.map((dish) => (
+                  <DishCard key={dish.id} dish={dish} theme={site.theme} />
+                ))
+            }
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

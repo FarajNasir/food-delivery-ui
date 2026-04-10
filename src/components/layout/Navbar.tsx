@@ -204,28 +204,16 @@ export default function Navbar() {
                 </Link>
               </li>
             ) : (
-              <>
-                <li>
-                  <Link
-                    href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 py-3 px-2 rounded-xl text-base font-medium transition-colors"
-                  >
-                    <LogIn className="w-5 h-5" />
-                    Sign In
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/register"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 py-3 px-2 rounded-xl text-base font-medium transition-colors"
-                  >
-                    <LogIn className="w-5 h-5" />
-                    Create Account
-                  </Link>
-                </li>
-              </>
+              <li>
+                <Link
+                  href="/login"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 py-3 px-2 rounded-xl text-base font-medium transition-colors"
+                >
+                  <LogIn className="w-5 h-5" />
+                  Sign In
+                </Link>
+              </li>
             )}
 
             <li className="pt-2 pb-1">

@@ -17,11 +17,17 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
-export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
+export default function CustomerNavbar({ user: serverUser }: { user: SessionUser | null }) {
   const { site, setSite } = useSite();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { profile, isReady } = useAuthStore();
+
+  // Once the client-side store is ready, use the DB profile (always fresh).
+  // Until then, fall back to the server-passed user to avoid a "Sign In" flash
+  // on first render before the auth listener fires.
+  const user = isReady ? profile : serverUser;
 
   const [locationOpen, setLocationOpen] = useState(false);
   const [profileOpen,  setProfileOpen]  = useState(false);
@@ -61,8 +67,9 @@ export default function CustomerNavbar({ user }: { user: SessionUser | null }) {
 
   const { totalItems } = useCart();
 
-  const initials = user ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "";
-  const firstName = user ? user.name.split(" ")[0] : "";
+  const initials = user?.name ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "";
+  const firstName = user?.name ? user.name.split(" ")[0] : "";
+
   const { gradientFrom, gradientTo, accent } = site.theme;
 
   return (
