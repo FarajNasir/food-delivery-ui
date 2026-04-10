@@ -43,10 +43,10 @@ export const useConfigStore = create<ConfigState>()(
     }),
     {
       name: "site-config",
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         site: state.site,
         userCoords: state.userCoords,
-        locationDismissed: state.locationDismissed
+        // locationDismissed is intentionally NOT persisted — re-ask each session
       }),
     }
   )

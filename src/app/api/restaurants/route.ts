@@ -40,7 +40,13 @@ export async function GET(req: Request) {
 
     const rows = await query;
 
-    return ok({ items: rows });
+    return new Response(JSON.stringify({ data: { items: rows } }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (err) {
     console.error("[api/restaurants GET]", err);
     return fail("Failed to load restaurants.", 500);

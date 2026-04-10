@@ -38,9 +38,15 @@ export async function GET(req: Request) {
         .where(where)
         .orderBy(asc(featuredItems.sortOrder));
 
-      return ok({ items: rows });
-    } 
-    
+      return new Response(JSON.stringify({ data: { items: rows } }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
     // If type is dish, join with menuItems and restaurants
     // Optionally filter by restaurantId if passed (for the modal)
     const dishConditions: (SQL | undefined)[] = [where];
@@ -74,7 +80,13 @@ export async function GET(req: Request) {
       price: parseFloat(r.price as unknown as string),
     }));
 
-    return ok({ items });
+    return new Response(JSON.stringify({ data: { items } }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (err) {
     console.error("[api/featured GET]", err);
     return fail("Failed to load featured items.", 500);

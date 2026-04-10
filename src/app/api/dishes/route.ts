@@ -57,7 +57,13 @@ export async function GET(req: Request) {
       price: parseFloat(r.price as unknown as string),
     }));
 
-    return ok({ items });
+    return new Response(JSON.stringify({ data: { items } }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (err) {
     console.error("[api/dishes GET]", err);
     return fail("Failed to load dishes.", 500);

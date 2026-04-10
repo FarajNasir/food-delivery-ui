@@ -82,7 +82,6 @@ async function loadProfile(session: Session) {
 // so we never set isReady before we have a trustworthy session.
 if (typeof window !== 'undefined') {
   supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-    console.log(`[useAuthStore] Auth Event: ${event}`);
     const store = useAuthStore.getState();
 
     switch (event) {

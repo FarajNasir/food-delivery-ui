@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -75,13 +75,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       : useAuthStore.getState().session;
 
     if (!sessionToUse?.access_token) {
-      console.log("[CartContext] No session available for fetching DB cart.");
       setCartItems(loadGuestCart());
       setLoading(false);
       return;
     }
-
-    console.log(`[CartContext] Fetching DB cart (retry: ${retryCount})...`);
 
     try {
       const res = await fetch("/api/cart", {
@@ -92,16 +89,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.status === 401) {
-        console.warn(`[CartContext] 401 Unauthorized received (retry: ${retryCount})`);
         if (retryCount < 1) {
-          // Try to get a fresh token from Supabase before retrying
           const freshToken = await getFreshToken();
-          if (freshToken) {
-            return fetchDBCart(freshToken, retryCount + 1);
-          }
+          if (freshToken) return fetchDBCart(freshToken, retryCount + 1);
         }
-        // Only fall back to guest if we genuinely have no valid session
-        console.warn("[CartContext] Could not refresh session. Falling back to guest cart.");
         setCartItems(loadGuestCart());
         return;
       }
@@ -110,10 +101,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const fetchedItems = data.data?.items || (Array.isArray(data.data) ? data.data : null);
 
       if (Array.isArray(fetchedItems)) {
-        console.log(`[CartContext] Successfully fetched ${fetchedItems.length} items from DB.`);
         setCartItems(fetchedItems);
       } else {
-        console.warn("[CartContext] No valid items array found in response:", data);
         if (data.success) setCartItems(loadGuestCart());
       }
     } catch (err) {
@@ -134,20 +123,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const guestItems = loadGuestCart();
     if (guestItems.length === 0) return;
 
-    console.log(`[CartContext] Syncing ${guestItems.length} guest items to DB...`);
-
     try {
       const res = await fetch("/api/cart/sync", {
         method: "POST",
-        headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToUse.access_token}`
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${sessionToUse.access_token}`,
         },
         body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
       });
-      
+
       if (res.ok) {
-        console.log("[CartContext] Guest cart synced successfully.");
         localStorage.removeItem(GUEST_CART_KEY);
       }
     } catch (err) {
@@ -159,16 +145,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!isReady) return;
 
     const initCart = async () => {
-        setLoading(true);
-        if (session) {
-            console.log("[CartContext] Auth detected, initiating sync and fetch...");
-            await syncGuestCartToDB(session.access_token);
-            await fetchDBCart(session.access_token);
-        } else {
-            console.log("[CartContext] No session, loading guest cart.");
-            setCartItems(loadGuestCart());
-            setLoading(false);
-        }
+      setLoading(true);
+      if (session) {
+        await syncGuestCartToDB(session.access_token);
+        await fetchDBCart(session.access_token);
+      } else {
+        setCartItems(loadGuestCart());
+        setLoading(false);
+      }
     };
 
     initCart();
@@ -292,21 +276,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-  const totalPrice = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const totalItems = useMemo(() => cartItems.reduce((acc, item) => acc + item.quantity, 0), [cartItems]);
+  const totalPrice = useMemo(() => cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0), [cartItems]);
+
+  const value = useMemo(() => ({
+    cartItems,
+    loading,
+    isGuest,
+    totalItems,
+    totalPrice,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart,
+  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart]);
 
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      loading,
-      isGuest,
-      totalItems,
-      totalPrice,
-      addItem,
-      removeItem,
-      updateQuantity,
-      clearCart,
-    }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

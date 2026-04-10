@@ -8,16 +8,20 @@ import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Menu, X, MapPin, ChevronDown, ShoppingBag, LogIn, LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Session, type User } from "@supabase/supabase-js";
+import { useCart } from "@/context/CartContext";
+import NavCartDrawer from "@/components/layout/NavCartDrawer";
 
 export default function Navbar() {
   const { site, setSite } = useSite();
   const pathname = usePathname();
   const isHome = pathname === "/";
 
-  const [menuOpen, setMenuOpen]       = useState(false);
+  const [menuOpen, setMenuOpen]         = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [scrolled, setScrolled]       = useState(!isHome);
-  const [loggedIn, setLoggedIn]       = useState(false);
+  const [scrolled, setScrolled]         = useState(!isHome);
+  const [loggedIn, setLoggedIn]         = useState(false);
+  const [cartOpen, setCartOpen]         = useState(false);
+  const { totalItems } = useCart();
 
   // Check session on mount
   useEffect(() => {
@@ -153,15 +157,22 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* Order Now */}
-            <a
-              href="#restaurants"
-              className="hidden sm:flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 shadow-md whitespace-nowrap"
+            {/* Cart */}
+            <button
+              onClick={() => setCartOpen(true)}
+              className="hidden sm:flex relative items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 shadow-md whitespace-nowrap"
               style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`, color: "#fff" }}
             >
               <ShoppingBag className="w-4 h-4" />
-              Order Now
-            </a>
+              Cart
+              {totalItems > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-white text-[10px] font-black flex items-center justify-center leading-none shadow"
+                  style={{ color: site.theme.gradientFrom }}
+                >
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
+            </button>
 
             {/* Mobile menu toggle */}
             <button
@@ -217,19 +228,27 @@ export default function Navbar() {
             )}
 
             <li className="pt-2 pb-1">
-              <a
-                href="#restaurants"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-center gap-2 text-sm font-bold py-3.5 rounded-2xl text-white shadow-md"
+              <button
+                onClick={() => { setMenuOpen(false); setCartOpen(true); }}
+                className="relative w-full flex items-center justify-center gap-2 text-sm font-bold py-3.5 rounded-2xl text-white shadow-md"
                 style={{ background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})` }}
               >
                 <ShoppingBag className="w-4 h-4" />
-                Order Now
-              </a>
+                My Cart
+                {totalItems > 0 && (
+                  <span className="ml-1 bg-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ color: site.theme.gradientFrom }}
+                  >
+                    {totalItems > 99 ? "99+" : totalItems}
+                  </span>
+                )}
+              </button>
             </li>
           </ul>
         </div>
       )}
+
+      <NavCartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </nav>
   );
 }

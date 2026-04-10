@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Navigation, X, ShieldCheck } from "lucide-react";
+import { MapPin, Navigation, X, ShieldCheck, Loader2 } from "lucide-react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { toast } from "sonner";
 import { SiteConfig } from "@/config/sites";
@@ -22,26 +22,43 @@ export default function LocationPermissionModal({
 }: LocationPermissionModalProps) {
   const setUserCoords = useConfigStore((state) => state.setUserCoords);
   const setLocationDismissed = useConfigStore((state) => state.setLocationDismissed);
+  const [loading, setLoading] = useState(false);
 
   const handleAllow = () => {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      toast.error("Your browser does not support location access.");
       onClose();
       return;
     }
+
+    setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         setUserCoords({ lat: latitude, lng: longitude });
         toast.success("Location access granted!");
+        setLoading(false);
         onClose();
       },
       (error) => {
-        console.error("Geolocation error:", error);
-        toast.error("Could not get your location. Please check browser permissions.");
-        onClose();
-      }
+        setLoading(false);
+        if (error.code === 1) {
+          // PERMISSION_DENIED
+          toast.error("Location permission denied. Please allow it in your browser settings.");
+        } else if (error.code === 2) {
+          // POSITION_UNAVAILABLE — common on laptops without GPS
+          toast.warning("Location unavailable. Your device may not support GPS — delivery address can be entered at checkout.");
+          setLocationDismissed(true);
+          onClose();
+        } else if (error.code === 3) {
+          // TIMEOUT
+          toast.error("Location request timed out. Please try again.");
+        } else {
+          toast.error("Could not get your location. Please try again.");
+        }
+      },
+      { timeout: 10000, maximumAge: 60000 }
     );
   };
 
@@ -117,13 +134,18 @@ export default function LocationPermissionModal({
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleAllow}
-                  className="w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                  disabled={loading}
+                  className="w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
                   style={{
                     background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.accent})`,
                   }}
                 >
-                  <Navigation className="w-4 h-4" />
-                  Allow Location Access
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Navigation className="w-4 h-4" />
+                  )}
+                  {loading ? "Detecting location..." : "Allow Location Access"}
                 </button>
 
                 {!isMandatory && (

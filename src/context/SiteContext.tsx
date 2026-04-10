@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { SiteKey, SiteConfig, SITES, DEFAULT_SITE } from "@/config/sites";
+import { useConfigStore } from "@/store/useConfigStore";
 
 interface SiteContextType {
   site: SiteConfig;
@@ -26,10 +27,7 @@ export function SiteProvider({
 
   const setSite = (key: SiteKey) => {
     setSiteKey(key);
-    // Sync with Zustand store to fix the "See all" location bug
-    import("@/store/useConfigStore").then((m) => {
-      m.useConfigStore.getState().setSite(key);
-    });
+    useConfigStore.getState().setSite(key);
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedSite", key);
     }

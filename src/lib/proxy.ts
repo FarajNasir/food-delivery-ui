@@ -63,20 +63,11 @@ export async function withAuth<T = NextResponse>(
   roles?: UserRole[]
 ): Promise<T | NextResponse<ApiError>> {
   try {
-    const path = new URL(req.url).pathname;
     const authHeader = req.headers.get("Authorization");
     const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined;
-    
-    console.log(`[withAuth] → ${req.method} ${path} (Token: ${!!token})`);
-    
     const user = await getCurrentUser(token);
-    
-    if (!user) {
-      console.log(`[withAuth] ✗ No user found for ${path} — returning 401`);
-      return fail("Unauthorized.", 401);
-    }
 
-    console.log(`[withAuth] ✓ Authenticated: ${user.id} (${user.role}) for ${path}`);
+    if (!user) return fail("Unauthorized.", 401);
 
     if (roles && !roles.includes(user.role)) {
       return fail("Forbidden. You don't have permission to access this resource.", 403);

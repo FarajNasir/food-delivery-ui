@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
 import { useConfigStore } from "@/store/useConfigStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import LocationPermissionModal from "@/components/shared/LocationPermissionModal";
 import DishCard, { SkeletonDishCard } from "@/components/dashboard/customer/DishCard";
 import { featuredApi, type PublicFeaturedDish } from "@/lib/api";
@@ -16,18 +17,38 @@ import { toast } from "sonner";
 export default function CustomerCart() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
-  const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading, isGuest } = useCart();
+  const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
+  const { profile, isReady: authReady } = useAuthStore();
+  const isLoggedIn = authReady && !!profile;
   const { userCoords, locationDismissed } = useConfigStore();
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [checkingOut, setCheckingOut] = React.useState(false);
   const router = useRouter();
 
-  // Show location prompt once when the customer opens the cart, if not already granted/dismissed
+  // On mount: if permission already granted, silently fetch coords.
+  // Otherwise show the modal automatically (location is required for checkout).
   useEffect(() => {
-    if (!userCoords && !locationDismissed) {
+    if (userCoords || !navigator.geolocation) return;
+
+    navigator.permissions.query({ name: "geolocation" }).then((result) => {
+      if (result.state === "granted") {
+        // Already granted — fetch silently, no modal
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            useConfigStore.getState().setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+          () => {}
+        );
+      } else if (result.state === "prompt") {
+        // Not yet decided — show modal automatically
+        const t = setTimeout(() => setLocationModalOpen(true), 600);
+        return () => clearTimeout(t);
+      }
+      // "denied" — modal will show via the checkout block when they try to proceed
+    }).catch(() => {
       const t = setTimeout(() => setLocationModalOpen(true), 600);
       return () => clearTimeout(t);
-    }
+    });
   }, []);
 
   const [featuredDishes, setFeaturedDishes] = useState<PublicFeaturedDish[]>([]);
@@ -258,7 +279,7 @@ export default function CustomerCart() {
               </div>
             </div>
 
-            {isGuest ? (
+            {!isLoggedIn ? (
               <Link
                 href="/login?redirect=/dashboard/customer/cart"
                 className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-black/5 transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] mt-2"
@@ -267,6 +288,23 @@ export default function CustomerCart() {
                 Sign in to checkout
                 <ChevronRight className="w-5 h-5" />
               </Link>
+            ) : !userCoords ? (
+              <div className="mt-2 space-y-2">
+                <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-2xl bg-amber-50 border border-amber-200">
+                  <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs font-bold text-amber-700 leading-relaxed">
+                    Location is required to calculate your delivery fee and place an order.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setLocationModalOpen(true)}
+                  className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]"
+                  style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                >
+                  <MapPin className="w-4 h-4" />
+                  Enable Location to Continue
+                </button>
+              </div>
             ) : hasOutOfLocationItems ? (
               <div className="mt-2 flex flex-col gap-2">
                 <div className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-sm uppercase tracking-widest bg-gray-100 text-gray-400 cursor-not-allowed">
@@ -294,6 +332,7 @@ export default function CustomerCart() {
         site={site}
         isOpen={locationModalOpen}
         onClose={() => setLocationModalOpen(false)}
+        isMandatory={!userCoords}
       />
 
       {/* Featured dishes — real data from API */}
