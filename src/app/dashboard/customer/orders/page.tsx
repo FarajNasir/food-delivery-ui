@@ -5,19 +5,20 @@ import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
 import {
   ShoppingBag, Clock, CheckCircle2, CreditCard,
-  Package, Truck, AlertCircle, ChevronRight, Star, Loader2,
+  Package, Truck, AlertCircle, Loader2, RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
+import OrderCard from "@/components/dashboard/customer/OrderCard";
 
 const STATUS_CONFIG: Record<
   string,
   { label: string; icon: any; color: string; hex: string; bg: string; description: string }
 > = {
   PENDING_CONFIRMATION: {
-    label: "Awaiting Confirmation",
+    label: "Confirming",
     icon: Clock,
     color: "text-amber-700",
     bg: "bg-amber-50",
@@ -49,7 +50,7 @@ const STATUS_CONFIG: Record<
     description: "Chef is working on your meal",
   },
   OUT_FOR_DELIVERY: {
-    label: "Out for Delivery",
+    label: "On the Way",
     icon: Truck,
     color: "text-orange-700",
     bg: "bg-orange-50",
@@ -67,7 +68,7 @@ const STATUS_CONFIG: Record<
   CANCELLED: {
     label: "Cancelled",
     icon: AlertCircle,
-    color: "text-red-700",
+    color: "text-red-500",
     bg: "bg-red-50",
     hex: "#EF4444",
     description: "This order was cancelled",
@@ -83,6 +84,7 @@ export default function CustomerOrdersPage() {
   const [isReordering, setIsReordering] = React.useState<string | null>(null);
   const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const handleReorder = async (orderId: string) => {
     try {
@@ -114,218 +116,138 @@ export default function CustomerOrdersPage() {
     }
   };
 
+  const handleExpire = async (orderId: string) => {
+    await updateOrderStatus(orderId, "CANCELLED");
+    toast.error("Restaurant didn't respond in time. Order cancelled.");
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshOrders();
+    setRefreshing(false);
+  };
+
   if (loading) {
     return (
-      <div className="py-32 flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center justify-center py-32 gap-3">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: gradientFrom }} />
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Loading orders…</p>
+        <p className="text-xs font-semibold text-gray-400">Loading your orders...</p>
       </div>
     );
   }
 
-  return (
-    <div className="w-full max-w-3xl mx-auto pb-16 space-y-8">
+  const sortedOrders = [...orders].sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-black tracking-tight" style={{ color: "var(--dash-text-primary)" }}>
-          My Orders
-        </h1>
-        <p className="text-sm font-medium text-gray-400 mt-1">
-          Track your meals or browse your order history.
-        </p>
+  const activeOrders = sortedOrders.filter(o =>
+    ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
+  );
+  const pastOrders = sortedOrders.filter(o =>
+    ["DELIVERED", "CANCELLED"].includes(o.status)
+  );
+
+
+  return (
+    <div className="w-full max-w-xl mx-auto pb-20 px-4 space-y-8">
+
+      {/* Page Header */}
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h1 className="text-xl font-black text-gray-900 tracking-tight">My Orders</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Track and manage your orders</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          className={cn(
+            "p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-gray-700 transition-all active:scale-95",
+            refreshing && "animate-spin"
+          )}
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Empty state */}
+      {/* Empty State */}
       {orders.length === 0 ? (
-        <div className="py-32 flex flex-col items-center gap-4 rounded-3xl bg-white border border-gray-100">
+        <div className="flex flex-col items-center justify-center py-24 gap-5 bg-white rounded-3xl border border-dashed border-gray-200">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: `${gradientFrom}12` }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: `${gradientFrom}14` }}
           >
             <ShoppingBag className="w-7 h-7" style={{ color: gradientFrom }} />
           </div>
           <div className="text-center">
-            <p className="text-base font-black text-gray-800">No orders yet</p>
-            <p className="text-sm text-gray-400 font-medium mt-1">Hungry? Find something delicious nearby.</p>
+            <p className="font-bold text-gray-800 text-sm">No orders yet</p>
+            <p className="text-xs text-gray-400 mt-1">Explore restaurants and place your first order!</p>
           </div>
           <button
             onClick={() => router.push("/dashboard/customer")}
-            className="mt-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:opacity-90 transition-all"
+            className="px-6 py-2.5 rounded-2xl text-xs font-bold text-white transition-all hover:opacity-90"
             style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
           >
-            Browse Restaurants
+            Find Food
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {orders.map((order: any) => {
-            const config = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION;
-            const Icon = config.icon;
-            const date = new Date(order.createdAt).toLocaleDateString("en-GB", {
-              day: "numeric", month: "short", year: "numeric",
-            });
+        <div className="space-y-8">
 
-            return (
-              <div
-                key={order.id}
-                className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
-              >
-                {/* Coloured accent bar */}
-                <div className="h-[3px]" style={{ background: config.hex }} />
-
-                <div className="p-6 space-y-5">
-
-                  {/* ── Top: status + restaurant + price ── */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 min-w-0">
-                      {/* Status icon */}
-                      <div
-                        className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0", config.bg)}
-                      >
-                        <Icon className="w-5 h-5" style={{ color: config.hex }} />
-                      </div>
-
-                      <div className="min-w-0">
-                        {/* Status badge + order id */}
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span
-                            className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full", config.bg, config.color)}
-                          >
-                            {config.label}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
-                            #{order.id?.slice(0, 8)}
-                          </span>
-                        </div>
-
-                        {/* Restaurant */}
-                        <p className="font-black text-gray-900 text-base leading-tight truncate">
-                          {order.restaurant?.name ?? "Restaurant"}
-                        </p>
-
-                        {/* Description + date */}
-                        <p className="text-xs font-medium text-gray-400 mt-0.5">{config.description}</p>
-                      </div>
-                    </div>
-
-                    {/* Price + date */}
-                    <div className="text-right shrink-0">
-                      <p className="text-xl font-black text-gray-900">
-                        £{parseFloat(order.totalAmount).toFixed(2)}
-                      </p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 flex items-center gap-1 justify-end">
-                        <Clock className="w-3 h-3" />
-                        {date}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* ── Items list ── */}
-                  {order.items?.length > 0 && (
-                    <div className="space-y-2 pt-1">
-                      <div className="h-px bg-gray-50" />
-                      {order.items.map((item: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="text-[10px] font-black text-gray-400 bg-gray-50 border border-gray-100 rounded-lg w-7 h-6 flex items-center justify-center"
-                            >
-                              {item.quantity}×
-                            </span>
-                            <span className="text-sm font-semibold text-gray-700">
-                              {item.menuItem?.name ?? "Item"}
-                            </span>
-                          </div>
-                          <span className="text-sm font-bold text-gray-500">
-                            £{parseFloat(item.price).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                      <div className="h-px bg-gray-50 !mt-3" />
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                          Order Total
-                        </span>
-                        <span className="text-base font-black" style={{ color: accent }}>
-                          £{parseFloat(order.totalAmount).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── Actions ── */}
-                  <div className="space-y-2 pt-1">
-
-                    {/* Pay now */}
-                    {order.status === "CONFIRMED" && (
-                      <button
-                        onClick={() => handlePayment(order.id)}
-                        disabled={!!isPaying}
-                        className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:translate-y-0"
-                        style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
-                      >
-                        {isPaying === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                        {isPaying === order.id ? "Initializing…" : "Complete Secure Payment"}
-                      </button>
-                    )}
-
-                    {/* Payment confirmed */}
-                    {order.status === "PAID" && (
-                      <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-50 text-blue-700">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Payment Confirmed</span>
-                      </div>
-                    )}
-
-                    {/* Rate experience */}
-                    {order.status === "DELIVERED" && (
-                      !order.review ? (
-                        <button
-                          onClick={() => { setSelectedOrderForFeedback(order); setIsFeedbackOpen(true); }}
-                          className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                          style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
-                        >
-                          <Star className="w-4 h-4 fill-white" />
-                          Rate Your Experience
-                        </button>
-                      ) : (
-                        <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 text-emerald-700">
-                          <Star className="w-4 h-4 fill-emerald-500 text-emerald-500" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">
-                            {order.review.status === "active" ? `Rated ${order.review.rating}/5` : "Review Pending"}
-                          </span>
-                        </div>
-                      )
-                    )}
-
-                    {/* Reorder (Delivered Only) */}
-                    {order.status === "DELIVERED" && (
-                      <button
-                        onClick={() => handleReorder(order.id)}
-                        disabled={!!isReordering}
-                        className="w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:translate-y-0"
-                        style={{ background: `linear-gradient(135deg, #22C55E, #16A34A)` }}
-                      >
-                        {isReordering === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4 text-white/80" />}
-                        {isReordering === order.id ? "Duplicating Order…" : "Reorder These Items"}
-                      </button>
-                    )}
-
-                    {/* Track order */}
-                    <button
-                      onClick={() => router.push(`/dashboard/customer/status/${order.id}`)}
-                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all"
-                    >
-                      View Real-time Tracking
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-
-                  </div>
-                </div>
+          {/* Active Orders */}
+          {activeOrders.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Active</p>
+                <span className="text-[10px] font-bold text-gray-300">· {activeOrders.length}</span>
               </div>
-            );
-          })}
+              <div className="space-y-3">
+                {activeOrders.map((order: any) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    config={STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                    accent={accent}
+                    gradientFrom={gradientFrom}
+                    isPaying={isPaying === order.id}
+                    isReordering={isReordering === order.id}
+                    onPay={handlePayment}
+                    onReorder={handleReorder}
+                    onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
+                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                    onExpire={handleExpire}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Past Orders */}
+          {pastOrders.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Past Orders</p>
+                <span className="text-[10px] font-bold text-gray-300">· {pastOrders.length}</span>
+              </div>
+              <div className="space-y-3">
+                {pastOrders.map((order: any) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    config={STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                    accent={accent}
+                    gradientFrom={gradientFrom}
+                    isPaying={isPaying === order.id}
+                    isReordering={isReordering === order.id}
+                    onPay={handlePayment}
+                    onReorder={handleReorder}
+                    onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
+                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                    onExpire={handleExpire}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

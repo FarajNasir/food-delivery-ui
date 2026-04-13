@@ -79,7 +79,7 @@ export const useFcmToken = (userId: string | undefined) => {
       toast.success(payload.notification?.title || "New Kitchen Alert", {
         description: payload.notification?.body || "A live order update was received.",
         icon: isNewOrder ? "🔥" : "🔔",
-        duration: isNewOrder ? 8000 : 4000,
+        duration: 3000,
       });
 
       if (isOrder) {

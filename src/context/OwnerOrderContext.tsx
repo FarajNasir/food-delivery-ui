@@ -16,12 +16,12 @@ interface OwnerOrderContextType {
 const OwnerOrderContext = createContext<OwnerOrderContextType | undefined>(undefined);
 
 export function OwnerOrderProvider({ children }: { children: React.ReactNode }) {
-  const { 
-    orders, 
-    ownedRestaurantIds, 
-    isLoading: loading, 
-    refreshOrders, 
-    updateOrderStatus: storeUpdateOrderStatus 
+  const {
+    orders,
+    ownedRestaurantIds,
+    isLoading: loading,
+    refreshOrders,
+    updateOrderStatus: storeUpdateOrderStatus
   } = useOwnerStore();
 
   const { session, isReady, user, role } = useAuthStore();
@@ -37,18 +37,21 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
 
     if (session && (role === "owner" || role === "admin")) {
       console.log("[OwnerOrderContext] Syncing with owner store...");
-      refreshOrders().catch(() => {});
+      refreshOrders().catch(() => { });
+
+      const sendHeartbeat = () => {
+        const s = useAuthStore.getState().session;
+        if (s) {
+          fetch("/api/user/heartbeat", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${s.access_token}` }
+          }).catch(() => { });
+        }
+      };
 
       if (!heartbeatInterval) {
-        heartbeatInterval = setInterval(() => {
-          const s = useAuthStore.getState().session;
-          if (s) {
-            fetch("/api/user/heartbeat", { 
-              method: "POST",
-              headers: { "Authorization": `Bearer ${s.access_token}` }
-            }).catch(() => { });
-          }
-        }, 60000); // Increased to 60s
+        sendHeartbeat(); // Fire immediately on mount
+        heartbeatInterval = setInterval(sendHeartbeat, 60000); // Increased to 60s
       }
     }
 

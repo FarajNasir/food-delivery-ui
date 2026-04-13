@@ -42,9 +42,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   // Called manually after login to ensure profile + role are loaded
   // before the app redirects. Does NOT use getSession() (stale cache).
   sync: async () => {
+    // Fetch fresh session to ensure `user` and `session` getters in contexts work immediately after login.
+    const { data: { session } } = await supabase.auth.getSession();
     const res = await authApi.getMe();
     if (res.success && res.data) {
-      set({ profile: res.data, role: res.data.role, isReady: true });
+      set({ 
+        session,
+        user: session?.user ?? null,
+        profile: res.data, 
+        role: res.data.role, 
+        isReady: true 
+      });
     }
   },
 }));

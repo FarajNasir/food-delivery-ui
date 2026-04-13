@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Timer } from "lucide-react";
+import { useOrderTimer } from "@/hooks/useOrderTimer";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; description: string; step: number }> = {
   PENDING_CONFIRMATION: {
@@ -78,6 +79,31 @@ export default function OrderStatusPage() {
   const { gradientFrom, accent } = site.theme;
   const [isPaying, setIsPaying] = React.useState(false);
 
+  const order = orders.find(o => o.id === id);
+
+  const handleExpire = async () => {
+    if (!order || order.status !== "PENDING_CONFIRMATION") return;
+    try {
+      const res = await fetch(`/api/orders/${order.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      if (res.ok) {
+        toast.error("Order expired as the restaurant did not respond in time.");
+        updateOrderStatus(order.id, "CANCELLED");
+      }
+    } catch (err) {
+      console.error("[handleExpire]", err);
+    }
+  };
+
+  const { formattedTime, isExpired } = useOrderTimer(
+    order?.createdAt || new Date().toISOString(),
+    5,
+    handleExpire
+  );
+
   const handlePayment = async () => {
     if (!order) return;
 
@@ -104,7 +130,6 @@ export default function OrderStatusPage() {
   };
 
 
-  const order = orders.find(o => o.id === id);
   const config = order ? (STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING_CONFIRMATION) : null;
 
   if (loading) {
@@ -168,8 +193,20 @@ export default function OrderStatusPage() {
                 </div>
 
                 <div>
-                  <h2 className="text-2xl font-black text-gray-00 mb-2">{config?.label}</h2>
+                  <h2 className="text-2xl font-black text-gray-900 mb-2">{config?.label}</h2>
                   <p className="text-sm font-medium text-gray-400 max-w-md">{config?.description}</p>
+
+                  {order.status === "PENDING_CONFIRMATION" && !isExpired && (
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-3 px-5 py-2.5 bg-amber-50 rounded-2xl border border-amber-100 shadow-sm animate-pulse">
+                        <Timer className="w-4 h-4 text-amber-500" />
+                        <span className="text-lg font-black text-amber-600 tabular-nums tracking-wider">{formattedTime}</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+                        Auto-cancels if not accepted soon
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -83,19 +83,17 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   },
 
   updateSingleOrder: (updatedOrder) => {
-    set((state) => {
-      const exists = state.orders.find((o) => o.id === updatedOrder.id);
-      if (exists) {
-        // Order already known — just patch the changed fields
-        return {
-          orders: state.orders.map((o) =>
-            o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
-          ),
-        };
-      }
+    const state = get();
+    const exists = state.orders.find((o) => o.id === updatedOrder.id);
+    if (exists) {
+      set({
+        orders: state.orders.map((o) =>
+          o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
+        ),
+      });
+    } else {
       // Order is brand-new — always refresh to get its full data from the server
       get().refreshOrders();
-      return state;
-    });
+    }
   },
 }));

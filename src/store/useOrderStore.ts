@@ -10,7 +10,7 @@ import type { Order } from "@/types/api.types";
 interface OrderState {
   orders: Order[];
   isLoading: boolean;
-  
+
   // Actions
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
@@ -36,10 +36,10 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
 
   updateOrderStatus: async (id, status, paymentIntentId) => {
     const previousOrders = [...get().orders];
-    
+
     // Optimistic update
     set({
-      orders: previousOrders.map((o) => 
+      orders: previousOrders.map((o) =>
         o.id === id ? { ...o, status, paymentIntentId } : o
       ),
     });
@@ -52,36 +52,31 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
   },
 
   updateSingleOrder: (updatedOrder) => {
-    set((state) => {
-      const exists = state.orders.find((o) => o.id === updatedOrder.id);
-      
-      if (exists) {
-        const newState = {
-          orders: state.orders.map((o) => 
-            o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
-          ),
-        };
+    const state = get();
+    const exists = state.orders.find((o) => o.id === updatedOrder.id);
 
-        // Handle toasts for status changes
-        if (updatedOrder.status) {
-          const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
-          if (isCustomerPage) {
-            if (updatedOrder.status === "CONFIRMED") {
-              toast.success("Restaurant confirmed your order!", { icon: "✅" });
-            } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-              toast.info("Your food is on the way!", { icon: "🛵" });
-            }
+    if (exists) {
+      set({
+        orders: state.orders.map((o) =>
+          o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
+        ),
+      });
+
+      // Handle toasts for status changes
+      if (updatedOrder.status) {
+        const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
+        if (isCustomerPage) {
+          if (updatedOrder.status === "CONFIRMED") {
+            toast.success("Restaurant confirmed your order!", { icon: "✅" });
+          } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
+            toast.info("Your food is on the way!", { icon: "🛵" });
           }
         }
-
-        return newState;
       }
-
+    } else {
       // Order is brand-new — always refresh the full list to maintain order and relations
       get().refreshOrders();
-
-      return state;
-    });
+    }
   },
   reorder: async (orderId: string) => {
     set({ isLoading: true });

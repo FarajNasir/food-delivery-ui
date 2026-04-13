@@ -86,7 +86,7 @@ export async function POST(
             .where(eq(users.id, restaurant.ownerId))
             .limit(1);
 
-          const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
+          const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
 
           const [newNotification] = await db.insert(notifications).values({
             recipientId: restaurant.ownerId,

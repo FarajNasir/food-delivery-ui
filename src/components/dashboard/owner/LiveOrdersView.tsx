@@ -38,6 +38,8 @@ const NEXT_STATUS: Record<string, { label: string; status: string; color: string
   OUT_FOR_DELIVERY: { label: "Mark Delivered", status: "DELIVERED", color: "bg-emerald-600 shadow-emerald-200" },
 };
 
+import { useOrderTimer } from "@/hooks/useOrderTimer";
+
 // ── Order Card ────────────────────────────────────────────────────────────────
 function OrderCard({
   order,
@@ -50,6 +52,17 @@ function OrderCard({
   const isPending = order.status === "PENDING_CONFIRMATION";
   const nextAction = NEXT_STATUS[order.status];
   const stepIndex = PIPELINE.findIndex((s) => s.id === order.status);
+
+  const { formattedTime, isExpired } = useOrderTimer(
+    order.createdAt,
+    5,
+    () => {
+      if (isPending) {
+        console.log(`[Owner] Order ${order.id} timed out. Auto-cancelling...`);
+        onUpdate(order.id, "CANCELLED");
+      }
+    }
+  );
 
   const handleUpdate = async (status: string) => {
     setBusy(true);
@@ -77,11 +90,13 @@ function OrderCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
-              {isPending && (
-                <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full animate-pulse">
-                  <Zap className="w-2 h-2 fill-amber-600" />
-                  Urgent
-                </span>
+              {isPending && !isExpired && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100 animate-pulse">
+                  <Clock className="w-2.5 h-2.5 text-amber-600" />
+                  <span className="text-[10px] font-black text-amber-700 tabular-nums">
+                    {formattedTime}
+                  </span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
