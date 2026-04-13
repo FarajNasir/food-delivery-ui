@@ -6,6 +6,7 @@ export interface AdminOrder {
   status: string;
   totalAmount: string;
   createdAt: string;
+  updatedAt: string;
   deliveryAddress: string | null;
   user: {
     id: string;

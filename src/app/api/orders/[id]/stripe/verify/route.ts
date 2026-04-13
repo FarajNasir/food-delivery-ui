@@ -76,7 +76,7 @@ export async function POST(
         const [newNotification] = await db.insert(notifications).values({
           recipientId: restaurant.ownerId,
           type: "ORDER",
-          subject: "Payment Received! 💰",
+          subject: "Payment Received",
           body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
           channel: isActive ? "FCM" : "WHATSAPP",
           status: "PENDING",
@@ -101,7 +101,7 @@ export async function POST(
         const [customerNotification] = await db.insert(notifications).values({
           recipientId: order.userId,
           type: "ORDER",
-          subject: "Payment Confirmed! ✅",
+          subject: "Payment Confirmed",
           body: `Your payment was successful. The restaurant will start preparing your meal shortly.`,
           channel: isActive ? "FCM" : "WHATSAPP",
           status: "PENDING",

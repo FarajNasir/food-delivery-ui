@@ -6,11 +6,11 @@ import { NotificationService } from "@/services/notification.service";
 
 // Human-readable labels for customer-facing notifications
 const STATUS_LABELS: Record<string, { subject: string; body: (id: string, restaurant: string) => string }> = {
-  CONFIRMED:       { subject: "Order Confirmed! ✅", body: (id, r) => `Your order #${id} at ${r} has been confirmed and is being prepared.` },
-  PREPARING:       { subject: "Kitchen is Cooking! 👨‍🍳", body: (id, r) => `Your order #${id} at ${r} is now being prepared.` },
-  OUT_FOR_DELIVERY:{ subject: "On the Way! 🛵", body: (id, r) => `Your order #${id} from ${r} is out for delivery.` },
-  DELIVERED:       { subject: "Delivered! 🎉", body: (id, r) => `Your order #${id} from ${r} has been delivered. Enjoy!` },
-  CANCELLED:       { subject: "Order Cancelled ❌", body: (id, r) => `Your order #${id} from ${r} has been cancelled.` },
+  CONFIRMED:       { subject: "Order Confirmed", body: (id, r) => `Your order #${id} at ${r} has been confirmed and is being prepared.` },
+  PREPARING:       { subject: "Kitchen is Cooking", body: (id, r) => `Your order #${id} at ${r} is now being prepared.` },
+  OUT_FOR_DELIVERY:{ subject: "On the Way", body: (id, r) => `Your order #${id} from ${r} is out for delivery.` },
+  DELIVERED:       { subject: "Delivered", body: (id, r) => `Your order #${id} from ${r} has been delivered. Enjoy!` },
+  CANCELLED:       { subject: "Order Cancelled", body: (id, r) => `Your order #${id} from ${r} has been cancelled.` },
 };
 
 /**

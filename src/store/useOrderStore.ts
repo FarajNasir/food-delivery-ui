@@ -67,9 +67,9 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
         const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
         if (isCustomerPage) {
           if (updatedOrder.status === "CONFIRMED") {
-            toast.success("Restaurant confirmed your order!", { icon: "✅" });
+            toast.success("Restaurant confirmed your order!");
           } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-            toast.info("Your food is on the way!", { icon: "🛵" });
+            toast.info("Your food is on the way!");
           }
         }
       }

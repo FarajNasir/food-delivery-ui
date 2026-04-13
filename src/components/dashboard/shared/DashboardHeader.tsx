@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import React, { useState, useRef } from "react";
 import { Menu, LogOut, Bell } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
-import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useOwnerStore } from "@/store/useOwnerStore";
 import { toast } from "sonner";
+import NotificationDropdown from "./NotificationDropdown";
 
 const roleBadge: Record<string, string> = {
   owner:    "bg-purple-100 text-purple-700",
@@ -24,6 +26,13 @@ export default function DashboardHeader({
   hideMenuButton?: boolean;
 }) {
   const router = useRouter();
+  const { orders } = useOwnerStore();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+
+  const pendingOrdersCount = user.role === "owner" 
+    ? orders.filter(o => ["PENDING_CONFIRMATION", "PAID"].includes(o.status)).length
+    : 0;
 
   const handleLogout = async () => {
     await useAuthStore.getState().logout();
@@ -33,7 +42,7 @@ export default function DashboardHeader({
 
   return (
     <header
-      className="h-16 flex items-center justify-between px-4 md:px-6 shrink-0"
+      className="h-16 flex items-center justify-between px-4 md:px-6 shrink-0 relative"
       style={{
         background:   "var(--dash-header-bg)",
         borderBottom: "1px solid var(--dash-header-border)",
@@ -57,9 +66,24 @@ export default function DashboardHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <Bell className="w-5 h-5" style={{ color: "var(--dash-text-secondary)" }} />
-        </button>
+        <div className="relative">
+          <button 
+            ref={bellRef}
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+          >
+            <Bell className="w-5 h-5" style={{ color: "var(--dash-text-secondary)" }} />
+            {pendingOrdersCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white animate-pulse" />
+            )}
+          </button>
+          
+          <NotificationDropdown 
+            isOpen={isNotificationsOpen}
+            onClose={() => setIsNotificationsOpen(false)}
+          />
+        </div>
+
         <button
           onClick={handleLogout}
           className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors"
