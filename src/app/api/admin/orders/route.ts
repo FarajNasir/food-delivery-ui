@@ -41,6 +41,15 @@ export async function GET(req: Request) {
                 name: true,
               },
             },
+            items: {
+              with: {
+                menuItem: {
+                  columns: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: [desc(orders.createdAt)],
         });

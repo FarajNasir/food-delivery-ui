@@ -24,16 +24,16 @@ export default function CheckoutView() {
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
 
-  const userCoords  = useConfigStore((s) => s.userCoords);
+  const userCoords = useConfigStore((s) => s.userCoords);
   const setUserCoords = useConfigStore((s) => s.setUserCoords);
-  const profile     = useAuthStore((s) => s.profile);
+  const profile = useAuthStore((s) => s.profile);
 
-  const [isPlacing,    setIsPlacing]    = React.useState(false);
+  const [isPlacing, setIsPlacing] = React.useState(false);
   const [isCalculating, setIsCalculating] = React.useState(false);
 
-  const [address,      setAddress]      = React.useState("");
-  const [phone,        setPhone]        = React.useState(profile?.phone ?? "");
-  const [phoneEdited,  setPhoneEdited]  = React.useState(false);
+  const [address, setAddress] = React.useState("");
+  const [phone, setPhone] = React.useState(profile?.phone ?? "");
+  const [phoneEdited, setPhoneEdited] = React.useState(false);
   const [deliveryArea, setDeliveryArea] = React.useState("");
   const [distanceBreakdown, setDistanceBreakdown] = React.useState<Record<string, number>>({});
   const [deliveryFeesBreakdown, setDeliveryFeesBreakdown] = React.useState<Record<string, number>>({});
@@ -58,7 +58,7 @@ export default function CheckoutView() {
   // Option B: Sum fees for all restaurants
   React.useEffect(() => {
     if (site.key !== "downpatrickeats" || !userCoords || isCalculating) return;
-    
+
     // Check if we already calculated everything for current userCoords
     const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
     const allDone = uniqueRestos.every(rid => deliveryFeesBreakdown[rid] !== undefined);
@@ -109,7 +109,7 @@ export default function CheckoutView() {
       acc[item.restaurantId] = g;
       return acc;
     }, {} as Record<string, { name: string; items: typeof cartItems }>),
-  [cartItems]);
+    [cartItems]);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
@@ -126,23 +126,23 @@ export default function CheckoutView() {
   const handleAreaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const area = e.target.value;
     setDeliveryArea(area);
-    
+
     // For Option B in fixed_areas, we'd also sum if we had multiple areas.
     // For now, assume fixed fee applies per restaurant in the cart.
     const perRestoFee = calculateDeliveryFee(site, { area });
     const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
     const total = perRestoFee * uniqueRestos.length;
-    
+
     const breakdown: Record<string, number> = {};
     uniqueRestos.forEach(rid => breakdown[rid] = perRestoFee);
-    
+
     setDeliveryFeesBreakdown(breakdown);
     setDeliveryFee(total);
   };
 
   const handlePlaceOrder = async () => {
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
-    if (!phone.trim())   { toast.error("Enter your phone number"); return; }
+    if (!phone.trim()) { toast.error("Enter your phone number"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
     if (site.key === "downpatrickeats" && deliveryFee === 0 && !isStandard) { toast.error("Calculate your delivery distance first"); return; }
 
@@ -155,13 +155,13 @@ export default function CheckoutView() {
           "Content-Type": "application/json",
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
-        body: JSON.stringify({ 
-          deliveryAddress: address, 
-          deliveryArea, 
-          deliveryFee, 
+        body: JSON.stringify({
+          deliveryAddress: address,
+          deliveryArea,
+          deliveryFee,
           deliveryFeesBreakdown, // Sum-up breakdown
           distanceMiles: 0, // No longer a single distance
-          customerPhone: phone 
+          customerPhone: phone
         }),
       });
       const data = await res.json();
@@ -181,10 +181,10 @@ export default function CheckoutView() {
     }
   };
 
-  const isStandard    = site.deliveryPricing?.type === "standard";
-  const isFixedAreas  = site.deliveryPricing?.type === "fixed_areas";
-  const isDistSlabs   = site.deliveryPricing?.type === "distance_slabs";
-  const grandTotal    = totalPrice + deliveryFee;
+  const isStandard = site.deliveryPricing?.type === "standard";
+  const isFixedAreas = site.deliveryPricing?.type === "fixed_areas";
+  const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
+  const grandTotal = totalPrice + deliveryFee;
 
   const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
@@ -219,10 +219,10 @@ export default function CheckoutView() {
       <div className="grid lg:grid-cols-5 gap-6">
 
         {/* ── LEFT FORM ── */}
-        <div className="lg:col-span-3 space-y-5">
+        <div className="lg:col-span-3 space-y-12">
 
-          {/* Delivery Details Card */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+          {/* Delivery Details Section */}
+          <div className="border-b border-gray-100 pb-10 space-y-6">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Delivery Details</p>
 
             {/* Address */}
@@ -247,11 +247,6 @@ export default function CheckoutView() {
                   <Phone className="w-3 h-3" style={{ color: accent }} />
                   Contact Number
                 </span>
-                {profile?.phone && phone === profile.phone && (
-                  <span className="text-[9px] font-black uppercase text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                    Prefilled from account
-                  </span>
-                )}
               </label>
               <div className="relative">
                 <input
@@ -294,25 +289,25 @@ export default function CheckoutView() {
             {isDistSlabs && (
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-600">Delivery Distance</label>
-                  <button
-                    onClick={handleGetLocation}
-                    disabled={isCalculating}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50"
-                    style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
-                  >
-                    {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-                    {Object.keys(distanceBreakdown).length > 0 ? "Recalculate Distances" : "Detect My Location & Calculate"}
-                  </button>
-                  {Object.entries(distanceBreakdown).map(([rid, dist]) => (
-                    <div key={rid} className="flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: `${accent}10` }}>
-                      <span className="text-[10px] text-gray-500 font-bold uppercase truncate max-w-[120px]">
-                        {groupedItems[rid]?.name}
-                      </span>
-                      <span className="text-sm font-black" style={{ color: accent }}>
-                        {dist} mi · £{deliveryFeesBreakdown[rid]?.toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                <button
+                  onClick={handleGetLocation}
+                  disabled={isCalculating}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50"
+                  style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
+                >
+                  {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                  {Object.keys(distanceBreakdown).length > 0 ? "Recalculate Distances" : "Detect My Location & Calculate"}
+                </button>
+                {Object.entries(distanceBreakdown).map(([rid, dist]) => (
+                  <div key={rid} className="flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: `${accent}10` }}>
+                    <span className="text-[10px] text-gray-500 font-bold uppercase truncate max-w-[120px]">
+                      {groupedItems[rid]?.name}
+                    </span>
+                    <span className="text-sm font-black" style={{ color: accent }}>
+                      {dist} mi · £{deliveryFeesBreakdown[rid]?.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -325,8 +320,8 @@ export default function CheckoutView() {
             )}
           </div>
 
-          {/* Order Items Card */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+          {/* Order Items Section */}
+          <div className="pt-2 space-y-6">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order Summary</p>
             {Object.entries(groupedItems).map(([rid, group]) => (
               <div key={rid} className="space-y-3">
@@ -334,23 +329,19 @@ export default function CheckoutView() {
                   <Store className="w-3 h-3 text-gray-400" />
                   <span className="text-xs font-bold text-gray-500">{group.name}</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {group.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-50 shrink-0 border border-gray-100">
-                        {item.imageUrl ? (
-                          <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="object-cover w-full h-full" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Store className="w-4 h-4 text-gray-300" />
-                          </div>
-                        )}
+                    <div key={item.id} className="flex justify-between items-start">
+                      <div className="flex gap-4">
+                        <span className="flex-shrink-0 w-6 h-6 bg-gray-50 rounded flex items-center justify-center text-[10px] font-sans font-bold text-gray-400">
+                          {item.quantity}
+                        </span>
+                        <div>
+                          <p className="text-sm font-sans font-bold text-gray-800">{item.name}</p>
+                          <p className="text-[10px] font-sans text-gray-400 font-medium">Standard Preparation</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-400">× {item.quantity}</p>
-                      </div>
-                      <p className="text-sm font-bold text-gray-700 shrink-0">£{(item.price * item.quantity).toFixed(2)}</p>
+                      <span className="text-sm font-sans font-bold text-gray-900">£{(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -364,34 +355,35 @@ export default function CheckoutView() {
           <div className="sticky top-24 space-y-4">
 
             {/* Price Breakdown */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+            <div className="bg-gray-50/50 rounded-2xl p-6 space-y-3 border border-gray-100/50">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bill Details</p>
 
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Item Total</span>
-                  <span className="text-sm font-bold text-gray-800">£{totalPrice.toFixed(2)}</span>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs font-medium text-gray-500">
+                  <span>Item Total</span>
+                  <span>£{totalPrice.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Delivery Fee</span>
-                  <span className="text-sm font-bold" style={{ color: deliveryFee > 0 ? accent : "#9ca3af" }}>
-                    {deliveryFee > 0 ? `£${deliveryFee.toFixed(2)}` : "—"}
+                <div className="flex justify-between items-center text-xs font-medium text-gray-400">
+                  <span>Delivery Fee</span>
+                  <span>
+                    {deliveryFee > 0 ? `£${deliveryFee.toFixed(2)}` : "FREE"}
                   </span>
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-                <span className="text-sm font-bold text-gray-900">Grand Total</span>
-                <span className="text-lg font-black" style={{ color: gradientFrom }}>
+              <div className="h-px bg-gray-200/50 my-2" />
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-sans font-bold text-gray-900">Grand Total</span>
+                <span className="text-2xl font-heading font-black text-gray-900 tracking-tight">
                   £{grandTotal.toFixed(2)}
                 </span>
               </div>
 
               {isFixedAreas && (
-                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100">
-                  <span className="text-amber-500 mt-0.5">ℹ️</span>
-                  <p className="text-[11px] text-amber-700 leading-relaxed">
-                    Delivery fee of £{deliveryFee.toFixed(2)} is paid in cash to the driver.
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
+                  <span className="text-amber-500 text-xs">ⓘ</span>
+                  <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">
+                    The delivery fee of £{deliveryFee.toFixed(2)} is paid directly in cash to the driver upon arrival.
                   </p>
                 </div>
               )}

@@ -18,6 +18,14 @@ export interface AdminOrder {
     id: string;
     name: string;
   };
+  items: {
+    id: string;
+    quantity: number;
+    price: string;
+    menuItem: {
+      name: string;
+    };
+  }[];
 }
 
 interface AdminStats {
