@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Sparkles, UtensilsCrossed, Tag, Info, ArrowRight, ShoppingCart } from "lucide-react";
+import { Sparkles, UtensilsCrossed, Tag, Info, ShoppingCart } from "lucide-react";
 import type { AdminMenuItemResponse, PublicFeaturedDish } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
 import { useSite } from "@/context/SiteContext";
@@ -109,13 +109,12 @@ export default function DishCard({
       </div>
 
       {/* Content Section */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col">
-        <div className="mb-4">
-          <h3 className="font-heading font-black text-gray-900 text-base sm:text-lg leading-tight line-clamp-1 group-hover/dish:text-gray-700 transition-colors mb-1.5">
+      <div className="p-3.5 flex-1 flex flex-col">
+        <div className="mb-3 flex-1">
+          <h3 className="font-heading font-black text-gray-900 text-sm leading-tight line-clamp-1 group-hover/dish:text-gray-700 transition-colors mb-1">
             {name}
           </h3>
-
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">
+          <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
             <span style={{ color: theme.accent }}>{category || "Dish"}</span>
             {restaurantName && (
               <>
@@ -124,48 +123,32 @@ export default function DishCard({
               </>
             )}
           </div>
-
-          {description && (
-            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed font-medium">
-              {description}
-            </p>
-          )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-center">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (!isUnavailable) {
-                addItem({
-                  menuItemId: id,
-                  name: name,
-                  price: price,
-                  imageUrl: imageUrl || "",
-                  restaurantId: "restaurantId" in dish ? dish.restaurantId : id,
-                  restaurantName: restaurantName || "Restaurant",
-                  restaurantLocation: site.location,
-                });
-              }
-            }}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isUnavailable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-white shadow-lg hover:shadow-xl hover:scale-110 active:scale-95"}`}
-            style={!isUnavailable ? { background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` } : {}}
-            disabled={isUnavailable}
-            title={isUnavailable ? "Sold Out" : "Add to Order"}
-          >
-             <ShoppingCart className="w-4 h-4" />
-          </button>
-
-          <button
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${isUnavailable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-900 text-white shadow-lg hover:shadow-xl hover:bg-gray-800"}`}
-            disabled={isUnavailable}
-          >
-            <span>Explore Dish</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Add to Cart */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (!isUnavailable) {
+              addItem({
+                menuItemId: id,
+                name,
+                price,
+                imageUrl: imageUrl || "",
+                restaurantId: "restaurantId" in dish ? dish.restaurantId : id,
+                restaurantName: restaurantName || "Restaurant",
+                restaurantLocation: site.location,
+              });
+            }
+          }}
+          className={`w-full mt-auto flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-200 ${isUnavailable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-white shadow-sm hover:opacity-90 active:scale-95"}`}
+          style={!isUnavailable ? { background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.accent})` } : {}}
+          disabled={isUnavailable}
+        >
+          <ShoppingCart className="w-3.5 h-3.5" />
+          {isUnavailable ? "Sold Out" : "Add to Cart"}
+        </button>
       </div>
     </div>
   );

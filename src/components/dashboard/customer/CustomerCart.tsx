@@ -123,15 +123,12 @@ export default function CustomerCart() {
       </div>
 
       {isEmpty ? (
-        <div
-          className="rounded-[2.5rem] p-12 flex flex-col items-center gap-6 text-center shadow-sm"
-          style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
-        >
+        <div className="flex flex-col items-center gap-6 text-center py-20">
           <div
-            className="w-24 h-24 rounded-[2rem] flex items-center justify-center shadow-inner"
+            className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center"
             style={{ background: `${gradientFrom}12` }}
           >
-            <ShoppingBag className="w-10 h-10" style={{ color: gradientFrom }} />
+            <ShoppingBag className="w-9 h-9" style={{ color: gradientFrom }} />
           </div>
 
           <div className="space-y-2">
@@ -172,9 +169,9 @@ export default function CustomerCart() {
               );
               return (
                 <div key={rid} className="space-y-3">
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border border-dashed ${isOutOfLocation ? "bg-amber-50/50 border-amber-200" : "bg-gray-50/50 border-gray-200"}`}>
-                    <Store className={`w-4 h-4 ${isOutOfLocation ? "text-amber-400" : "text-gray-400"}`} />
-                    <span className={`text-xs font-black uppercase tracking-widest ${isOutOfLocation ? "text-amber-600" : "text-gray-500"}`}>
+                  <div className="flex items-center gap-1.5 px-1">
+                    <Store className={`w-3.5 h-3.5 ${isOutOfLocation ? "text-amber-400" : "text-gray-300"}`} />
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${isOutOfLocation ? "text-amber-500" : "text-gray-400"}`}>
                       {group.name}
                     </span>
                     {isOutOfLocation && (
@@ -337,12 +334,9 @@ export default function CustomerCart() {
 
       {/* Featured dishes — real data from API */}
       {(featuredLoading || featuredDishes.length > 0) && (
-        <div
-          className="rounded-[2.5rem] p-6 shadow-sm"
-          style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
-        >
-          <h2 className="text-sm font-black uppercase tracking-widest mb-6 px-2 flex items-center gap-2" style={{ color: "var(--dash-text-primary)", opacity: 0.5 }}>
-            <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400 opacity-100" style={{ opacity: 1 }} />
+        <div className="space-y-4">
+          <h2 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 px-1" style={{ color: "var(--dash-text-secondary)" }}>
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
             You might also like
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
