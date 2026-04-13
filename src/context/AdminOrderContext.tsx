@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useAdminStore, AdminOrder } from "@/store/useAdminStore";
+import { useAdminStore, type AdminOrder } from "@/store/useAdminStore";
+export type { AdminOrder };
 import { useFcmToken } from "@/hooks/useFcmToken";
 
 interface AdminStats {
