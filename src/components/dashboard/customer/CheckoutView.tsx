@@ -47,6 +47,14 @@ export default function CheckoutView() {
     if (profile?.phone && !phone) setPhone(profile.phone);
   }, [profile?.phone]);
 
+  // Location guard — distance-slab sites require coords before checkout
+  React.useEffect(() => {
+    if (site.deliveryPricing?.type === "distance_slabs" && !userCoords) {
+      toast.error("Please allow location access before checking out.");
+      router.replace("/dashboard/customer/cart");
+    }
+  }, [site.deliveryPricing?.type, userCoords]);
+
   // Downpatrick — auto-calc if coords already available
   React.useEffect(() => {
     if (site.key !== "downpatrickeats" || !userCoords || !site.coordinates || distance !== null || isCalculating) return;
