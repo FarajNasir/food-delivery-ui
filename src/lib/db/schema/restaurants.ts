@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, pgEnum, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, pgEnum, timestamp, jsonb, index, decimal } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users";
 
@@ -19,6 +19,8 @@ export const restaurants = pgTable("restaurants", {
   contactPhone:  varchar("contact_phone",  { length: 30   }).notNull(),
   businessRegNo: varchar("business_reg_no",{ length: 100  }),
   openingHours:  jsonb("opening_hours").$type<OpeningHours>(),
+  latitude:      decimal("latitude",  { precision: 10, scale: 7 }),
+  longitude:     decimal("longitude", { precision: 10, scale: 7 }),
   status:        restaurantStatusEnum("status").default("active").notNull(),
   createdAt:     timestamp("created_at").defaultNow().notNull(),
   updatedAt:     timestamp("updated_at").defaultNow().notNull(),

@@ -2,6 +2,7 @@ import { pgTable, uuid, text, timestamp, decimal, integer, index } from "drizzle
 import { users } from "./users";
 import { restaurants } from "./restaurants";
 import { menuItems } from "./menuItems";
+import { orderSessions } from "./orderSessions";
 
 export const orderStatusEnum = [
   "PENDING_CONFIRMATION",
@@ -28,12 +29,14 @@ export const orders = pgTable("orders", {
   customerPhone:   text("customer_phone"),
   currency:        text("currency").default("GBP").notNull(),
   paymentIntentId: text("payment_intent_id"),
+  sessionId:       uuid("session_id").references(() => orderSessions.id, { onDelete: "cascade" }),
   createdAt:       timestamp("created_at").defaultNow().notNull(),
   updatedAt:       timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
   index("orders_user_idx").on(t.userId),
   index("orders_restaurant_idx").on(t.restaurantId),
   index("orders_status_idx").on(t.status),
+  index("orders_session_idx").on(t.sessionId),
 ]);
 
 export const orderItems = pgTable("order_items", {

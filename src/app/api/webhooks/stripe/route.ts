@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { NotificationService } from "@/services/notification.service";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
       return new NextResponse("Missing Stripe signature or webhook secret", { status: 400 });
     }
-    
+
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
         // 2. Update Order Status to PAID
         const [updatedOrder] = await db
           .update(orders)
-          .set({ 
+          .set({
             status: "PAID",
             updatedAt: new Date()
           })
@@ -56,11 +57,11 @@ export async function POST(req: Request) {
           .returning();
 
         if (updatedOrder) {
-          // 2. Notify Restaurant Owner
+          // 3. Notify Restaurant Owner
           const [restaurant] = await db
-            .select({ 
-              ownerId: restaurants.ownerId, 
-              name: restaurants.name 
+            .select({
+              ownerId: restaurants.ownerId,
+              name: restaurants.name
             })
             .from(restaurants)
             .where(eq(restaurants.id, updatedOrder.restaurantId))
@@ -73,20 +74,48 @@ export async function POST(req: Request) {
               .where(eq(users.id, restaurant.ownerId))
               .limit(1);
 
-            // Check if owner is active (last 60 seconds)
-            const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
+            const isOwnerActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
 
-            await db.insert(notifications).values({
+            const [ownerNotification] = await db.insert(notifications).values({
               recipientId: restaurant.ownerId,
               type: "ORDER",
               subject: "Payment Received! 💰",
               body: `Payment for Order #${updatedOrder.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
-              channel: isActive ? "FCM" : "WHATSAPP",
+              channel: isOwnerActive ? "FCM" : "WHATSAPP",
               status: "PENDING",
-              metadata: { orderId: updatedOrder.id }
-            });
+              metadata: { orderId: updatedOrder.id, orderStatus: "PAID" }
+            }).returning();
 
-            console.log(`[Stripe Webhook] Notification queued for Owner: ${restaurant.ownerId}`);
+            if (ownerNotification && ownerNotification.channel === "FCM") {
+              NotificationService.trigger(ownerNotification.id);
+            }
+          }
+
+          // 4. Notify Customer
+          try {
+            const [customer] = await db
+              .select({ lastActive: users.lastActive })
+              .from(users)
+              .where(eq(users.id, updatedOrder.userId))
+              .limit(1);
+
+            const isCustomerActive = customer?.lastActive && (Date.now() - new Date(customer.lastActive).getTime() < 300000);
+
+            const [customerNotification] = await db.insert(notifications).values({
+              recipientId: updatedOrder.userId,
+              type: "ORDER",
+              subject: "Payment Confirmed! ✅",
+              body: `Your payment was successful. The restaurant will start preparing your meal shortly.`,
+              channel: isCustomerActive ? "FCM" : "WHATSAPP",
+              status: "PENDING",
+              metadata: { orderId: updatedOrder.id, orderStatus: "PAID" }
+            }).returning();
+
+            if (customerNotification && customerNotification.channel === "FCM") {
+              NotificationService.trigger(customerNotification.id);
+            }
+          } catch (notifyErr) {
+            console.error("[Stripe Webhook] Failed to notify customer:", notifyErr);
           }
         }
       } catch (dbErr) {

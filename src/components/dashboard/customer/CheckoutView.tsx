@@ -10,11 +10,12 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { toast } from "sonner";
 import {
   ChevronLeft, MapPin, Phone, CreditCard, Loader2,
-  Navigation, Store, ChevronDown, ShieldCheck,
+  Navigation, Store, ChevronDown, ShieldCheck, CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { getOSRMDistance, calculateDeliveryFee } from "@/lib/delivery";
+import { cn } from "@/lib/utils";
 
 export default function CheckoutView() {
   const { cartItems, totalPrice, clearCart } = useCart();
@@ -23,31 +24,30 @@ export default function CheckoutView() {
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
 
-  const userCoords  = useConfigStore((s) => s.userCoords);
+  const userCoords = useConfigStore((s) => s.userCoords);
   const setUserCoords = useConfigStore((s) => s.setUserCoords);
-  const profile     = useAuthStore((s) => s.profile);
+  const profile = useAuthStore((s) => s.profile);
 
-  const [isPlacing,    setIsPlacing]    = React.useState(false);
+  const [isPlacing, setIsPlacing] = React.useState(false);
   const [isCalculating, setIsCalculating] = React.useState(false);
 
-  const [address,      setAddress]      = React.useState("");
-  const [phone,        setPhone]        = React.useState(profile?.phone ?? "");
+  const [address, setAddress] = React.useState("");
+  const [phone, setPhone] = React.useState(profile?.phone ?? "");
+  const [phoneEdited, setPhoneEdited] = React.useState(false);
   const [deliveryArea, setDeliveryArea] = React.useState("");
-  const [distance,     setDistance]     = React.useState<number | null>(null);
-  const [deliveryFee,  setDeliveryFee]  = React.useState(() => {
-    // Kilkeel (standard) — fee is fixed, set it immediately
-    if (site.deliveryPricing?.type === "standard") {
-      return calculateDeliveryFee(site, {});
-    }
-    return 0;
-  });
+  const [distanceBreakdown, setDistanceBreakdown] = React.useState<Record<string, number>>({});
+  const [deliveryFeesBreakdown, setDeliveryFeesBreakdown] = React.useState<Record<string, number>>({});
+  const [deliveryFee, setDeliveryFee] = React.useState(0);
 
-  // Sync phone if profile loads after mount
+  const hasPrefilled = React.useRef(false);
+
   React.useEffect(() => {
-    if (profile?.phone && !phone) setPhone(profile.phone);
-  }, [profile?.phone]);
+    if (profile?.phone && !hasPrefilled.current && !phoneEdited) {
+      setPhone(profile.phone);
+      hasPrefilled.current = true;
+    }
+  }, [profile?.phone, phoneEdited]);
 
-  // Location guard — distance-slab sites require coords before checkout
   React.useEffect(() => {
     if (site.deliveryPricing?.type === "distance_slabs" && !userCoords) {
       toast.error("Please allow location access before checking out.");
@@ -55,19 +55,52 @@ export default function CheckoutView() {
     }
   }, [site.deliveryPricing?.type, userCoords]);
 
-  // Downpatrick — auto-calc if coords already available
+  // Option B: Sum fees for all restaurants
   React.useEffect(() => {
-    if (site.key !== "downpatrickeats" || !userCoords || !site.coordinates || distance !== null || isCalculating) return;
+    if (site.key !== "downpatrickeats" || !userCoords || isCalculating) return;
+
+    // Check if we already calculated everything for current userCoords
+    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const allDone = uniqueRestos.every(rid => deliveryFeesBreakdown[rid] !== undefined);
+    if (allDone && Object.keys(deliveryFeesBreakdown).length === uniqueRestos.length) return;
+
     (async () => {
       setIsCalculating(true);
-      const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
-      if (miles !== null) {
-        setDistance(miles);
-        setDeliveryFee(calculateDeliveryFee(site, { miles }));
+      const newDistances: Record<string, number> = {};
+      const newFees: Record<string, number> = {};
+      let total = 0;
+
+      for (const restaurantId of uniqueRestos) {
+        const item = cartItems.find(i => i.restaurantId === restaurantId);
+        if (!item?.restaurantLat || !item?.restaurantLng) {
+          // Fallback to site coordinates if restaurant coords are missing
+          const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
+          if (miles !== null) {
+            newDistances[restaurantId] = miles;
+            newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+            total += newFees[restaurantId];
+          }
+          continue;
+        }
+
+        const miles = await getOSRMDistance(
+          { lat: parseFloat(item.restaurantLat), lng: parseFloat(item.restaurantLng) },
+          { lat: userCoords.lat, lng: userCoords.lng }
+        );
+
+        if (miles !== null) {
+          newDistances[restaurantId] = miles;
+          newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+          total += newFees[restaurantId];
+        }
       }
+
+      setDistanceBreakdown(newDistances);
+      setDeliveryFeesBreakdown(newFees);
+      setDeliveryFee(total);
       setIsCalculating(false);
     })();
-  }, [site, userCoords]);
+  }, [site, userCoords, cartItems]);
 
   const groupedItems = React.useMemo(() =>
     cartItems.reduce((acc, item) => {
@@ -76,7 +109,7 @@ export default function CheckoutView() {
       acc[item.restaurantId] = g;
       return acc;
     }, {} as Record<string, { name: string; items: typeof cartItems }>),
-  [cartItems]);
+    [cartItems]);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
@@ -84,17 +117,7 @@ export default function CheckoutView() {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         setUserCoords({ lat: coords.latitude, lng: coords.longitude });
-        if (site.coordinates) {
-          const miles = await getOSRMDistance(site.coordinates, { lat: coords.latitude, lng: coords.longitude });
-          if (miles !== null) {
-            setDistance(miles);
-            setDeliveryFee(calculateDeliveryFee(site, { miles }));
-            toast.success(`${miles} miles — fee calculated`);
-          } else {
-            toast.error("Could not calculate road distance.");
-          }
-        }
-        setIsCalculating(false);
+        // The effect above will trigger recalculation
       },
       () => { toast.error("Could not get location."); setIsCalculating(false); }
     );
@@ -103,14 +126,25 @@ export default function CheckoutView() {
   const handleAreaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const area = e.target.value;
     setDeliveryArea(area);
-    setDeliveryFee(calculateDeliveryFee(site, { area }));
+
+    // For Option B in fixed_areas, we'd also sum if we had multiple areas.
+    // For now, assume fixed fee applies per restaurant in the cart.
+    const perRestoFee = calculateDeliveryFee(site, { area });
+    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const total = perRestoFee * uniqueRestos.length;
+
+    const breakdown: Record<string, number> = {};
+    uniqueRestos.forEach(rid => breakdown[rid] = perRestoFee);
+
+    setDeliveryFeesBreakdown(breakdown);
+    setDeliveryFee(total);
   };
 
   const handlePlaceOrder = async () => {
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
-    if (!phone.trim())   { toast.error("Enter your phone number"); return; }
+    if (!phone.trim()) { toast.error("Enter your phone number"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
-    if (site.key === "downpatrickeats" && distance === null) { toast.error("Calculate your delivery distance first"); return; }
+    if (site.key === "downpatrickeats" && deliveryFee === 0 && !isStandard) { toast.error("Calculate your delivery distance first"); return; }
 
     try {
       setIsPlacing(true);
@@ -121,14 +155,22 @@ export default function CheckoutView() {
           "Content-Type": "application/json",
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
-        body: JSON.stringify({ deliveryAddress: address, deliveryArea, deliveryFee, distanceMiles: distance, customerPhone: phone }),
+        body: JSON.stringify({
+          deliveryAddress: address,
+          deliveryArea,
+          deliveryFee,
+          deliveryFeesBreakdown, // Sum-up breakdown
+          distanceMiles: 0, // No longer a single distance
+          customerPhone: phone
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success("Order placed!");
         clearCart();
         await refreshOrders();
-        router.push(`/dashboard/customer/status/${data.data.orders[0].id}`);
+        // Redirect to the first sub-order or a custom session status page
+        router.push(`/dashboard/customer/orders`);
       } else {
         toast.error(data.message ?? "Failed to place order");
       }
@@ -139,159 +181,170 @@ export default function CheckoutView() {
     }
   };
 
-  const isStandard    = site.deliveryPricing?.type === "standard";
-  const isFixedAreas  = site.deliveryPricing?.type === "fixed_areas";
-  const isDistSlabs   = site.deliveryPricing?.type === "distance_slabs";
-  const grandTotal    = totalPrice + deliveryFee;
+  const isStandard = site.deliveryPricing?.type === "standard";
+  const isFixedAreas = site.deliveryPricing?.type === "fixed_areas";
+  const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
+  const grandTotal = totalPrice + deliveryFee;
+
+  const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
   if (cartItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-lg font-black text-gray-400">Your basket is empty</p>
+        <p className="text-base font-bold text-gray-500">Your basket is empty</p>
         <Link href="/dashboard/customer" className="text-sm font-bold underline" style={{ color: accent }}>
-          Back to restaurants
+          Browse restaurants
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           href="/dashboard/customer/cart"
-          className="w-9 h-9 rounded-full flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 transition-all shrink-0"
+          className="w-8 h-8 rounded-xl flex items-center justify-center bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all"
         >
           <ChevronLeft className="w-4 h-4 text-gray-500" />
         </Link>
         <div>
-          <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Checkout</h1>
-          <p className="text-xs text-gray-400 font-medium mt-0.5">Review and place your order</p>
+          <h1 className="text-lg font-black text-gray-900 tracking-tight">Checkout</h1>
+          <p className="text-[11px] text-gray-400">Review and place your order</p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-8">
+      <div className="grid lg:grid-cols-5 gap-6">
 
         {/* ── LEFT FORM ── */}
-        <div className="lg:col-span-3 space-y-8">
+        <div className="lg:col-span-3 space-y-12">
 
-          {/* Delivery address */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
-              <MapPin className="w-3 h-3" /> Delivery Address
-            </p>
-            <textarea
-              placeholder="House number, street, postcode…"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-3.5 rounded-2xl bg-white border border-gray-200 text-sm font-medium text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 transition-all resize-none"
-              style={{ "--tw-ring-color": `${accent}40` } as any}
-            />
-          </div>
+          {/* Delivery Details Section */}
+          <div className="border-b border-gray-100 pb-10 space-y-6">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Delivery Details</p>
 
-          {/* Phone */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
-              <Phone className="w-3 h-3" /> Phone Number
-            </p>
-            <div className="relative">
-              <input
-                type="tel"
-                placeholder="e.g. 07700 900000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-4 py-3.5 rounded-2xl bg-white border border-gray-200 text-sm font-medium text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 transition-all"
-                style={{ "--tw-ring-color": `${accent}40` } as any}
+            {/* Address */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                <MapPin className="w-3 h-3" style={{ color: accent }} />
+                Delivery Address
+              </label>
+              <textarea
+                placeholder="House number, street, postcode…"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={2}
+                className={cn(inputClass, "resize-none")}
               />
-              {profile?.phone && phone === profile.phone && (
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: `${accent}18`, color: accent }}>
-                  From profile
-                </span>
-              )}
             </div>
-            <p className="text-[10px] text-gray-400 font-medium">The driver will use this to contact you.</p>
+
+            {/* Phone */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-600 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-3 h-3" style={{ color: accent }} />
+                  Contact Number
+                </span>
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  placeholder="e.g. 07700 900000"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setPhoneEdited(true);
+                  }}
+                  className={inputClass}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
+                The driver will use this number if they need to contact you. You can change it if you're ordering for someone else.
+              </p>
+            </div>
+
+            {/* Fixed Areas */}
+            {isFixedAreas && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-600">Delivery Area</label>
+                <div className="relative">
+                  <select
+                    value={deliveryArea}
+                    onChange={handleAreaChange}
+                    className={cn(inputClass, "appearance-none pr-10")}
+                  >
+                    <option value="">Select your area…</option>
+                    {site.deliveryPricing?.rules.map((r: any) => (
+                      <option key={r.name} value={r.name}>{r.name} — £{r.fee.toFixed(2)}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Distance Slabs */}
+            {isDistSlabs && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-600">Delivery Distance</label>
+                <button
+                  onClick={handleGetLocation}
+                  disabled={isCalculating}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50"
+                  style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
+                >
+                  {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                  {Object.keys(distanceBreakdown).length > 0 ? "Recalculate Distances" : "Detect My Location & Calculate"}
+                </button>
+                {Object.entries(distanceBreakdown).map(([rid, dist]) => (
+                  <div key={rid} className="flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: `${accent}10` }}>
+                    <span className="text-[10px] text-gray-500 font-bold uppercase truncate max-w-[120px]">
+                      {groupedItems[rid]?.name}
+                    </span>
+                    <span className="text-sm font-black" style={{ color: accent }}>
+                      {dist} mi · £{deliveryFeesBreakdown[rid]?.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Standard flat fee */}
+            {isStandard && deliveryFee > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-dashed" style={{ borderColor: `${accent}30`, background: `${accent}06` }}>
+                <span className="text-xs text-gray-500">Fixed delivery fee</span>
+                <span className="text-sm font-black" style={{ color: accent }}>£{deliveryFee.toFixed(2)}</span>
+              </div>
+            )}
           </div>
 
-          {/* Newcastle — area picker */}
-          {isFixedAreas && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Delivery Area</p>
-              <div className="relative">
-                <select
-                  value={deliveryArea}
-                  onChange={handleAreaChange}
-                  className="w-full appearance-none px-4 py-3.5 rounded-2xl bg-white border border-gray-200 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": `${accent}40` } as any}
-                >
-                  <option value="">Select your area…</option>
-                  {site.deliveryPricing?.rules.map((r: any) => (
-                    <option key={r.name} value={r.name}>{r.name} — £{r.fee.toFixed(2)}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-          )}
-
-          {/* Downpatrick — GPS distance calc */}
-          {isDistSlabs && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Delivery Distance</p>
-              <button
-                onClick={handleGetLocation}
-                disabled={isCalculating}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border text-sm font-bold transition-all disabled:opacity-50"
-                style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
-              >
-                {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-                {distance !== null ? `${distance} miles — Recalculate` : "Detect My Location & Calculate"}
-              </button>
-              {distance !== null && (
-                <div className="flex items-center justify-between px-4 py-3 rounded-2xl" style={{ background: `${accent}10` }}>
-                  <span className="text-xs font-bold text-gray-500">Road distance</span>
-                  <span className="text-sm font-black" style={{ color: accent }}>{distance} miles · £{deliveryFee.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Kilkeel standard — just show the flat fee info */}
-          {isStandard && (
-            <div className="flex items-center justify-between px-4 py-3.5 rounded-2xl border border-dashed" style={{ borderColor: `${accent}30`, background: `${accent}06` }}>
-              <span className="text-xs font-bold text-gray-500">Fixed delivery fee</span>
-              <span className="text-sm font-black" style={{ color: accent }}>£{deliveryFee.toFixed(2)}</span>
-            </div>
-          )}
-
-          {/* Divider */}
-          <div className="h-px bg-gray-100" />
-
-          {/* Order items */}
-          <div className="space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Your Order</p>
+          {/* Order Items Section */}
+          <div className="pt-2 space-y-6">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order Summary</p>
             {Object.entries(groupedItems).map(([rid, group]) => (
               <div key={rid} className="space-y-3">
                 <div className="flex items-center gap-1.5">
-                  <Store className="w-3 h-3 text-gray-300" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{group.name}</span>
+                  <Store className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs font-bold text-gray-500">{group.name}</span>
                 </div>
-                {group.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 shrink-0">
-                      {item.imageUrl && (
-                        <Image src={item.imageUrl} alt={item.name} width={44} height={44} className="object-cover w-full h-full" />
-                      )}
+                <div className="space-y-4">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-start">
+                      <div className="flex gap-4">
+                        <span className="flex-shrink-0 w-6 h-6 bg-gray-50 rounded flex items-center justify-center text-[10px] font-sans font-bold text-gray-400">
+                          {item.quantity}
+                        </span>
+                        <div>
+                          <p className="text-sm font-sans font-bold text-gray-800">{item.name}</p>
+                          <p className="text-[10px] font-sans text-gray-400 font-medium">Standard Preparation</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-sans font-bold text-gray-900">£{(item.price * item.quantity).toFixed(2)}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 truncate">{item.name}</p>
-                      <p className="text-xs text-gray-400 font-medium">× {item.quantity}</p>
-                    </div>
-                    <p className="text-sm font-black text-gray-700 shrink-0">£{(item.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -299,46 +352,48 @@ export default function CheckoutView() {
 
         {/* ── RIGHT SUMMARY ── */}
         <div className="lg:col-span-2">
-          <div className="sticky top-24 space-y-5">
+          <div className="sticky top-24 space-y-4">
 
-            {/* Totals */}
-            <div className="bg-white rounded-3xl border border-gray-100 p-5 space-y-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Summary</p>
+            {/* Price Breakdown */}
+            <div className="bg-gray-50/50 rounded-2xl p-6 space-y-3 border border-gray-100/50">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bill Details</p>
 
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400 font-medium">Subtotal</span>
-                  <span className="font-bold text-gray-700">£{totalPrice.toFixed(2)}</span>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs font-medium text-gray-500">
+                  <span>Item Total</span>
+                  <span>£{totalPrice.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400 font-medium">Delivery</span>
-                  <span className="font-bold" style={{ color: deliveryFee > 0 ? accent : "#9ca3af" }}>
-                    {deliveryFee > 0 ? `£${deliveryFee.toFixed(2)}` : "—"}
+                <div className="flex justify-between items-center text-xs font-medium text-gray-400">
+                  <span>Delivery Fee</span>
+                  <span>
+                    {deliveryFee > 0 ? `£${deliveryFee.toFixed(2)}` : "FREE"}
                   </span>
                 </div>
               </div>
 
-              <div className="h-px bg-gray-100" />
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-black text-gray-800">Total</span>
-                <span className="text-xl font-black" style={{ color: gradientFrom }}>
+              <div className="h-px bg-gray-200/50 my-2" />
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-sans font-bold text-gray-900">Grand Total</span>
+                <span className="text-2xl font-heading font-black text-gray-900 tracking-tight">
                   £{grandTotal.toFixed(2)}
                 </span>
               </div>
 
               {isFixedAreas && (
-                <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-xl leading-relaxed">
-                  Delivery fee of £{deliveryFee.toFixed(2)} is paid in cash to the driver at the door.
-                </p>
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
+                  <span className="text-amber-500 text-xs">ⓘ</span>
+                  <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">
+                    The delivery fee of £{deliveryFee.toFixed(2)} is paid directly in cash to the driver upon arrival.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* Place order button */}
+            {/* CTA */}
             <button
               onClick={handlePlaceOrder}
-              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && distance === null)}
-              className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
+              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && Object.keys(distanceBreakdown).length === 0)}
+              className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-sm uppercase tracking-wide shadow-lg transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
             >
               {isPlacing
@@ -349,7 +404,7 @@ export default function CheckoutView() {
 
             <div className="flex items-center justify-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-gray-300" />
-              <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Secured by Stripe</p>
+              <p className="text-[10px] text-gray-400 font-medium">Secured by Stripe</p>
             </div>
           </div>
         </div>

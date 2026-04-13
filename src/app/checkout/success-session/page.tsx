@@ -6,9 +6,9 @@ import { CheckCircle2, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-function SuccessContent() {
+function SuccessSessionContent() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get("order_id");
+  const orderSessionId = searchParams.get("order_session_id");
   const router = useRouter();
 
   const [verifying, setVerifying] = React.useState(true);
@@ -17,13 +17,13 @@ function SuccessContent() {
   useEffect(() => {
     const verifyPayment = async () => {
       const sessionId = searchParams.get("session_id");
-      if (!orderId || !sessionId) {
+      if (!orderSessionId || !sessionId) {
         setVerifying(false);
         return;
       }
 
       try {
-        const res = await fetch(`/api/orders/${orderId}/stripe/verify`, {
+        const res = await fetch(`/api/orders/session/${orderSessionId}/stripe/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
@@ -41,7 +41,7 @@ function SuccessContent() {
     };
 
     verifyPayment();
-  }, [orderId, searchParams]);
+  }, [orderSessionId, searchParams]);
 
   if (verifying) {
     return (
@@ -79,8 +79,14 @@ function SuccessContent() {
         transition={{ delay: 0.3 }}
         className="text-sm font-medium text-gray-400 max-w-sm leading-relaxed mb-10"
       >
-        Your order is now being prepared by the restaurant. You can track its real-time progress below.
+        Your multi-restaurant order is now being prepared. You can track all sub-orders in your dashboard.
       </motion.p>
+
+      {error && (
+        <p className="text-red-500 text-xs font-bold mb-4 uppercase tracking-tighter">
+          Verification issue: {error}. Your order may still be processing.
+        </p>
+      )}
 
       <motion.div 
         initial={{ y: 20, opacity: 0 }}
@@ -89,17 +95,17 @@ function SuccessContent() {
         className="flex flex-col sm:flex-row gap-4 w-full max-w-md"
       >
         <Link 
-          href={orderId ? `/dashboard/customer/status/${orderId}` : "/dashboard/customer/orders"}
+          href="/dashboard/customer/orders"
           className="flex-1 bg-gray-900 text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
         >
-          Track Order <ArrowRight className="w-4 h-4" />
+          View My Orders <ArrowRight className="w-4 h-4" />
         </Link>
         
         <Link 
-          href="/dashboard/customer/orders"
+          href="/dashboard/customer"
           className="flex-1 bg-gray-100 text-gray-400 py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 hover:text-gray-600 transition-all"
         >
-          <ShoppingBag className="w-4 h-4" /> All Orders
+          <ShoppingBag className="w-4 h-4" /> Home
         </Link>
       </motion.div>
 
@@ -109,20 +115,20 @@ function SuccessContent() {
         transition={{ delay: 0.8 }}
         className="mt-12 text-[10px] font-bold text-gray-300 uppercase tracking-widest"
       >
-        Order ID: {orderId?.slice(0, 12) || "N/A"}
+        Session ID: {orderSessionId?.slice(0, 12) || "N/A"}
       </motion.p>
     </div>
   );
 }
 
-export default function SuccessPage() {
+export default function SuccessSessionPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center font-black text-xs uppercase tracking-widest text-gray-300">
-        Verifying Payment...
+        Verifying Session...
       </div>
     }>
-      <SuccessContent />
+      <SuccessSessionContent />
     </Suspense>
   );
 }

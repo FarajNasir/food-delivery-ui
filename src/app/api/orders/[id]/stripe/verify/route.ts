@@ -4,8 +4,9 @@ import { orders, restaurants, users, notifications } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
+import { NotificationService } from "@/services/notification.service";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // Trigger re-compile
 
 /**
  * POST /api/orders/[id]/stripe/verify
@@ -47,7 +48,7 @@ export async function POST(
     if (order.status !== "PAID") {
       await db
         .update(orders)
-        .set({ 
+        .set({
           status: "PAID",
           updatedAt: new Date()
         })
@@ -55,9 +56,9 @@ export async function POST(
 
       // 4. Notify Restaurant Owner (same logic as webhook)
       const [restaurant] = await db
-        .select({ 
-          ownerId: restaurants.ownerId, 
-          name: restaurants.name 
+        .select({
+          ownerId: restaurants.ownerId,
+          name: restaurants.name
         })
         .from(restaurants)
         .where(eq(restaurants.id, order.restaurantId))
@@ -70,19 +71,50 @@ export async function POST(
           .where(eq(users.id, restaurant.ownerId))
           .limit(1);
 
-        const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
+        const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
 
-        await db.insert(notifications).values({
+        const [newNotification] = await db.insert(notifications).values({
           recipientId: restaurant.ownerId,
           type: "ORDER",
-          subject: "Payment Received! 💰",
+          subject: "Payment Received",
           body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
           channel: isActive ? "FCM" : "WHATSAPP",
           status: "PENDING",
-          metadata: { orderId: order.id }
-        });
+          metadata: { orderId: order.id, orderStatus: "PAID" }
+        }).returning();
+
+        if (newNotification && newNotification.channel === "FCM") {
+          NotificationService.trigger(newNotification.id);
+        }
       }
-      
+
+      // 5. Notify Customer
+      try {
+        const [customer] = await db
+          .select({ lastActive: users.lastActive })
+          .from(users)
+          .where(eq(users.id, order.userId))
+          .limit(1);
+
+        const isActive = customer?.lastActive && (Date.now() - new Date(customer.lastActive).getTime() < 300000);
+
+        const [customerNotification] = await db.insert(notifications).values({
+          recipientId: order.userId,
+          type: "ORDER",
+          subject: "Payment Confirmed",
+          body: `Your payment was successful. The restaurant will start preparing your meal shortly.`,
+          channel: isActive ? "FCM" : "WHATSAPP",
+          status: "PENDING",
+          metadata: { orderId: order.id, orderStatus: "PAID" }
+        }).returning();
+
+        if (customerNotification && customerNotification.channel === "FCM") {
+          NotificationService.trigger(customerNotification.id);
+        }
+      } catch (notifyErr) {
+        console.error("[Stripe Verify] Failed to notify customer:", notifyErr);
+      }
+
       console.log(`[Stripe Verify] Order ${id} marked as PAID via frontend verify.`);
     }
 

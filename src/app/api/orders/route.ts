@@ -1,7 +1,8 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications } from "@/lib/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
+import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications, orderSessions } from "@/lib/db/schema";
+import { eq, inArray, desc, sql } from "drizzle-orm";
+import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
 
@@ -12,53 +13,95 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   return withAuth(req, async (user) => {
     try {
-      const userCartItems = await db
-        .select({
-          cartItemId: cartItems.id,
-          menuItemId: cartItems.menuItemId,
-          quantity: cartItems.quantity,
-          price: menuItems.price,
-          restaurantId: menuItems.restaurantId,
-        })
-        .from(cartItems)
-        .innerJoin(menuItems, eq(cartItems.menuItemId, menuItems.id))
-        .where(eq(cartItems.userId, user.id));
-
-      if (userCartItems.length === 0) {
-        return fail("Cart is empty", 400);
-      }
-
-      const itemsByRestaurant: Record<string, typeof userCartItems> = {};
-      userCartItems.forEach((item) => {
-        if (!itemsByRestaurant[item.restaurantId]) {
-          itemsByRestaurant[item.restaurantId] = [];
-        }
-        itemsByRestaurant[item.restaurantId].push(item);
-      });
-
-      const { 
-        deliveryAddress, 
-        deliveryArea, 
-        deliveryFee, 
+      const {
+        deliveryAddress,
+        deliveryArea,
+        deliveryFee,
         distanceMiles,
-        customerPhone
+        customerPhone,
+        deliveryFeesBreakdown // New field from frontend: { [restaurantId]: fee }
       } = await req.json().catch(() => ({}));
 
+      // Validate or fallback for deliveryFeesBreakdown
+      const fees = deliveryFeesBreakdown || {};
+
       const createdOrders = await db.transaction(async (tx) => {
+        // 1. Atomically delete items and capture the original data
+        const deletedCartItems = await tx.delete(cartItems)
+          .where(eq(cartItems.userId, user.id))
+          .returning();
+
+        if (deletedCartItems.length === 0) {
+          throw new Error("CART_EMPTY");
+        }
+
+        // 2. Fetch the corresponding menu items to get prices and restaurantIds
+        const itemIds = deletedCartItems.map(i => i.menuItemId);
+        const menuDetails = await tx.select({
+           id: menuItems.id,
+           price: menuItems.price,
+           restaurantId: menuItems.restaurantId
+        }).from(menuItems).where(inArray(menuItems.id, itemIds));
+
+        // Create a lookup map for menu details
+        const menuLookup = new Map(menuDetails.map(m => [m.id, m]));
+
+        // 3. Assemble the complete payload
+        const userCartItems = deletedCartItems.map(item => {
+           const info = menuLookup.get(item.menuItemId);
+           if (!info) throw new Error("INVALID_MENU_ITEM");
+           return {
+             cartItemId: item.id,
+             menuItemId: item.menuItemId,
+             quantity: item.quantity,
+             price: info.price,
+             restaurantId: info.restaurantId
+           };
+        });
+
+        // 4. Group by restaurant as before
+        const itemsByRestaurant: Record<string, typeof userCartItems> = {};
+        userCartItems.forEach((item) => {
+          if (!itemsByRestaurant[item.restaurantId]) {
+            itemsByRestaurant[item.restaurantId] = [];
+          }
+          itemsByRestaurant[item.restaurantId].push(item);
+        });
+
+        // 1. Create the parent Session
+        const [session] = await tx.insert(orderSessions).values({
+          userId: user.id,
+          status: "PENDING",
+          totalItemsAmount: "0.00", // Will update or calculate
+          totalDeliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+          deliveryAddress,
+          deliveryArea,
+          distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
+          customerPhone,
+        }).returning();
+
         const ordersList = [];
+        let sessionTotalItems = 0;
+
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
           const totalAmount = items.reduce((sum, item) => {
             return sum + (parseFloat(item.price as string) * item.quantity);
           }, 0);
+          sessionTotalItems += totalAmount;
+
+          // If breakdown exists, use it. Otherwise split evenly (Option B fallback)
+          const restaurantFee = fees[restaurantId] 
+            || (deliveryFee / Object.keys(itemsByRestaurant).length);
 
           const [newOrder] = await tx.insert(orders).values({
             userId: user.id,
             restaurantId,
+            sessionId: session.id,
             totalAmount: totalAmount.toFixed(2),
-            deliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+            deliveryFee: restaurantFee.toFixed(2),
             deliveryAddress,
             deliveryArea,
-            distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
+            distanceMiles: distanceMiles ? (distanceMiles / Object.keys(itemsByRestaurant).length).toFixed(4) : null,
             customerPhone,
             status: "PENDING_CONFIRMATION",
           }).returning();
@@ -75,14 +118,16 @@ export async function POST(req: Request) {
           ordersList.push(newOrder);
         }
 
-        const cartItemIds = userCartItems.map(i => i.cartItemId);
-        await tx.delete(cartItems).where(inArray(cartItems.id, cartItemIds));
+        // Update session with correct item total
+        await tx.update(orderSessions)
+          .set({ totalItemsAmount: sessionTotalItems.toFixed(2) })
+          .where(eq(orderSessions.id, session.id));
 
-        return ordersList;
+        return { orders: ordersList, sessionId: session.id };
       });
 
       // --- Notification Logic (Outside Transaction) ---
-      for (const newOrder of createdOrders) {
+      for (const newOrder of createdOrders.orders) {
         try {
           const [restaurant] = await db
             .select({ ownerId: restaurants.ownerId, name: restaurants.name })
@@ -97,17 +142,21 @@ export async function POST(req: Request) {
               .where(eq(users.id, restaurant.ownerId))
               .limit(1);
 
-            const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
+            const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
 
-            await db.insert(notifications).values({
+            const [newNotification] = await db.insert(notifications).values({
               recipientId: restaurant.ownerId,
               type: "ORDER",
               subject: "New Order Received!",
               body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
               channel: isActive ? "FCM" : "WHATSAPP",
               status: "PENDING",
-              metadata: { orderId: newOrder.id }
-            });
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
+            }).returning();
+
+            if (newNotification && newNotification.channel === "FCM") {
+              NotificationService.trigger(newNotification.id);
+            }
           }
         } catch (notifyErr) {
           console.error("Failed to queue notification:", notifyErr);
@@ -115,9 +164,12 @@ export async function POST(req: Request) {
       }
       // --------------------------
 
-      return ok({ orders: createdOrders });
-    } catch (err) {
+      return ok({ orders: createdOrders.orders, sessionId: createdOrders.sessionId });
+    } catch (err: any) {
       console.error("[api/orders POST]", err);
+      if (err.message === "CART_EMPTY") {
+        return fail("Cart is empty", 400);
+      }
       return fail("Failed to create orders.", 500);
     }
   });
@@ -134,20 +186,21 @@ export async function GET(req: Request) {
       // Step 1: fetch orders + restaurant name
       const orderRows = await db
         .select({
-          id:             orders.id,
-          userId:         orders.userId,
-          restaurantId:   orders.restaurantId,
+          id: orders.id,
+          userId: orders.userId,
+          restaurantId: orders.restaurantId,
           restaurantName: restaurants.name,
-          status:         orders.status,
-          totalAmount:    orders.totalAmount,
-          deliveryFee:    orders.deliveryFee,
-          deliveryAddress:orders.deliveryAddress,
-          deliveryArea:   orders.deliveryArea,
-          customerPhone:  orders.customerPhone,
-          currency:       orders.currency,
-          paymentIntentId:orders.paymentIntentId,
-          createdAt:      orders.createdAt,
-          updatedAt:      orders.updatedAt,
+          status: orders.status,
+          totalAmount: orders.totalAmount,
+          deliveryFee: orders.deliveryFee,
+          deliveryAddress: orders.deliveryAddress,
+          deliveryArea: orders.deliveryArea,
+          customerPhone: orders.customerPhone,
+          currency: orders.currency,
+          paymentIntentId: orders.paymentIntentId,
+          sessionId: orders.sessionId,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
         })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
@@ -160,13 +213,13 @@ export async function GET(req: Request) {
       const orderIds = orderRows.map((o) => o.id);
       const itemRows = await db
         .select({
-          id:          orderItems.id,
-          orderId:     orderItems.orderId,
-          menuItemId:  orderItems.menuItemId,
-          quantity:    orderItems.quantity,
-          price:       orderItems.price,
-          itemName:    menuItems.name,
-          itemImageUrl:menuItems.imageUrl,
+          id: orderItems.id,
+          orderId: orderItems.orderId,
+          menuItemId: orderItems.menuItemId,
+          quantity: orderItems.quantity,
+          price: orderItems.price,
+          itemName: menuItems.name,
+          itemImageUrl: menuItems.imageUrl,
         })
         .from(orderItems)
         .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
@@ -174,26 +227,26 @@ export async function GET(req: Request) {
 
       // Step 3: assemble
       const result = orderRows.map((order) => ({
-        id:             order.id,
-        userId:         order.userId,
-        restaurantId:   order.restaurantId,
-        status:         order.status,
-        totalAmount:    order.totalAmount,
-        deliveryFee:    order.deliveryFee,
-        deliveryAddress:order.deliveryAddress,
-        deliveryArea:   order.deliveryArea,
-        customerPhone:  order.customerPhone,
-        currency:       order.currency,
-        paymentIntentId:order.paymentIntentId,
-        createdAt:      order.createdAt,
-        updatedAt:      order.updatedAt,
+        id: order.id,
+        userId: order.userId,
+        restaurantId: order.restaurantId,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        deliveryFee: order.deliveryFee,
+        deliveryAddress: order.deliveryAddress,
+        deliveryArea: order.deliveryArea,
+        customerPhone: order.customerPhone,
+        currency: order.currency,
+        paymentIntentId: order.paymentIntentId,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
         restaurant: { name: order.restaurantName },
         items: itemRows
           .filter((i) => i.orderId === order.id)
           .map((i) => ({
-            id:       i.id,
+            id: i.id,
             quantity: i.quantity,
-            price:    i.price,
+            price: i.price,
             menuItem: { id: i.menuItemId, name: i.itemName, imageUrl: i.itemImageUrl },
           })),
       }));

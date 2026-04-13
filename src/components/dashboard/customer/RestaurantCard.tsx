@@ -39,11 +39,6 @@ export default function RestaurantCard({
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ 
-        y: -8, 
-        borderColor: `${theme.accent}30`,
-        transition: { duration: 0.3, ease: "easeOut" } 
-      }}
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
       className={cn(
         "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",

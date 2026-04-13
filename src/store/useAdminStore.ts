@@ -6,6 +6,7 @@ export interface AdminOrder {
   status: string;
   totalAmount: string;
   createdAt: string;
+  updatedAt: string;
   deliveryAddress: string | null;
   user: {
     id: string;
@@ -17,6 +18,14 @@ export interface AdminOrder {
     id: string;
     name: string;
   };
+  items: {
+    id: string;
+    quantity: number;
+    price: string;
+    menuItem: {
+      name: string;
+    };
+  }[];
 }
 
 interface AdminStats {

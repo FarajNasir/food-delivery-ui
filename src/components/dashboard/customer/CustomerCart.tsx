@@ -3,7 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, ArrowRight, Minus, Plus, Trash2, ChevronRight, Store, MapPin, AlertTriangle, Sparkles } from "lucide-react";
+import { 
+  ShoppingBag, ArrowRight, Minus, Plus, Trash2, 
+  Store, MapPin, AlertTriangle, Sparkles, ChevronRight 
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
@@ -12,7 +15,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import LocationPermissionModal from "@/components/shared/LocationPermissionModal";
 import DishCard, { SkeletonDishCard } from "@/components/dashboard/customer/DishCard";
 import { featuredApi, type PublicFeaturedDish } from "@/lib/api";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function CustomerCart() {
   const { site } = useSite();
@@ -20,19 +23,16 @@ export default function CustomerCart() {
   const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
   const { profile, isReady: authReady } = useAuthStore();
   const isLoggedIn = authReady && !!profile;
-  const { userCoords, locationDismissed } = useConfigStore();
+  const { userCoords } = useConfigStore();
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [checkingOut, setCheckingOut] = React.useState(false);
   const router = useRouter();
 
-  // On mount: if permission already granted, silently fetch coords.
-  // Otherwise show the modal automatically (location is required for checkout).
   useEffect(() => {
     if (userCoords || !navigator.geolocation) return;
 
     navigator.permissions.query({ name: "geolocation" }).then((result) => {
       if (result.state === "granted") {
-        // Already granted — fetch silently, no modal
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             useConfigStore.getState().setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -40,11 +40,9 @@ export default function CustomerCart() {
           () => {}
         );
       } else if (result.state === "prompt") {
-        // Not yet decided — show modal automatically
         const t = setTimeout(() => setLocationModalOpen(true), 600);
         return () => clearTimeout(t);
       }
-      // "denied" — modal will show via the checkout block when they try to proceed
     }).catch(() => {
       const t = setTimeout(() => setLocationModalOpen(true), 600);
       return () => clearTimeout(t);
@@ -64,7 +62,6 @@ export default function CustomerCart() {
     });
   }, [site.location]);
 
-  // Group items by restaurant
   const groupedItems = React.useMemo(() => {
     return cartItems.reduce((acc, item) => {
       const g = acc[item.restaurantId] || { name: item.restaurantName, items: [] };
@@ -74,10 +71,6 @@ export default function CustomerCart() {
     }, {} as Record<string, { name: string; items: typeof cartItems }>);
   }, [cartItems]);
 
-  useEffect(() => {
-    // refreshCart removed
-  }, []);
-
   const handleCheckout = () => {
     router.push("/dashboard/customer/checkout");
   };
@@ -86,13 +79,12 @@ export default function CustomerCart() {
   const hasOutOfLocationItems = cartItems.some(
     i => i.restaurantLocation && i.restaurantLocation !== site.location
   );
-  const finalTotal = totalPrice;
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto py-20 text-center">
+      <div className="max-w-xl mx-auto py-20 text-center">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 w-32 bg-gray-100 rounded-lg mx-auto" />
+          <div className="h-6 w-32 bg-gray-100 rounded-lg mx-auto" />
           <div className="h-4 w-48 bg-gray-50 rounded-lg mx-auto" />
         </div>
       </div>
@@ -100,100 +92,96 @@ export default function CustomerCart() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-20">
+    <div className="max-w-2xl mx-auto space-y-10 pb-32 px-4">
       {/* Page header */}
-      <div className="flex items-end justify-between px-2">
+      <div className="flex items-end justify-between pt-6 border-b border-gray-100 pb-6">
         <div>
-          <h1 className="text-2xl font-black tracking-tight" style={{ color: "var(--dash-text-primary)" }}>
-            My Cart
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight font-heading">
+            Your Cart
           </h1>
-          <p className="text-xs font-bold uppercase tracking-widest mt-1 opacity-50" style={{ color: "var(--dash-text-secondary)" }}>
-            {totalItems} items in your basket
+          <p className="text-[11px] font-medium text-gray-400 mt-1 flex items-center gap-2">
+            <span>{totalItems} item{totalItems !== 1 ? 's' : ''} in total</span>
+            {site.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {site.location}</span>}
           </p>
         </div>
         {!isEmpty && (
           <button 
             onClick={clearCart}
-            className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors flex items-center gap-1.5"
+            className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-all flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-50 rounded-full"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Clear all
+            Clear items
           </button>
         )}
       </div>
 
       {isEmpty ? (
-        <div className="flex flex-col items-center gap-6 text-center py-20">
+        <div className="flex flex-col items-center gap-8 text-center py-24">
           <div
-            className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center"
-            style={{ background: `${gradientFrom}12` }}
+            className="w-20 h-20 rounded-[2rem] flex items-center justify-center p-6 bg-gray-50"
           >
-            <ShoppingBag className="w-9 h-9" style={{ color: gradientFrom }} />
+            <ShoppingBag className="w-full h-full text-gray-200" />
           </div>
 
           <div className="space-y-2">
-            <p className="text-xl font-black" style={{ color: "var(--dash-text-primary)" }}>
-              Your cart is empty
-            </p>
-            <p className="text-sm max-w-xs mx-auto leading-relaxed font-medium" style={{ color: "var(--dash-text-secondary)" }}>
-              Looks like you haven't added anything yet. Explore local restaurants to find your next meal!
+            <h2 className="text-xl font-bold text-gray-900 font-heading">
+              Your basket is empty
+            </h2>
+            <p className="text-sm text-gray-400 max-w-[240px] mx-auto leading-relaxed">
+              Explore best restaurants around you and add something delicious!
             </p>
           </div>
 
           <Link
             href="/dashboard/customer"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-black text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-95 shadow-lg shadow-black/5"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl text-sm font-semibold text-white transition-all hover:shadow-lg active:scale-95"
             style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
           >
-            Browse Restaurants
+            Browse restaurants
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {/* Out-of-location warning banner */}
-          {cartItems.some(i => i.restaurantLocation && i.restaurantLocation !== site.location) && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200">
+          {hasOutOfLocationItems && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-100/50">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs font-bold text-amber-700 leading-relaxed">
-                Some items below are from a different location and cannot be ordered here. Switch location or remove them to continue.
+              <p className="text-[11px] font-medium text-amber-800 leading-relaxed uppercase tracking-tight">
+                Some items are outside your current delivery location. Please remove them.
               </p>
             </div>
           )}
 
-          {/* Cart Items Grouped by Restaurant */}
+          {/* Unified List Surface */}
           <div className="space-y-6">
             {Object.entries(groupedItems).map(([rid, group]) => {
               const isOutOfLocation = group.items.some(
                 i => i.restaurantLocation && i.restaurantLocation !== site.location
               );
               return (
-                <div key={rid} className="space-y-3">
-                  <div className="flex items-center gap-1.5 px-1">
-                    <Store className={`w-3.5 h-3.5 ${isOutOfLocation ? "text-amber-400" : "text-gray-300"}`} />
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${isOutOfLocation ? "text-amber-500" : "text-gray-400"}`}>
-                      {group.name}
-                    </span>
-                    {isOutOfLocation && (
-                      <span className="ml-auto flex items-center gap-1 text-[10px] font-black text-amber-500 uppercase tracking-widest">
-                        <MapPin className="w-3 h-3" />
-                        {group.items[0].restaurantLocation}
+                <div key={rid} className="space-y-4">
+                  {/* Restaurant Info */}
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100">
+                         <Store className={cn("w-4 h-4", isOutOfLocation ? "text-amber-500" : "text-gray-400")} />
+                      </div>
+                      <span className={cn("text-xs font-bold", isOutOfLocation ? "text-amber-600" : "text-gray-900")}>
+                        {group.name}
                       </span>
-                    )}
+                    </div>
                   </div>
 
-                  <div className="space-y-3">
+                  {/* Items List */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
                     {group.items.map((item) => {
                       const unavailable = !!(item.restaurantLocation && item.restaurantLocation !== site.location);
                       return (
-                        <div
-                          key={item.id}
-                          className={`relative flex items-center gap-4 p-4 rounded-3xl transition-all ${unavailable ? "opacity-50" : "hover:shadow-md"}`}
-                          style={{ background: "var(--dash-card)", border: `1px solid ${unavailable ? "#fcd34d" : "var(--dash-card-border)"}` }}
-                        >
-                          <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-gray-50 flex-shrink-0">
+                        <div key={item.id} className={cn("p-5 flex gap-5 transition-all bg-white", unavailable && "opacity-40")}>
+                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-white shrink-0 shadow-sm border border-gray-100">
                             {item.imageUrl ? (
-                              <Image src={item.imageUrl} alt={item.name} fill className={`object-cover ${unavailable ? "grayscale" : ""}`} />
+                              <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-200">
                                 <ShoppingBag className="w-8 h-8" />
@@ -201,47 +189,43 @@ export default function CustomerCart() {
                             )}
                           </div>
 
-                          <div className="flex-1 min-w-0 pr-2">
-                            <h3 className="text-sm font-black text-gray-900 truncate leading-tight mb-1">
+                          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                            <h3 className="text-base font-bold text-gray-900 truncate">
                               {item.name}
                             </h3>
-                            {unavailable ? (
-                              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">
-                                Not available in {site.location}
-                              </p>
-                            ) : (
-                              <p className="text-sm font-black" style={{ color: accent }}>
-                                £{item.price.toFixed(2)}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-black text-gray-900">£{item.price.toFixed(2)}</span>
+                              {unavailable && (
+                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded">Switch Location</span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col items-end justify-center">
                             {unavailable ? (
                               <button
                                 onClick={() => removeItem(item.menuItemId)}
-                                className="w-7 h-7 rounded-full flex items-center justify-center bg-red-50 border border-red-100 text-red-400 hover:text-red-600 hover:bg-red-100 transition-all"
-                                title="Remove item"
+                                className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 transition-colors"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-5 h-5" />
                               </button>
                             ) : (
-                              <div className="flex items-center gap-3 bg-gray-50 p-1 rounded-full border border-gray-100">
+                              <div className="flex items-center gap-3 h-10 px-1 rounded-full border border-gray-100 bg-gray-50/30">
                                 <button
                                   onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
-                                  className="w-7 h-7 rounded-full flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-gray-900 shadow-sm transition-all"
+                                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-gray-900 shadow-sm transition-all"
                                 >
-                                  <Minus className="w-3 h-3" />
+                                  <Minus className="w-3.5 h-3.5" />
                                 </button>
-                                <span className="text-xs font-black text-gray-900 w-4 text-center">
+                                <span className="text-sm font-bold text-gray-900 tabular-nums w-4 text-center">
                                   {item.quantity}
                                 </span>
                                 <button
                                   onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-white shadow-sm transition-all hover:scale-105 active:scale-95"
+                                  className="w-8 h-8 flex items-center justify-center rounded-full text-white shadow-sm transition-all hover:scale-105 active:scale-95"
                                   style={{ background: accent }}
                                 >
-                                  <Plus className="w-3 h-3" />
+                                  <Plus className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             )}
@@ -255,72 +239,67 @@ export default function CustomerCart() {
             })}
           </div>
 
-          {/* Order Summary */}
-          <div
-            className="rounded-[2.5rem] p-6 space-y-4 shadow-sm"
-            style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
-          >
-            <h2 className="text-sm font-black uppercase tracking-widest opacity-50 px-2" style={{ color: "var(--dash-text-primary)" }}>
-              Order Summary
-            </h2>
-            
-            <div className="space-y-2 px-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-bold opacity-60" style={{ color: "var(--dash-text-secondary)" }}>Subtotal</span>
-                <span className="font-black" style={{ color: "var(--dash-text-primary)" }}>£{totalPrice.toFixed(2)}</span>
-              </div>
-              <div className="h-px bg-gray-50 my-2" />
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-base font-black" style={{ color: "var(--dash-text-primary)" }}>Total Payable</span>
-                <span className="text-xl font-black" style={{ color: accent }}>£{finalTotal.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {!isLoggedIn ? (
-              <Link
-                href="/login?redirect=/dashboard/customer/cart"
-                className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-black/5 transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] mt-2"
-                style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
-              >
-                Sign in to checkout
-                <ChevronRight className="w-5 h-5" />
-              </Link>
-            ) : !userCoords ? (
-              <div className="mt-2 space-y-2">
-                <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-2xl bg-amber-50 border border-amber-200">
-                  <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-xs font-bold text-amber-700 leading-relaxed">
-                    Location is required to calculate your delivery fee and place an order.
-                  </p>
+          {/* Integrated Summary Section */}
+          <div className="pt-6 space-y-6">
+             <div className="space-y-3 px-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium text-gray-400">Items Subtotal</span>
+                  <span className="font-bold text-gray-900">£{totalPrice.toFixed(2)}</span>
                 </div>
-                <button
-                  onClick={() => setLocationModalOpen(true)}
-                  className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]"
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium text-gray-400">Delivery Fee</span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Calculated at checkout</span>
+                </div>
+                <div className="h-px bg-gray-100 my-4" />
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-bold text-gray-900 font-heading">Amount Payable</span>
+                  <span className="text-2xl font-black" style={{ color: accent }}>£{totalPrice.toFixed(2)}</span>
+                </div>
+             </div>
+
+             <div className="pt-4">
+              {!isLoggedIn ? (
+                <Link
+                  href="/login?redirect=/dashboard/customer/cart"
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all hover:opacity-90 active:scale-95"
                   style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
                 >
-                  <MapPin className="w-4 h-4" />
-                  Enable Location to Continue
-                </button>
-              </div>
-            ) : hasOutOfLocationItems ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <div className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-sm uppercase tracking-widest bg-gray-100 text-gray-400 cursor-not-allowed">
-                  <AlertTriangle className="w-4 h-4" />
-                  Remove out-of-location items first
+                  Log in to Continue
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              ) : !userCoords ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/50">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-tight">Enable location for delivery fees</span>
+                  </div>
+                  <button
+                    onClick={() => setLocationModalOpen(true)}
+                    className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all hover:opacity-90 active:scale-95"
+                    style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                  >
+                    Enable Access
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <button
-                onClick={handleCheckout}
-                disabled={checkingOut}
-                className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-black/5 transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
-              >
-                {checkingOut ? "Placing Orders..." : "Checkout Now"}
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            )}
-
+              ) : hasOutOfLocationItems ? (
+                <button
+                  disabled
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-gray-100 text-gray-300 cursor-not-allowed"
+                >
+                   Items from multiple locations
+                </button>
+              ) : (
+                <button
+                  onClick={handleCheckout}
+                  disabled={checkingOut}
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all hover:opacity-90 hover:shadow-2xl active:scale-[0.98] disabled:opacity-50"
+                  style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                >
+                  {checkingOut ? "..." : "Proceed to Checkout"}
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              )}
+             </div>
           </div>
         </div>
       )}
@@ -332,13 +311,15 @@ export default function CustomerCart() {
         isMandatory={!userCoords}
       />
 
-      {/* Featured dishes — real data from API */}
+      {/* Suggested Items Section */}
       {(featuredLoading || featuredDishes.length > 0) && (
-        <div className="space-y-4">
-          <h2 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 px-1" style={{ color: "var(--dash-text-secondary)" }}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            You might also like
-          </h2>
+        <div className="space-y-6 pt-10 border-t border-gray-100">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <h2 className="text-sm font-bold text-gray-900 font-heading">Complete your meal</h2>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {featuredLoading
               ? [1, 2, 3].map((n) => <SkeletonDishCard key={n} />)

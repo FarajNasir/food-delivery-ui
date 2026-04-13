@@ -18,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 
 const PIPELINE = [
   { id: "PENDING_CONFIRMATION", label: "New", icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500" },
+  { id: "CONFIRMED", label: "Payment", icon: Clock, color: "text-blue-400", bg: "bg-blue-400" },
   { id: "PAID", label: "Paid", icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-500" },
   { id: "PREPARING", label: "Kitchen", icon: Utensils, color: "text-purple-500", bg: "bg-purple-500" },
   { id: "OUT_FOR_DELIVERY", label: "Dispatched", icon: Truck, color: "text-orange-500", bg: "bg-orange-500" },
@@ -31,12 +32,15 @@ const STATUS_BAR: Record<string, string> = {
   OUT_FOR_DELIVERY: "bg-orange-500",
 };
 
-const NEXT_STATUS: Record<string, { label: string; status: string; color: string }> = {
+const NEXT_STATUS: Record<string, { label: string; status: string; color: string; disabled?: boolean }> = {
   PENDING_CONFIRMATION: { label: "Accept Order", status: "CONFIRMED", color: "bg-emerald-600 shadow-emerald-200" },
+  CONFIRMED: { label: "Waiting for payment", status: "CONFIRMED", color: "bg-slate-100 text-slate-400 shadow-none", disabled: true },
   PAID: { label: "Send to Kitchen", status: "PREPARING", color: "bg-blue-600 shadow-blue-200" },
   PREPARING: { label: "Dispatch Food", status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
   OUT_FOR_DELIVERY: { label: "Mark Delivered", status: "DELIVERED", color: "bg-emerald-600 shadow-emerald-200" },
 };
+
+import { useOrderTimer } from "@/hooks/useOrderTimer";
 
 // ── Order Card ────────────────────────────────────────────────────────────────
 function OrderCard({
@@ -50,6 +54,17 @@ function OrderCard({
   const isPending = order.status === "PENDING_CONFIRMATION";
   const nextAction = NEXT_STATUS[order.status];
   const stepIndex = PIPELINE.findIndex((s) => s.id === order.status);
+
+  const { formattedTime, isExpired } = useOrderTimer(
+    order.createdAt,
+    5,
+    () => {
+      if (isPending) {
+        console.log(`[Owner] Order ${order.id} timed out. Auto-cancelling...`);
+        onUpdate(order.id, "CANCELLED");
+      }
+    }
+  );
 
   const handleUpdate = async (status: string) => {
     setBusy(true);
@@ -77,11 +92,16 @@ function OrderCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
-              {isPending && (
-                <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full animate-pulse">
-                  <Zap className="w-2 h-2 fill-amber-600" />
-                  Urgent
-                </span>
+              <span className="text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 border border-primary/10 rounded-lg uppercase tracking-wider">
+                {order.restaurant?.name}
+              </span>
+              {isPending && !isExpired && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100 animate-pulse">
+                  <Clock className="w-2.5 h-2.5 text-amber-600" />
+                  <span className="text-[10px] font-black text-amber-700 tabular-nums">
+                    {formattedTime}
+                  </span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -100,29 +120,36 @@ function OrderCard({
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-1 py-4 border-y border-slate-50 mb-4">
+        <div className="flex items-center gap-1 py-4 border-y border-slate-50 mb-4 overflow-x-auto no-scrollbar">
           {PIPELINE.map((step, idx) => {
             const done = idx <= stepIndex;
             const Icon = step.icon;
+            
+            // Special handling for Cancelled status to show it's a timeout
+            const isTimeout = order.status === 'CANCELLED' && 
+              (new Date(order.updatedAt).getTime() - new Date(order.createdAt).getTime() >= 290000); // ~5 mins
+            
             return (
               <React.Fragment key={step.id}>
                 <div className="flex flex-col items-center gap-1.5 shrink-0">
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                    done ? `${step.bg} text-white shadow-lg` : "bg-muted/30 text-muted-foreground"
+                    done ? `${step.bg} text-white shadow-lg` : 
+                    (order.status === 'CANCELLED' && idx === 0) ? "bg-red-500 text-white shadow-lg" : "bg-muted/30 text-muted-foreground"
                   )}>
-                    <Icon className="w-4 h-4" />
+                    {order.status === 'CANCELLED' && idx === 0 ? <X className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                   </div>
                   <span className={cn(
                     "text-[8px] font-black uppercase tracking-widest",
-                    done ? "text-gray-900" : "text-muted-foreground/40"
+                    done ? "text-gray-900" : 
+                    (order.status === 'CANCELLED' && idx === 0) ? "text-red-600" : "text-muted-foreground/40"
                   )}>
-                    {step.label}
+                    {order.status === 'CANCELLED' && idx === 0 ? (isTimeout ? "Timed Out" : "Cancelled") : step.label}
                   </span>
                 </div>
                 {idx < PIPELINE.length - 1 && (
                   <div className={cn(
-                    "flex-1 h-px mt-[-18px] transition-all duration-700",
+                    "flex-1 h-px mt-[-18px] transition-all duration-700 min-w-[20px]",
                     idx < stepIndex ? step.bg : "bg-muted/30"
                   )} />
                 )}
@@ -152,18 +179,19 @@ function OrderCard({
         <div className="flex gap-2">
           {nextAction && (
             <button
-              disabled={busy}
+              disabled={busy || nextAction.disabled}
               onClick={() => handleUpdate(nextAction.status)}
               className={cn(
-                "flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white shadow-elevated transition-all flex items-center justify-center gap-2",
+                "flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
                 nextAction.color,
-                "hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                !nextAction.disabled && "text-white shadow-elevated hover:scale-[1.02] active:scale-95",
+                "disabled:opacity-50"
               )}
             >
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
                   {nextAction.label}
-                  <ChevronRight className="w-4 h-4" />
+                  {!nextAction.disabled && <ChevronRight className="w-4 h-4" />}
                 </>
               )}
             </button>
@@ -261,11 +289,6 @@ export default function LiveOrdersView() {
             "glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all duration-1000",
             newOrderAlert ? "border-emerald-500 bg-emerald-50/50" : "border-border/40"
           )}>
-            <div className="relative">
-              <Bell className={cn("w-5 h-5 transition-colors", newOrderAlert ? "text-emerald-500" : "text-slate-500")} />
-              {(activeOrders.length > 0) && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />}
-            </div>
-            <div className="h-4 w-px bg-border/40" />
             <div className="flex items-center gap-2">
               <div className={cn("w-2 h-2 rounded-full animate-pulse", newOrderAlert ? "bg-emerald-500" : "bg-emerald-500/50")} />
               <span className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", newOrderAlert ? "text-emerald-700" : "text-slate-500")}>

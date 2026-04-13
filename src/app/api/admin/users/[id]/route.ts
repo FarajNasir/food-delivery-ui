@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, invalidateUserCache } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -51,6 +51,9 @@ export async function PUT(
 
   if (!updated) return fail("User not found.", 404);
 
+  // Evict from cache — role/status change must take effect immediately.
+  invalidateUserCache(id);
+
   return ok(updated);
 }
 
@@ -75,6 +78,9 @@ export async function DELETE(
     .returning({ id: users.id });
 
   if (!deleted) return fail("User not found.", 404);
+
+  // Evict from cache — user no longer exists.
+  invalidateUserCache(id);
 
   /* Also remove from Supabase Auth */
   const adminClient = createAdminClient();

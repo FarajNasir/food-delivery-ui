@@ -91,6 +91,7 @@ export interface Order {
   userId: string;
   restaurantId: string;
   status: string;
+  sessionId?: string | null;
   totalAmount: string;
   createdAt: string;
   updatedAt: string;

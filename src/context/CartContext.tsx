@@ -14,6 +14,8 @@ export interface CartItem {
   restaurantName: string;
   restaurantId: string;
   restaurantLocation?: string;
+  restaurantLat?: string;
+  restaurantLng?: string;
 }
 
 interface CartContextType {

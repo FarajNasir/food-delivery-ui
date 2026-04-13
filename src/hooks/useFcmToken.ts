@@ -43,8 +43,6 @@ export const useFcmToken = (userId: string | undefined) => {
         await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
         // Wait for an active service worker before calling getToken.
-        // Without this, getToken throws an AbortError because the SW
-        // is still in the "installing" state when subscribe() is called.
         const registration = await navigator.serviceWorker.ready;
 
         const getAndRegisterToken = async () => {
@@ -78,29 +76,38 @@ export const useFcmToken = (userId: string | undefined) => {
       const isOrder = payload.data?.type === "ORDER";
       const isNewOrder = isOrder && (payload.data?.status === "PENDING_CONFIRMATION" || !payload.data?.status);
 
-      // Play premium sound for all kitchen updates
-      if (isOrder) {
-        // playNotificationSound();
-      }
-
       toast.success(payload.notification?.title || "New Kitchen Alert", {
         description: payload.notification?.body || "A live order update was received.",
-        icon: isNewOrder ? "🔥" : "🔔",
-        duration: isNewOrder ? 8000 : 4000,
+        duration: 3000,
       });
 
       if (isOrder) {
         const orderId = payload.data?.orderId;
         const status = payload.data?.status;
+        // Get role once — only dispatch to the relevant store to avoid 403 errors
+        const role = useAuthStore.getState().role;
 
         if (orderId) {
+          // Customer order store — always update (customer tracks their own orders)
           useOrderStore.getState().updateSingleOrder({ id: orderId, status });
-          useOwnerStore.getState().updateSingleOrder({ id: orderId, status });
-          useAdminStore.getState().updateSingleOrder({ id: orderId, status });
+
+          // Owner store — only if the user is an owner or admin
+          if (role === "owner" || role === "admin") {
+            useOwnerStore.getState().updateSingleOrder({ id: orderId, status });
+          }
+
+          // Admin store — only if the user is an admin (avoids 403 for owners)
+          if (role === "admin") {
+            useAdminStore.getState().updateSingleOrder({ id: orderId, status });
+          }
         } else {
           useOrderStore.getState().refreshOrders();
-          useOwnerStore.getState().refreshOrders();
-          useAdminStore.getState().refreshOrders();
+          if (role === "owner" || role === "admin") {
+            useOwnerStore.getState().refreshOrders();
+          }
+          if (role === "admin") {
+            useAdminStore.getState().refreshOrders();
+          }
         }
       }
     });

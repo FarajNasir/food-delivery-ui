@@ -1,7 +1,7 @@
 import { ok, fail, parseBody, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { cartItems, menuItems, restaurants } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
 const AddToCartSchema = z.object({
@@ -24,6 +24,8 @@ export async function GET(req: Request) {
           restaurantName: restaurants.name,
           restaurantId: restaurants.id,
           restaurantLocation: restaurants.location,
+          restaurantLat: restaurants.latitude,
+          restaurantLng: restaurants.longitude,
         })
         .from(cartItems)
         .innerJoin(menuItems, eq(cartItems.menuItemId, menuItems.id))
@@ -52,36 +54,31 @@ export async function POST(req: Request) {
       if ("error" in res) return res.error;
       const { menuItemId, quantity } = res.data;
 
-      // Check if item already in cart
-      const [existing] = await db
-        .select()
-        .from(cartItems)
+      // Attempt an atomic update first
+      const [updated] = await db
+        .update(cartItems)
+        .set({ 
+          quantity: sql`${cartItems.quantity} + ${quantity}`,
+          updatedAt: new Date(),
+        })
         .where(and(eq(cartItems.userId, user.id), eq(cartItems.menuItemId, menuItemId)))
-        .limit(1);
+        .returning();
 
-      if (existing) {
-        // Update quantity
-        const [updated] = await db
-          .update(cartItems)
-          .set({ 
-            quantity: existing.quantity + quantity,
-            updatedAt: new Date(),
-          })
-          .where(eq(cartItems.id, existing.id))
-          .returning();
+      if (updated) {
         return ok({ item: updated });
-      } else {
-        // Insert new item
-        const [inserted] = await db
-          .insert(cartItems)
-          .values({
-            userId: user.id,
-            menuItemId,
-            quantity,
-          })
-          .returning();
-        return ok({ item: inserted });
       }
+
+      // If not updated, insert new item
+      const [inserted] = await db
+        .insert(cartItems)
+        .values({
+          userId: user.id,
+          menuItemId,
+          quantity,
+        })
+        .returning();
+
+      return ok({ item: inserted });
     } catch (err) {
       console.error("[api/cart POST]", err);
       return fail("Failed to update cart.", 500);
