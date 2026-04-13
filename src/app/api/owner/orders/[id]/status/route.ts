@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { orders, restaurants, users, notifications } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
+import { syncSessionStatus } from "@/lib/order-session";
 
 // Human-readable labels for customer-facing notifications
 const STATUS_LABELS: Record<string, { subject: string; body: (id: string, restaurant: string) => string }> = {
@@ -56,7 +57,12 @@ export async function PATCH(
         .where(eq(orders.id, id))
         .returning();
 
-      // 3. Notify the customer via FCM
+      // 3. Sync Session Status (Aggregation)
+      if (updated.sessionId && (status === "CONFIRMED" || status === "CANCELLED")) {
+        await syncSessionStatus(updated.sessionId);
+      }
+
+      // 4. Notify the customer via FCM
       try {
         const label = STATUS_LABELS[status];
         if (label && ownedOrder.userId) {

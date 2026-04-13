@@ -3,6 +3,7 @@ import { users } from "./users";
 import { restaurants } from "./restaurants";
 import { menuItems } from "./menuItems";
 import { orders, orderItems } from "./orders";
+import { orderSessions } from "./orderSessions";
 import { reviews } from "./reviews";
 
 /**
@@ -46,6 +47,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     fields: [orders.id],
     references: [reviews.orderId],
   }),
+  session: one(orderSessions, {
+    fields: [orders.sessionId],
+    references: [orderSessions.id],
+  }),
 }));
 
 
@@ -79,5 +84,17 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
     fields: [reviews.orderId],
     references: [orders.id],
   }),
+}));
+
+
+/**
+ * ── Session Relations ─────────────────────────────────────
+ */
+export const orderSessionsRelations = relations(orderSessions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [orderSessions.userId],
+    references: [users.id],
+  }),
+  orders: many(orders),
 }));
 

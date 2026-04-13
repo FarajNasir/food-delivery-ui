@@ -24,6 +24,8 @@ export async function GET(req: Request) {
           restaurantName: restaurants.name,
           restaurantId: restaurants.id,
           restaurantLocation: restaurants.location,
+          restaurantLat: restaurants.latitude,
+          restaurantLng: restaurants.longitude,
         })
         .from(cartItems)
         .innerJoin(menuItems, eq(cartItems.menuItemId, menuItems.id))

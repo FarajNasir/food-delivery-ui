@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
 import OrderCard from "@/components/dashboard/customer/OrderCard";
+import OrderSessionCard from "@/components/dashboard/customer/OrderSessionCard";
 
 const STATUS_CONFIG: Record<
   string,
@@ -127,6 +128,52 @@ export default function CustomerOrdersPage() {
     setRefreshing(false);
   };
 
+  const handleSessionPayment = async (sessionId: string) => {
+    try {
+      setIsPaying(sessionId);
+      const res = await fetch(`/api/orders/session/${sessionId}/stripe/session`, { method: "POST" });
+      const data = await res.json();
+      const sessionUrl = data.url || data.data?.url;
+      if (sessionUrl) {
+        window.location.href = sessionUrl;
+      } else {
+        toast.error(data.message || data.error || "Failed to initialize session payment");
+      }
+    } catch {
+      toast.error("A network error occurred. Please try again.");
+    } finally {
+      setIsPaying(null);
+    }
+  };
+
+  // --- Grouping Logic ---
+  const [sessionDetails, setSessionDetails] = React.useState<Record<string, any>>({});
+  const groupedItems = React.useMemo(() => {
+    const sessionsMap: Record<string, any> = {};
+    const standalones: any[] = [];
+    orders.forEach(order => {
+      if (order.sessionId) {
+        if (!sessionsMap[order.sessionId]) {
+          sessionsMap[order.sessionId] = { id: order.sessionId, orders: [], createdAt: order.createdAt, status: "PENDING", totalItemsAmount: "0", totalDeliveryFee: "0" };
+        }
+        sessionsMap[order.sessionId].orders.push(order);
+      } else { standalones.push(order); }
+    });
+    return { sessions: Object.values(sessionsMap), standalones };
+  }, [orders]);
+
+  React.useEffect(() => {
+    const sessionIds = Object.keys(orders.reduce((acc, o) => { if (o.sessionId) acc[o.sessionId] = true; return acc; }, {} as any));
+    sessionIds.forEach(async (sid) => {
+      if (sessionDetails[sid]) return;
+      try {
+        const res = await fetch(`/api/orders/session/${sid}`);
+        const data = await res.json();
+        if (data.success) setSessionDetails(prev => ({ ...prev, [sid]: data.data.session }));
+      } catch (e) { console.error("Failed to fetch session", sid, e); }
+    });
+  }, [orders]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-3">
@@ -136,16 +183,13 @@ export default function CustomerOrdersPage() {
     );
   }
 
-  const sortedOrders = [...orders].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const allItems = [
+    ...groupedItems.standalones.map(o => ({ type: "order", data: o, date: new Date(o.createdAt) })),
+    ...groupedItems.sessions.map(s => ({ type: "session", data: sessionDetails[s.id] || s, date: new Date(s.createdAt) }))
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  const activeOrders = sortedOrders.filter(o =>
-    ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
-  );
-  const pastOrders = sortedOrders.filter(o =>
-    ["DELIVERED", "CANCELLED"].includes(o.status)
-  );
+  const activeItems = allItems.filter(item => item.type === "order" ? ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(item.data.status) : ["PENDING", "READY_TO_PAY", "PAID"].includes(item.data.status));
+  const pastItems = allItems.filter(item => item.type === "order" ? ["DELIVERED", "CANCELLED"].includes(item.data.status) : ["CANCELLED"].includes(item.data.status));
 
 
   return (
@@ -193,23 +237,33 @@ export default function CustomerOrdersPage() {
         <div className="space-y-8">
 
           {/* Active Orders */}
-          {activeOrders.length > 0 && (
+          {activeItems.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Active</p>
-                <span className="text-[10px] font-bold text-gray-300">· {activeOrders.length}</span>
+                <span className="text-[10px] font-bold text-gray-300">· {activeItems.length}</span>
               </div>
               <div className="space-y-3">
-                {activeOrders.map((order: any) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    config={STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                {activeItems.map((item: any) => item.type === "session" ? (
+                  <OrderSessionCard
+                    key={`session-${item.data.id}`}
+                    session={item.data}
                     accent={accent}
                     gradientFrom={gradientFrom}
-                    isPaying={isPaying === order.id}
-                    isReordering={isReordering === order.id}
+                    isPaying={isPaying === item.data.id}
+                    onPay={handleSessionPayment}
+                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                  />
+                ) : (
+                  <OrderCard
+                    key={`order-${item.data.id}`}
+                    order={item.data}
+                    config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                    accent={accent}
+                    gradientFrom={gradientFrom}
+                    isPaying={isPaying === item.data.id}
+                    isReordering={isReordering === item.data.id}
                     onPay={handlePayment}
                     onReorder={handleReorder}
                     onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
@@ -222,22 +276,32 @@ export default function CustomerOrdersPage() {
           )}
 
           {/* Past Orders */}
-          {pastOrders.length > 0 && (
+          {pastItems.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Past Orders</p>
-                <span className="text-[10px] font-bold text-gray-300">· {pastOrders.length}</span>
+                <span className="text-[10px] font-bold text-gray-300">· {pastItems.length}</span>
               </div>
               <div className="space-y-3">
-                {pastOrders.map((order: any) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    config={STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                {pastItems.map((item: any) => item.type === "session" ? (
+                  <OrderSessionCard
+                    key={`session-${item.data.id}`}
+                    session={item.data}
                     accent={accent}
                     gradientFrom={gradientFrom}
-                    isPaying={isPaying === order.id}
-                    isReordering={isReordering === order.id}
+                    isPaying={isPaying === item.data.id}
+                    onPay={handleSessionPayment}
+                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                  />
+                ) : (
+                  <OrderCard
+                    key={`order-${item.data.id}`}
+                    order={item.data}
+                    config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                    accent={accent}
+                    gradientFrom={gradientFrom}
+                    isPaying={isPaying === item.data.id}
+                    isReordering={isReordering === item.data.id}
                     onPay={handlePayment}
                     onReorder={handleReorder}
                     onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}

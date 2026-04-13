@@ -139,7 +139,7 @@ export default function OrderCard({
         {/* Actions */}
         <div className="mt-3 flex items-center gap-2">
           {/* Primary action */}
-          {order.status === "CONFIRMED" && (
+          {order.status === "CONFIRMED" && !order.sessionId && (
             <button
               onClick={() => onPay(order.id)}
               disabled={isPaying}

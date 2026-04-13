@@ -1,8 +1,9 @@
 import { ok, fail, parseBody, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { orders, restaurants, orderSessions } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { syncSessionStatus } from "@/lib/order-session";
 
 const StatusSchema = z.object({
   status: z.enum([
@@ -118,6 +119,11 @@ export async function PATCH(
 
       if (!updated) {
         return fail("Conflict: Order status was changed recently. Please refresh and try again.", 409);
+      }
+
+      // 4. Session Status Aggregation (Post-update)
+      if (updated.sessionId && (status === "CONFIRMED" || status === "CANCELLED")) {
+        await syncSessionStatus(updated.sessionId);
       }
 
       return ok({ order: updated });

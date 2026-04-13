@@ -35,13 +35,9 @@ export default function CheckoutView() {
   const [phone,        setPhone]        = React.useState(profile?.phone ?? "");
   const [phoneEdited,  setPhoneEdited]  = React.useState(false);
   const [deliveryArea, setDeliveryArea] = React.useState("");
-  const [distance,     setDistance]     = React.useState<number | null>(null);
-  const [deliveryFee,  setDeliveryFee]  = React.useState(() => {
-    if (site.deliveryPricing?.type === "standard") {
-      return calculateDeliveryFee(site, {});
-    }
-    return 0;
-  });
+  const [distanceBreakdown, setDistanceBreakdown] = React.useState<Record<string, number>>({});
+  const [deliveryFeesBreakdown, setDeliveryFeesBreakdown] = React.useState<Record<string, number>>({});
+  const [deliveryFee, setDeliveryFee] = React.useState(0);
 
   const hasPrefilled = React.useRef(false);
 
@@ -59,18 +55,52 @@ export default function CheckoutView() {
     }
   }, [site.deliveryPricing?.type, userCoords]);
 
+  // Option B: Sum fees for all restaurants
   React.useEffect(() => {
-    if (site.key !== "downpatrickeats" || !userCoords || !site.coordinates || distance !== null || isCalculating) return;
+    if (site.key !== "downpatrickeats" || !userCoords || isCalculating) return;
+    
+    // Check if we already calculated everything for current userCoords
+    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const allDone = uniqueRestos.every(rid => deliveryFeesBreakdown[rid] !== undefined);
+    if (allDone && Object.keys(deliveryFeesBreakdown).length === uniqueRestos.length) return;
+
     (async () => {
       setIsCalculating(true);
-      const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
-      if (miles !== null) {
-        setDistance(miles);
-        setDeliveryFee(calculateDeliveryFee(site, { miles }));
+      const newDistances: Record<string, number> = {};
+      const newFees: Record<string, number> = {};
+      let total = 0;
+
+      for (const restaurantId of uniqueRestos) {
+        const item = cartItems.find(i => i.restaurantId === restaurantId);
+        if (!item?.restaurantLat || !item?.restaurantLng) {
+          // Fallback to site coordinates if restaurant coords are missing
+          const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
+          if (miles !== null) {
+            newDistances[restaurantId] = miles;
+            newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+            total += newFees[restaurantId];
+          }
+          continue;
+        }
+
+        const miles = await getOSRMDistance(
+          { lat: parseFloat(item.restaurantLat), lng: parseFloat(item.restaurantLng) },
+          { lat: userCoords.lat, lng: userCoords.lng }
+        );
+
+        if (miles !== null) {
+          newDistances[restaurantId] = miles;
+          newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+          total += newFees[restaurantId];
+        }
       }
+
+      setDistanceBreakdown(newDistances);
+      setDeliveryFeesBreakdown(newFees);
+      setDeliveryFee(total);
       setIsCalculating(false);
     })();
-  }, [site, userCoords]);
+  }, [site, userCoords, cartItems]);
 
   const groupedItems = React.useMemo(() =>
     cartItems.reduce((acc, item) => {
@@ -87,17 +117,7 @@ export default function CheckoutView() {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         setUserCoords({ lat: coords.latitude, lng: coords.longitude });
-        if (site.coordinates) {
-          const miles = await getOSRMDistance(site.coordinates, { lat: coords.latitude, lng: coords.longitude });
-          if (miles !== null) {
-            setDistance(miles);
-            setDeliveryFee(calculateDeliveryFee(site, { miles }));
-            toast.success(`${miles} miles — fee calculated`);
-          } else {
-            toast.error("Could not calculate road distance.");
-          }
-        }
-        setIsCalculating(false);
+        // The effect above will trigger recalculation
       },
       () => { toast.error("Could not get location."); setIsCalculating(false); }
     );
@@ -106,14 +126,25 @@ export default function CheckoutView() {
   const handleAreaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const area = e.target.value;
     setDeliveryArea(area);
-    setDeliveryFee(calculateDeliveryFee(site, { area }));
+    
+    // For Option B in fixed_areas, we'd also sum if we had multiple areas.
+    // For now, assume fixed fee applies per restaurant in the cart.
+    const perRestoFee = calculateDeliveryFee(site, { area });
+    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const total = perRestoFee * uniqueRestos.length;
+    
+    const breakdown: Record<string, number> = {};
+    uniqueRestos.forEach(rid => breakdown[rid] = perRestoFee);
+    
+    setDeliveryFeesBreakdown(breakdown);
+    setDeliveryFee(total);
   };
 
   const handlePlaceOrder = async () => {
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim())   { toast.error("Enter your phone number"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
-    if (site.key === "downpatrickeats" && distance === null) { toast.error("Calculate your delivery distance first"); return; }
+    if (site.key === "downpatrickeats" && deliveryFee === 0 && !isStandard) { toast.error("Calculate your delivery distance first"); return; }
 
     try {
       setIsPlacing(true);
@@ -124,14 +155,22 @@ export default function CheckoutView() {
           "Content-Type": "application/json",
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
-        body: JSON.stringify({ deliveryAddress: address, deliveryArea, deliveryFee, distanceMiles: distance, customerPhone: phone }),
+        body: JSON.stringify({ 
+          deliveryAddress: address, 
+          deliveryArea, 
+          deliveryFee, 
+          deliveryFeesBreakdown, // Sum-up breakdown
+          distanceMiles: 0, // No longer a single distance
+          customerPhone: phone 
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success("Order placed!");
         clearCart();
         await refreshOrders();
-        router.push(`/dashboard/customer/status/${data.data.orders[0].id}`);
+        // Redirect to the first sub-order or a custom session status page
+        router.push(`/dashboard/customer/orders`);
       } else {
         toast.error(data.message ?? "Failed to place order");
       }
@@ -255,21 +294,25 @@ export default function CheckoutView() {
             {isDistSlabs && (
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-600">Delivery Distance</label>
-                <button
-                  onClick={handleGetLocation}
-                  disabled={isCalculating}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50"
-                  style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
-                >
-                  {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-                  {distance !== null ? `${distance} miles — Recalculate` : "Detect My Location & Calculate"}
-                </button>
-                {distance !== null && (
-                  <div className="flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: `${accent}10` }}>
-                    <span className="text-xs text-gray-500">Road distance</span>
-                    <span className="text-sm font-black" style={{ color: accent }}>{distance} mi · £{deliveryFee.toFixed(2)}</span>
-                  </div>
-                )}
+                  <button
+                    onClick={handleGetLocation}
+                    disabled={isCalculating}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:opacity-50"
+                    style={{ borderColor: `${accent}40`, color: accent, background: `${accent}08` }}
+                  >
+                    {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                    {Object.keys(distanceBreakdown).length > 0 ? "Recalculate Distances" : "Detect My Location & Calculate"}
+                  </button>
+                  {Object.entries(distanceBreakdown).map(([rid, dist]) => (
+                    <div key={rid} className="flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: `${accent}10` }}>
+                      <span className="text-[10px] text-gray-500 font-bold uppercase truncate max-w-[120px]">
+                        {groupedItems[rid]?.name}
+                      </span>
+                      <span className="text-sm font-black" style={{ color: accent }}>
+                        {dist} mi · £{deliveryFeesBreakdown[rid]?.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -357,7 +400,7 @@ export default function CheckoutView() {
             {/* CTA */}
             <button
               onClick={handlePlaceOrder}
-              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && distance === null)}
+              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && Object.keys(distanceBreakdown).length === 0)}
               className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-sm uppercase tracking-wide shadow-lg transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
             >

@@ -92,6 +92,9 @@ function OrderCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
+              <span className="text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 border border-primary/10 rounded-lg uppercase tracking-wider">
+                {order.restaurant?.name}
+              </span>
               {isPending && !isExpired && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100 animate-pulse">
                   <Clock className="w-2.5 h-2.5 text-amber-600" />

@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications } from "@/lib/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
+import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications, orderSessions } from "@/lib/db/schema";
+import { eq, inArray, desc, sql } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +18,12 @@ export async function POST(req: Request) {
         deliveryArea,
         deliveryFee,
         distanceMiles,
-        customerPhone
+        customerPhone,
+        deliveryFeesBreakdown // New field from frontend: { [restaurantId]: fee }
       } = await req.json().catch(() => ({}));
+
+      // Validate or fallback for deliveryFeesBreakdown
+      const fees = deliveryFeesBreakdown || {};
 
       const createdOrders = await db.transaction(async (tx) => {
         // 1. Atomically delete items and capture the original data
@@ -64,20 +68,40 @@ export async function POST(req: Request) {
           itemsByRestaurant[item.restaurantId].push(item);
         });
 
+        // 1. Create the parent Session
+        const [session] = await tx.insert(orderSessions).values({
+          userId: user.id,
+          status: "PENDING",
+          totalItemsAmount: "0.00", // Will update or calculate
+          totalDeliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+          deliveryAddress,
+          deliveryArea,
+          distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
+          customerPhone,
+        }).returning();
+
         const ordersList = [];
+        let sessionTotalItems = 0;
+
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
           const totalAmount = items.reduce((sum, item) => {
             return sum + (parseFloat(item.price as string) * item.quantity);
           }, 0);
+          sessionTotalItems += totalAmount;
+
+          // If breakdown exists, use it. Otherwise split evenly (Option B fallback)
+          const restaurantFee = fees[restaurantId] 
+            || (deliveryFee / Object.keys(itemsByRestaurant).length);
 
           const [newOrder] = await tx.insert(orders).values({
             userId: user.id,
             restaurantId,
+            sessionId: session.id,
             totalAmount: totalAmount.toFixed(2),
-            deliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+            deliveryFee: restaurantFee.toFixed(2),
             deliveryAddress,
             deliveryArea,
-            distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
+            distanceMiles: distanceMiles ? (distanceMiles / Object.keys(itemsByRestaurant).length).toFixed(4) : null,
             customerPhone,
             status: "PENDING_CONFIRMATION",
           }).returning();
@@ -94,11 +118,16 @@ export async function POST(req: Request) {
           ordersList.push(newOrder);
         }
 
-        return ordersList;
+        // Update session with correct item total
+        await tx.update(orderSessions)
+          .set({ totalItemsAmount: sessionTotalItems.toFixed(2) })
+          .where(eq(orderSessions.id, session.id));
+
+        return { orders: ordersList, sessionId: session.id };
       });
 
       // --- Notification Logic (Outside Transaction) ---
-      for (const newOrder of createdOrders) {
+      for (const newOrder of createdOrders.orders) {
         try {
           const [restaurant] = await db
             .select({ ownerId: restaurants.ownerId, name: restaurants.name })
@@ -135,7 +164,7 @@ export async function POST(req: Request) {
       }
       // --------------------------
 
-      return ok({ orders: createdOrders });
+      return ok({ orders: createdOrders.orders, sessionId: createdOrders.sessionId });
     } catch (err: any) {
       console.error("[api/orders POST]", err);
       if (err.message === "CART_EMPTY") {
@@ -169,6 +198,7 @@ export async function GET(req: Request) {
           customerPhone: orders.customerPhone,
           currency: orders.currency,
           paymentIntentId: orders.paymentIntentId,
+          sessionId: orders.sessionId,
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
         })
