@@ -4,6 +4,7 @@ import { orders, restaurants, users, notifications } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
+import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
 
@@ -72,15 +73,19 @@ export async function POST(
 
         const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
 
-        await db.insert(notifications).values({
+        const [newNotification] = await db.insert(notifications).values({
           recipientId: restaurant.ownerId,
           type: "ORDER",
           subject: "Payment Received! 💰",
           body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
           channel: isActive ? "FCM" : "WHATSAPP",
           status: "PENDING",
-          metadata: { orderId: order.id }
-        });
+          metadata: { orderId: order.id, orderStatus: "PAID" }
+        }).returning();
+
+        if (newNotification && newNotification.channel === "FCM") {
+          NotificationService.trigger(newNotification.id);
+        }
       }
       
       console.log(`[Stripe Verify] Order ${id} marked as PAID via frontend verify.`);

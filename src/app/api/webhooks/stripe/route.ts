@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { NotificationService } from "@/services/notification.service";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -76,15 +77,19 @@ export async function POST(req: Request) {
             // Check if owner is active (last 60 seconds)
             const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
 
-            await db.insert(notifications).values({
+            const [newNotification] = await db.insert(notifications).values({
               recipientId: restaurant.ownerId,
               type: "ORDER",
               subject: "Payment Received! 💰",
               body: `Payment for Order #${updatedOrder.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
               channel: isActive ? "FCM" : "WHATSAPP",
               status: "PENDING",
-              metadata: { orderId: updatedOrder.id }
-            });
+              metadata: { orderId: updatedOrder.id, orderStatus: "PAID" }
+            }).returning();
+
+            if (newNotification && newNotification.channel === "FCM") {
+              NotificationService.trigger(newNotification.id);
+            }
 
             console.log(`[Stripe Webhook] Notification queued for Owner: ${restaurant.ownerId}`);
           }

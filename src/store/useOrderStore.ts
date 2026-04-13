@@ -76,10 +76,8 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
         return newState;
       }
 
-      // If it's a new order, we should probably just refresh the whole list to maintain order and relations
-      if (updatedOrder.status === "PENDING_CONFIRMATION") {
-        get().refreshOrders();
-      }
+      // Order is brand-new — always refresh the full list to maintain order and relations
+      get().refreshOrders();
 
       return state;
     });

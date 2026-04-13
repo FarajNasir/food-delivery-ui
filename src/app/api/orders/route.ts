@@ -2,6 +2,7 @@ import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications } from "@/lib/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
+import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,10 @@ export async function POST(req: Request) {
         itemsByRestaurant[item.restaurantId].push(item);
       });
 
-      const { 
-        deliveryAddress, 
-        deliveryArea, 
-        deliveryFee, 
+      const {
+        deliveryAddress,
+        deliveryArea,
+        deliveryFee,
         distanceMiles,
         customerPhone
       } = await req.json().catch(() => ({}));
@@ -99,15 +100,19 @@ export async function POST(req: Request) {
 
             const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 60000);
 
-            await db.insert(notifications).values({
+            const [newNotification] = await db.insert(notifications).values({
               recipientId: restaurant.ownerId,
               type: "ORDER",
               subject: "New Order Received!",
               body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
               channel: isActive ? "FCM" : "WHATSAPP",
               status: "PENDING",
-              metadata: { orderId: newOrder.id }
-            });
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
+            }).returning();
+
+            if (newNotification && newNotification.channel === "FCM") {
+              NotificationService.trigger(newNotification.id);
+            }
           }
         } catch (notifyErr) {
           console.error("Failed to queue notification:", notifyErr);
@@ -134,20 +139,20 @@ export async function GET(req: Request) {
       // Step 1: fetch orders + restaurant name
       const orderRows = await db
         .select({
-          id:             orders.id,
-          userId:         orders.userId,
-          restaurantId:   orders.restaurantId,
+          id: orders.id,
+          userId: orders.userId,
+          restaurantId: orders.restaurantId,
           restaurantName: restaurants.name,
-          status:         orders.status,
-          totalAmount:    orders.totalAmount,
-          deliveryFee:    orders.deliveryFee,
-          deliveryAddress:orders.deliveryAddress,
-          deliveryArea:   orders.deliveryArea,
-          customerPhone:  orders.customerPhone,
-          currency:       orders.currency,
-          paymentIntentId:orders.paymentIntentId,
-          createdAt:      orders.createdAt,
-          updatedAt:      orders.updatedAt,
+          status: orders.status,
+          totalAmount: orders.totalAmount,
+          deliveryFee: orders.deliveryFee,
+          deliveryAddress: orders.deliveryAddress,
+          deliveryArea: orders.deliveryArea,
+          customerPhone: orders.customerPhone,
+          currency: orders.currency,
+          paymentIntentId: orders.paymentIntentId,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
         })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
@@ -160,13 +165,13 @@ export async function GET(req: Request) {
       const orderIds = orderRows.map((o) => o.id);
       const itemRows = await db
         .select({
-          id:          orderItems.id,
-          orderId:     orderItems.orderId,
-          menuItemId:  orderItems.menuItemId,
-          quantity:    orderItems.quantity,
-          price:       orderItems.price,
-          itemName:    menuItems.name,
-          itemImageUrl:menuItems.imageUrl,
+          id: orderItems.id,
+          orderId: orderItems.orderId,
+          menuItemId: orderItems.menuItemId,
+          quantity: orderItems.quantity,
+          price: orderItems.price,
+          itemName: menuItems.name,
+          itemImageUrl: menuItems.imageUrl,
         })
         .from(orderItems)
         .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
@@ -174,26 +179,26 @@ export async function GET(req: Request) {
 
       // Step 3: assemble
       const result = orderRows.map((order) => ({
-        id:             order.id,
-        userId:         order.userId,
-        restaurantId:   order.restaurantId,
-        status:         order.status,
-        totalAmount:    order.totalAmount,
-        deliveryFee:    order.deliveryFee,
-        deliveryAddress:order.deliveryAddress,
-        deliveryArea:   order.deliveryArea,
-        customerPhone:  order.customerPhone,
-        currency:       order.currency,
-        paymentIntentId:order.paymentIntentId,
-        createdAt:      order.createdAt,
-        updatedAt:      order.updatedAt,
+        id: order.id,
+        userId: order.userId,
+        restaurantId: order.restaurantId,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        deliveryFee: order.deliveryFee,
+        deliveryAddress: order.deliveryAddress,
+        deliveryArea: order.deliveryArea,
+        customerPhone: order.customerPhone,
+        currency: order.currency,
+        paymentIntentId: order.paymentIntentId,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
         restaurant: { name: order.restaurantName },
         items: itemRows
           .filter((i) => i.orderId === order.id)
           .map((i) => ({
-            id:       i.id,
+            id: i.id,
             quantity: i.quantity,
-            price:    i.price,
+            price: i.price,
             menuItem: { id: i.menuItemId, name: i.itemName, imageUrl: i.itemImageUrl },
           })),
       }));

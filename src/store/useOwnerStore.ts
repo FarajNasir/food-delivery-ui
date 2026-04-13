@@ -86,16 +86,15 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     set((state) => {
       const exists = state.orders.find((o) => o.id === updatedOrder.id);
       if (exists) {
+        // Order already known — just patch the changed fields
         return {
           orders: state.orders.map((o) =>
             o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
           ),
         };
       }
-      // If it's a new order (Partial won't have all required fields so we might need to refresh)
-      if (updatedOrder.status === 'PENDING_CONFIRMATION') {
-        get().refreshOrders();
-      }
+      // Order is brand-new — always refresh to get its full data from the server
+      get().refreshOrders();
       return state;
     });
   },

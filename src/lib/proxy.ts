@@ -53,9 +53,10 @@ import { getCurrentUser, type SessionUser, type UserRole } from "./auth";
 
 /**
  * Higher-order function to protect API Route Handlers.
- * - Automatically refreshes the session token.
- * - Enforces authentication.
- * - Optional: enforces one or more specific roles.
+ *
+ * Passes the full Request object into getCurrentUser() so it can use the
+ * x-user-id header injected by middleware (fast path, ~0ms Supabase call)
+ * rather than re-verifying the JWT independently (~250ms network call).
  */
 export async function withAuth<T = NextResponse>(
   req: Request,
@@ -63,9 +64,9 @@ export async function withAuth<T = NextResponse>(
   roles?: UserRole[]
 ): Promise<T | NextResponse<ApiError>> {
   try {
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined;
-    const user = await getCurrentUser(token);
+    // Pass the full request — getCurrentUser() will use the x-user-id header
+    // (set by middleware) as the fast path, skipping a Supabase round-trip.
+    const user = await getCurrentUser(req);
 
     if (!user) return fail("Unauthorized.", 401);
 
