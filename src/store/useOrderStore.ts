@@ -15,6 +15,7 @@ interface OrderState {
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   updateSingleOrder: (order: Partial<Order> & { id: string }) => void;
+  reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
 }
 
 export const useOrderStore = create<OrderState>()((set, get) => ({
@@ -81,5 +82,26 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
 
       return state;
     });
+  },
+  reorder: async (orderId: string) => {
+    set({ isLoading: true });
+    try {
+      const { success, data } = await customerService.reorder(orderId);
+      if (success && data?.order) {
+        toast.success("Order duplicated successfully!");
+        // We don't manually add to state, as we want to maintain the correct sort order.
+        // refreshOrders will fetch the new list.
+        await get().refreshOrders();
+        return { success: true, orderId: data.order.id };
+      } else {
+        toast.error("Failed to reorder. Please try again.");
+        return { success: false };
+      }
+    } catch (err) {
+      toast.error("A network error occurred.");
+      return { success: false };
+    } finally {
+      set({ isLoading: false });
+    }
   },
 }));

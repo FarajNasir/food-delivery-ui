@@ -34,6 +34,7 @@ interface OrderContextType {
   loading: boolean;
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
+  reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -47,7 +48,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     orders, 
     isLoading: loading, 
     refreshOrders, 
-    updateOrderStatus: storeUpdateOrderStatus 
+    updateOrderStatus: storeUpdateOrderStatus,
+    reorder: storeReorder
   } = useOrderStore();
   
   const { session, isReady, user } = useAuthStore();
@@ -70,7 +72,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <OrderContext.Provider value={{ orders, loading, refreshOrders, updateOrderStatus }}>
+    <OrderContext.Provider value={{ orders, loading, refreshOrders, updateOrderStatus, reorder: storeReorder }}>
       {children}
     </OrderContext.Provider>
   );

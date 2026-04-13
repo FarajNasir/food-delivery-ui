@@ -2,7 +2,7 @@
 
 import React, { useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { CheckCircle2, ArrowRight, ShoppingBag } from "lucide-react";
+import { CheckCircle2, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 

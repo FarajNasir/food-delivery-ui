@@ -66,4 +66,6 @@ export const customerService = {
   
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => 
     http.patch(`/api/orders/${id}/status`, { status, paymentIntentId }),
+
+  reorder: (orderId: string) => http.post<{ order: Order }>(`/api/orders/${orderId}/reorder`, {}),
 };

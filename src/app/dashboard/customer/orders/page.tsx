@@ -75,13 +75,26 @@ const STATUS_CONFIG: Record<
 };
 
 export default function CustomerOrdersPage() {
-  const { orders, loading, updateOrderStatus, refreshOrders } = useOrders();
+  const { orders, loading, updateOrderStatus, refreshOrders, reorder } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
   const [isPaying, setIsPaying] = React.useState<string | null>(null);
+  const [isReordering, setIsReordering] = React.useState<string | null>(null);
   const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+
+  const handleReorder = async (orderId: string) => {
+    try {
+      setIsReordering(orderId);
+      const res = await reorder(orderId);
+      if (res.success && res.orderId) {
+        router.push(`/dashboard/customer/status/${res.orderId}`);
+      }
+    } finally {
+      setIsReordering(null);
+    }
+  };
 
   const handlePayment = async (orderId: string) => {
     try {
@@ -284,6 +297,19 @@ export default function CustomerOrdersPage() {
                           </span>
                         </div>
                       )
+                    )}
+
+                    {/* Reorder (Delivered Only) */}
+                    {order.status === "DELIVERED" && (
+                      <button
+                        onClick={() => handleReorder(order.id)}
+                        disabled={!!isReordering}
+                        className="w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:translate-y-0"
+                        style={{ background: `linear-gradient(135deg, #22C55E, #16A34A)` }}
+                      >
+                        {isReordering === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4 text-white/80" />}
+                        {isReordering === order.id ? "Duplicating Order…" : "Reorder These Items"}
+                      </button>
                     )}
 
                     {/* Track order */}
