@@ -27,6 +27,13 @@ export interface OwnerOrder {
   restaurant: {
     name: string;
   };
+  deliveryJob?: {
+    status: string | null;
+    trackingUrl: string | null;
+    driverName: string | null;
+    driverPhone: string | null;
+    eta: string | null;
+  };
 }
 
 interface OwnerState {
@@ -40,6 +47,11 @@ interface OwnerState {
   updateSingleOrder: (order: Partial<OwnerOrder> & { id: string }) => void;
 }
 
+type OwnerOrdersResponse = {
+  orders?: OwnerOrder[];
+  ownedRestaurantIds?: string[];
+};
+
 export const useOwnerStore = create<OwnerState>()((set, get) => ({
   orders: [],
   ownedRestaurantIds: [],
@@ -49,10 +61,12 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await ownerService.getLiveOrders();
-      // Adjusting to handle both direct array and { orders, ownedRestaurantIds }
-      const data = response.data as any;
-      const fetchedOrders = data?.orders || (Array.isArray(data) ? data : []);
-      const fetchedRestaurantIds = data?.ownedRestaurantIds || [];
+      const data = response.data;
+      const normalizedData: OwnerOrdersResponse = Array.isArray(data)
+        ? { orders: data as OwnerOrder[] }
+        : ((data as OwnerOrdersResponse | undefined) ?? {});
+      const fetchedOrders = normalizedData.orders ?? [];
+      const fetchedRestaurantIds = normalizedData.ownedRestaurantIds ?? [];
       
       set({ 
         orders: fetchedOrders,
@@ -77,8 +91,15 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       set({ orders: previousOrders }); // Rollback
       return false;
     }
+
+    const serverOrder = (res.data as { order?: OwnerOrder } | undefined)?.order;
+    if (serverOrder) {
+      set({
+        orders: get().orders.map((o) => (o.id === id ? { ...o, ...serverOrder } : o)),
+      });
+    }
     
-    toast.success(`Order #${id.slice(0, 6)} updated to ${status}`);
+    toast.success(`Order #${id.slice(0, 6)} updated to ${serverOrder?.status ?? status}`);
     return true;
   },
 

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { 
-  ShoppingBag, ArrowRight, Minus, Plus, Trash2, 
-  Store, MapPin, AlertTriangle, Sparkles, ChevronRight 
+import {
+  ShoppingBag, ArrowRight, Minus, Plus, Trash2,
+  Store, MapPin, AlertTriangle, Sparkles, ChevronRight
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
@@ -37,7 +37,7 @@ export default function CustomerCart() {
           (pos) => {
             useConfigStore.getState().setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           },
-          () => {}
+          () => { }
         );
       } else if (result.state === "prompt") {
         const t = setTimeout(() => setLocationModalOpen(true), 600);
@@ -105,7 +105,7 @@ export default function CustomerCart() {
           </p>
         </div>
         {!isEmpty && (
-          <button 
+          <button
             onClick={clearCart}
             className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-all flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-50 rounded-full"
           >
@@ -165,7 +165,7 @@ export default function CustomerCart() {
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100">
-                         <Store className={cn("w-4 h-4", isOutOfLocation ? "text-amber-500" : "text-gray-400")} />
+                        <Store className={cn("w-4 h-4", isOutOfLocation ? "text-amber-500" : "text-gray-400")} />
                       </div>
                       <span className={cn("text-xs font-bold", isOutOfLocation ? "text-amber-600" : "text-gray-900")}>
                         {group.name}
@@ -174,12 +174,12 @@ export default function CustomerCart() {
                   </div>
 
                   {/* Items List */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
+                  <div className="space-y-4">
                     {group.items.map((item) => {
                       const unavailable = !!(item.restaurantLocation && item.restaurantLocation !== site.location);
                       return (
-                        <div key={item.id} className={cn("p-5 flex gap-5 transition-all bg-white", unavailable && "opacity-40")}>
-                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-white shrink-0 shadow-sm border border-gray-100">
+                        <div key={item.id} className={cn("py-4 flex gap-6 transition-all", unavailable && "opacity-40")}>
+                          <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white shrink-0 border border-gray-100">
                             {item.imageUrl ? (
                               <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
                             ) : (
@@ -241,23 +241,23 @@ export default function CustomerCart() {
 
           {/* Integrated Summary Section */}
           <div className="pt-6 space-y-6">
-             <div className="space-y-3 px-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-medium text-gray-400">Items Subtotal</span>
-                  <span className="font-bold text-gray-900">£{totalPrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-medium text-gray-400">Delivery Fee</span>
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Calculated at checkout</span>
-                </div>
-                <div className="h-px bg-gray-100 my-4" />
-                <div className="flex justify-between items-center">
-                  <span className="text-base font-bold text-gray-900 font-heading">Amount Payable</span>
-                  <span className="text-2xl font-black" style={{ color: accent }}>£{totalPrice.toFixed(2)}</span>
-                </div>
-             </div>
+            <div className="space-y-3 px-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-medium text-gray-400">Items Subtotal</span>
+                <span className="font-bold text-gray-900">£{totalPrice.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-medium text-gray-400">Delivery Fee</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Calculated at checkout</span>
+              </div>
+              <div className="h-px bg-gray-100 my-4" />
+              <div className="flex justify-between items-center">
+                <span className="text-base font-bold text-gray-900 font-heading">Amount Payable</span>
+                <span className="text-2xl font-black" style={{ color: accent }}>£{totalPrice.toFixed(2)}</span>
+              </div>
+            </div>
 
-             <div className="pt-4">
+            <div className="pt-4">
               {!isLoggedIn ? (
                 <Link
                   href="/login?redirect=/dashboard/customer/cart"
@@ -286,7 +286,7 @@ export default function CustomerCart() {
                   disabled
                   className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-gray-100 text-gray-300 cursor-not-allowed"
                 >
-                   Items from multiple locations
+                  Items from multiple locations
                 </button>
               ) : (
                 <button
@@ -299,7 +299,7 @@ export default function CustomerCart() {
                   <ChevronRight className="w-6 h-6" />
                 </button>
               )}
-             </div>
+            </div>
           </div>
         </div>
       )}
@@ -324,8 +324,8 @@ export default function CustomerCart() {
             {featuredLoading
               ? [1, 2, 3].map((n) => <SkeletonDishCard key={n} />)
               : featuredDishes.map((dish) => (
-                  <DishCard key={dish.id} dish={dish} theme={site.theme} />
-                ))
+                <DishCard key={dish.id} dish={dish} theme={site.theme} />
+              ))
             }
           </div>
         </div>

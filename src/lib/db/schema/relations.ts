@@ -4,6 +4,7 @@ import { restaurants } from "./restaurants";
 import { menuItems } from "./menuItems";
 import { orders, orderItems } from "./orders";
 import { orderSessions } from "./orderSessions";
+import { deliveryJobs } from "./deliveryJobs";
 import { reviews } from "./reviews";
 
 /**
@@ -47,9 +48,20 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     fields: [orders.id],
     references: [reviews.orderId],
   }),
+  deliveryJob: one(deliveryJobs, {
+    fields: [orders.id],
+    references: [deliveryJobs.orderId],
+  }),
   session: one(orderSessions, {
     fields: [orders.sessionId],
     references: [orderSessions.id],
+  }),
+}));
+
+export const deliveryJobsRelations = relations(deliveryJobs, ({ one }) => ({
+  order: one(orders, {
+    fields: [deliveryJobs.orderId],
+    references: [orders.id],
   }),
 }));
 
@@ -97,4 +109,3 @@ export const orderSessionsRelations = relations(orderSessions, ({ one, many }) =
   }),
   orders: many(orders),
 }));
-

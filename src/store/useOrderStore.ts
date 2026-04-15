@@ -68,6 +68,8 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
         if (isCustomerPage) {
           if (updatedOrder.status === "CONFIRMED") {
             toast.success("Restaurant confirmed your order!");
+          } else if (updatedOrder.status === "DISPATCH_REQUESTED") {
+            toast.info("Your delivery has been requested.");
           } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
             toast.info("Your food is on the way!");
           }

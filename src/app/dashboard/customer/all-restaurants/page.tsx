@@ -61,7 +61,7 @@ function AllRestaurantsContent() {
   return (
     <div className="min-h-screen bg-dash-bg pb-20 selection:bg-primary/20 selection:text-primary">
       {/* Premium Header */}
-      <div className="glass-premium sticky top-0 z-30 border-b border-border/40">
+      <div className="glass-premium sticky top-16 z-30 !border-none !shadow-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link 
@@ -74,17 +74,6 @@ function AllRestaurantsContent() {
               <h1 className="text-2xl font-black text-gray-900 tracking-tight">Explore Cuisines</h1>
               <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">{site.location}'s Finest</p>
             </div>
-          </div>
-
-          <div className="relative w-full sm:w-80 group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Search dishes or restaurants..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full bg-white/50 border border-border/40 rounded-full py-2.5 pl-11 pr-4 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 focus:bg-white transition-all shadow-inset"
-            />
           </div>
         </div>
       </div>
