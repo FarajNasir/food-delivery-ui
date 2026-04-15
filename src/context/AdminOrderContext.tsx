@@ -5,6 +5,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useAdminStore, AdminOrder } from "@/store/useAdminStore";
 import { useFcmToken } from "@/hooks/useFcmToken";
 
+export type { AdminOrder } from "@/store/useAdminStore";
+
 interface AdminStats {
   totalRevenue: string;
   totalOrders: number;
