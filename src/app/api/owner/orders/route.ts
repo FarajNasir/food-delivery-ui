@@ -1,6 +1,6 @@
 import { ok, fail, withOwnerAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, restaurants, menuItems } from "@/lib/db/schema";
+import { orders, orderItems, restaurants, menuItems, deliveryJobs } from "@/lib/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,11 @@ export async function GET(req: Request) {
           currency:        orders.currency,
           createdAt:       orders.createdAt,
           updatedAt:       orders.updatedAt,
+          deliveryJobStatus: deliveryJobs.status,
+          trackingUrl:     deliveryJobs.trackingUrl,
+          driverName:      deliveryJobs.driverName,
+          driverPhone:     deliveryJobs.driverPhone,
+          eta:             deliveryJobs.eta,
           // order item fields (null when no items)
           itemId:          orderItems.id,
           itemMenuItemId:  orderItems.menuItemId,
@@ -56,6 +61,7 @@ export async function GET(req: Request) {
         })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+        .leftJoin(deliveryJobs, eq(deliveryJobs.orderId, orders.id))
         .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
         .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
         .where(inArray(orders.restaurantId, ownedRestaurantIds))
@@ -67,6 +73,13 @@ export async function GET(req: Request) {
         totalAmount: string; deliveryFee: string; deliveryAddress: string | null;
         deliveryArea: string | null; customerPhone: string | null;
         currency: string; createdAt: Date; updatedAt: Date;
+        deliveryJob?: {
+          status: string | null;
+          trackingUrl: string | null;
+          driverName: string | null;
+          driverPhone: string | null;
+          eta: string | null;
+        };
         restaurant: { name: string };
         items: { id: string; quantity: number; price: string; menuItem: { id: string; name: string; imageUrl: string | null } }[];
       }>();
@@ -86,6 +99,15 @@ export async function GET(req: Request) {
             currency:        row.currency,
             createdAt:       row.createdAt,
             updatedAt:       row.updatedAt,
+            deliveryJob: row.deliveryJobStatus || row.trackingUrl || row.driverName || row.driverPhone || row.eta
+              ? {
+                  status: row.deliveryJobStatus,
+                  trackingUrl: row.trackingUrl,
+                  driverName: row.driverName,
+                  driverPhone: row.driverPhone,
+                  eta: row.eta,
+                }
+              : undefined,
             restaurant:      { name: row.restaurantName },
             items:           [],
           });
@@ -114,4 +136,3 @@ export async function GET(req: Request) {
     }
   });
 }
-

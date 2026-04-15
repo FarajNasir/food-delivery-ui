@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Utensils, Package, Truck, CheckCircle2,
   Clock, ChevronRight, AlertCircle, Loader2,
-  Store, X, Bell, Zap
+  Store, X, Bell, Zap, ExternalLink
 } from "lucide-react";
 import { useOwnerStore, type OwnerOrder } from "@/store/useOwnerStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +21,7 @@ const PIPELINE = [
   { id: "CONFIRMED", label: "Payment", icon: Clock, color: "text-blue-400", bg: "bg-blue-400" },
   { id: "PAID", label: "Paid", icon: CheckCircle2, color: "text-blue-500", bg: "bg-blue-500" },
   { id: "PREPARING", label: "Kitchen", icon: Utensils, color: "text-purple-500", bg: "bg-purple-500" },
+  { id: "DISPATCH_REQUESTED", label: "Dispatching", icon: Truck, color: "text-orange-400", bg: "bg-orange-400" },
   { id: "OUT_FOR_DELIVERY", label: "Dispatched", icon: Truck, color: "text-orange-500", bg: "bg-orange-500" },
 ];
 
@@ -29,6 +30,7 @@ const STATUS_BAR: Record<string, string> = {
   CONFIRMED: "bg-blue-400",
   PAID: "bg-blue-500",
   PREPARING: "bg-purple-500",
+  DISPATCH_REQUESTED: "bg-orange-400",
   OUT_FOR_DELIVERY: "bg-orange-500",
 };
 
@@ -37,7 +39,7 @@ const NEXT_STATUS: Record<string, { label: string; status: string; color: string
   CONFIRMED: { label: "Waiting for payment", status: "CONFIRMED", color: "bg-slate-100 text-slate-400 shadow-none", disabled: true },
   PAID: { label: "Send to Kitchen", status: "PREPARING", color: "bg-blue-600 shadow-blue-200" },
   PREPARING: { label: "Dispatch Food", status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
-  OUT_FOR_DELIVERY: { label: "Mark Delivered", status: "DELIVERED", color: "bg-emerald-600 shadow-emerald-200" },
+  DISPATCH_REQUESTED: { label: "Awaiting Driver", status: "OUT_FOR_DELIVERY", color: "bg-slate-100 text-slate-400 shadow-none", disabled: true },
 };
 
 import { useOrderTimer } from "@/hooks/useOrderTimer";
@@ -52,6 +54,7 @@ function OrderCard({
 }) {
   const [busy, setBusy] = useState(false);
   const isPending = order.status === "PENDING_CONFIRMATION";
+  const isDelivered = order.status === "DELIVERED";
   const nextAction = NEXT_STATUS[order.status];
   const stepIndex = PIPELINE.findIndex((s) => s.id === order.status);
 
@@ -177,9 +180,28 @@ function OrderCard({
 
         {/* Actions */}
         <div className="flex gap-2">
+          {order.deliveryJob?.trackingUrl && (order.status === "DISPATCH_REQUESTED" || order.status === "OUT_FOR_DELIVERY") && (
+            <a
+              href={order.deliveryJob.trackingUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-border/50 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-2 text-slate-600"
+            >
+              Tracking
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+
+          {isDelivered && (
+            <div className="flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Delivered
+            </div>
+          )}
+
           {nextAction && (
             <button
-              disabled={busy || nextAction.disabled}
+              disabled={busy || nextAction.disabled || isDelivered}
               onClick={() => handleUpdate(nextAction.status)}
               className={cn(
                 "flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
@@ -226,15 +248,19 @@ export default function LiveOrdersView() {
     const currentPending = orders.filter(o => o.status === 'PENDING_CONFIRMATION');
     if (currentPending.length > prevPendingCount.current) {
       setNewOrderAlert(true);
-      const timer = setTimeout(() => setNewOrderAlert(false), 8000);
-      prevPendingCount.current = currentPending.length;
-      return () => clearTimeout(timer);
     }
     prevPendingCount.current = currentPending.length;
   }, [orders]);
 
+  useEffect(() => {
+    if (newOrderAlert) {
+      const timer = setTimeout(() => setNewOrderAlert(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [newOrderAlert]);
+
   const activeOrders = orders.filter((o) =>
-    ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status)
+    ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status)
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (

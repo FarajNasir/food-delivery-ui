@@ -50,6 +50,14 @@ const STATUS_CONFIG: Record<
     hex: "#A855F7",
     description: "Chef is working on your meal",
   },
+  DISPATCH_REQUESTED: {
+    label: "Dispatching",
+    icon: Truck,
+    color: "text-orange-700",
+    bg: "bg-orange-50",
+    hex: "#FB923C",
+    description: "Your courier is being arranged",
+  },
   OUT_FOR_DELIVERY: {
     label: "On the Way",
     icon: Truck,
@@ -188,7 +196,7 @@ export default function CustomerOrdersPage() {
     ...groupedItems.sessions.map(s => ({ type: "session", data: sessionDetails[s.id] || s, date: new Date(s.createdAt) }))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  const activeItems = allItems.filter(item => item.type === "order" ? ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "OUT_FOR_DELIVERY"].includes(item.data.status) : ["PENDING", "READY_TO_PAY", "PAID"].includes(item.data.status));
+  const activeItems = allItems.filter(item => item.type === "order" ? ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(item.data.status) : ["PENDING", "READY_TO_PAY", "PAID"].includes(item.data.status));
   const pastItems = allItems.filter(item => item.type === "order" ? ["DELIVERED", "CANCELLED"].includes(item.data.status) : ["CANCELLED"].includes(item.data.status));
 
 

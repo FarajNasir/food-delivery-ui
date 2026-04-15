@@ -17,6 +17,7 @@ const STATUS_COLOR: Record<string, string> = {
   CONFIRMED:   "bg-blue-100 text-blue-700 border-blue-200",
   PAID:        "bg-cyan-100 text-cyan-700 border-cyan-200",
   PREPARING:   "bg-purple-100 text-purple-700 border-purple-200",
+  DISPATCH_REQUESTED: "bg-orange-100 text-orange-700 border-orange-200",
   OUT_FOR_DELIVERY: "bg-orange-100 text-orange-700 border-orange-200",
   DELIVERED:   "bg-emerald-100 text-emerald-700 border-emerald-200",
   CANCELLED:   "bg-red-100 text-red-700 border-red-200",
@@ -27,6 +28,7 @@ const STATUS_DOT: Record<string, string> = {
   CONFIRMED:   "bg-blue-500",
   PAID:        "bg-cyan-500",
   PREPARING:   "bg-purple-500",
+  DISPATCH_REQUESTED: "bg-orange-400",
   OUT_FOR_DELIVERY: "bg-orange-500",
   DELIVERED:   "bg-emerald-500",
   CANCELLED:   "bg-red-500",
@@ -44,12 +46,13 @@ export default function OwnerOverview({ user }: { user: SessionUser }) {
   const activeOrders = orders
     .filter(o =>
       ["PENDING_CONFIRMATION","CONFIRMED","PAID","PREPARING","OUT_FOR_DELIVERY"].includes(o.status)
+      || o.status === "DISPATCH_REQUESTED"
     )
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
   const pendingCount  = orders.filter(o => o.status === "PENDING_CONFIRMATION").length;
-  const activeCount   = orders.filter(o => ["PAID","PREPARING","OUT_FOR_DELIVERY"].includes(o.status)).length;
+  const activeCount   = orders.filter(o => ["PAID","PREPARING","DISPATCH_REQUESTED","OUT_FOR_DELIVERY"].includes(o.status)).length;
   const deliveredToday = orders.filter(o => o.status === "DELIVERED").length;
   const totalRevenue = orders
     .filter(o => o.status === "DELIVERED")

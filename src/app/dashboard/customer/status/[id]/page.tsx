@@ -49,6 +49,13 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; d
     description: "Chef is working on your meal!",
     step: 3
   },
+  DISPATCH_REQUESTED: {
+    label: "Dispatch Requested",
+    icon: Truck,
+    color: "#FB923C",
+    description: "We're arranging your rider now.",
+    step: 4
+  },
   OUT_FOR_DELIVERY: {
     label: "Out for Delivery",
     icon: Truck,
@@ -200,8 +207,8 @@ export default function OrderStatusPage() {
             { id: "OUT_FOR_DELIVERY", label: "Out for Delivery", step: 4, icon: Truck },
             { id: "DELIVERED", label: "Delivered", step: 5, icon: CheckCircle2 },
           ].map((item, index, arr) => {
-            const isCompleted = (config?.step || 0) > item.step;
-            const isActive = (config?.step || 0) === item.step;
+            const isCompleted = (config?.step || 0) > item.step || (config?.step === 5 && item.step === 5);
+            const isActive = (config?.step || 0) === item.step && !isCompleted;
             const isLast = index === arr.length - 1;
             
             return (

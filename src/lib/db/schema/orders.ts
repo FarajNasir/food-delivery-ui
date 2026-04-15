@@ -9,6 +9,7 @@ export const orderStatusEnum = [
   "CONFIRMED",
   "PAID",
   "PREPARING",
+  "DISPATCH_REQUESTED",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
   "CANCELLED",
