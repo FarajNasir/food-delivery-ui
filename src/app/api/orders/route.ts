@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications, orderSessions } from "@/lib/db/schema";
-import { eq, inArray, desc, sql } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
            };
         });
 
-        // 4. Group by restaurant as before
+        // 1. Group by restaurant as before
         const itemsByRestaurant: Record<string, typeof userCartItems> = {};
         userCartItems.forEach((item) => {
           if (!itemsByRestaurant[item.restaurantId]) {
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
           itemsByRestaurant[item.restaurantId].push(item);
         });
 
-        // 1. Create the parent Session
+        // 2. Create the parent Session
         const [session] = await tx.insert(orderSessions).values({
           userId: user.id,
           status: "PENDING",
@@ -80,14 +80,30 @@ export async function POST(req: Request) {
           customerPhone,
         }).returning();
 
+        // 3. Fetch restaurants to get financial settings
+        const restaurantIds = Object.keys(itemsByRestaurant);
+        const restaurantsData = await tx.select({
+          id: restaurants.id,
+          name: restaurants.name,
+        }).from(restaurants).where(inArray(restaurants.id, restaurantIds));
+
+        const restaurantLookup = new Map(restaurantsData.map(r => [r.id, r]));
+
         const ordersList = [];
         let sessionTotalItems = 0;
 
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
-          const totalAmount = items.reduce((sum, item) => {
+          const restaurant = restaurantLookup.get(restaurantId);
+          if (!restaurant) throw new Error("RESTAURANT_NOT_FOUND");
+
+          const itemTotal = items.reduce((sum, item) => {
             return sum + (parseFloat(item.price as string) * item.quantity);
           }, 0);
-          sessionTotalItems += totalAmount;
+
+
+          const finalTotalAmount = itemTotal;
+
+          sessionTotalItems += itemTotal;
 
           // If breakdown exists, use it. Otherwise split evenly (Option B fallback)
           const restaurantFee = fees[restaurantId] 
@@ -97,13 +113,14 @@ export async function POST(req: Request) {
             userId: user.id,
             restaurantId,
             sessionId: session.id,
-            totalAmount: totalAmount.toFixed(2),
+            totalAmount: finalTotalAmount.toFixed(2),
             deliveryFee: restaurantFee.toFixed(2),
             deliveryAddress,
             deliveryArea,
             distanceMiles: distanceMiles ? (distanceMiles / Object.keys(itemsByRestaurant).length).toFixed(4) : null,
             customerPhone,
             status: "PENDING_CONFIRMATION",
+            isSettled: "NO",
           }).returning();
 
           await tx.insert(orderItems).values(

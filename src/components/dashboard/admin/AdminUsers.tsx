@@ -19,42 +19,42 @@ type SortField = "name" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 interface Filters {
-  search:   string;
-  role:     string;
-  status:   string;
-  sort:     SortField;
-  order:    SortOrder;
-  page:     number;
+  search: string;
+  role: string;
+  status: string;
+  sort: SortField;
+  order: SortOrder;
+  page: number;
   pageSize: number;
 }
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
   customer: { label: "Customer", color: "#3b82f6", bg: "#eff6ff" },
-  driver:   { label: "Driver",   color: "#f59e0b", bg: "#fffbeb" },
-  owner:    { label: "Owner",    color: "#8b5cf6", bg: "#f5f3ff" },
-  admin:    { label: "Admin",    color: "#ef4444", bg: "#fef2f2" },
+  driver: { label: "Driver", color: "#f59e0b", bg: "#fffbeb" },
+  owner: { label: "Owner", color: "#8b5cf6", bg: "#f5f3ff" },
+  admin: { label: "Admin", color: "#ef4444", bg: "#fef2f2" },
 };
 
 const EMPTY_FORM = { name: "", email: "", phone: "", role: "customer" as UserRole, password: "", confirmPassword: "" };
 
 /* ── Main Component ── */
 export default function AdminUsers({ currentUserId }: { currentUserId: string }) {
-  const [userData,    setUserData]    = useState<{ users: AdminUserItem[]; total: number }>({ users: [], total: 0 });
+  const [userData, setUserData] = useState<{ users: AdminUserItem[]; total: number }>({ users: [], total: 0 });
   const [initialLoad, setInitialLoad] = useState(true);  // skeleton on first mount only
-  const [fetching,    setFetching]    = useState(false);  // subtle indicator on subsequent fetches
+  const [fetching, setFetching] = useState(false);  // subtle indicator on subsequent fetches
   const [searchInput, setSearchInput] = useState("");     // controlled input — updates instantly
-  const [filters,     setFilters]     = useState<Filters>({
+  const [filters, setFilters] = useState<Filters>({
     search: "", role: "all", status: "all",
     sort: "name", order: "asc", page: 1, pageSize: 10,
   });
 
-  const [menuId,       setMenuId]       = useState<string | null>(null);
-  const [editUser,     setEditUser]     = useState<AdminUserItem | null>(null);
-  const [addOpen,      setAddOpen]      = useState(false);
-  const [form,         setForm]         = useState(EMPTY_FORM);
-  const [banTarget,    setBanTarget]    = useState<AdminUserItem | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<AdminUserItem | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [banTarget, setBanTarget] = useState<AdminUserItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserItem | null>(null);
-  const [saving,       setSaving]       = useState(false);
+  const [saving, setSaving] = useState(false);
 
   /* ── Debounce: commit search to filters 1s after user stops typing ── */
   useEffect(() => {
@@ -147,9 +147,9 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
     if (!editUser) return;
     setSaving(true);
     const res = await adminApi.updateUser(editUser.id, {
-      name:   editUser.name,
-      phone:  editUser.phone,
-      role:   editUser.role,
+      name: editUser.name,
+      phone: editUser.phone,
+      role: editUser.role,
       status: editUser.status,
     });
     setSaving(false);
@@ -196,7 +196,7 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
   const SortIcon = ({ field }: { field: SortField }) => {
     if (filters.sort !== field) return <ChevronsUpDown className="w-3.5 h-3.5 opacity-40" />;
     return filters.order === "asc"
-      ? <ChevronUp   className="w-3.5 h-3.5" style={{ color: "var(--dash-accent)" }} />
+      ? <ChevronUp className="w-3.5 h-3.5" style={{ color: "var(--dash-accent)" }} />
       : <ChevronDown className="w-3.5 h-3.5" style={{ color: "var(--dash-accent)" }} />;
   };
 
@@ -254,11 +254,11 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
           value={filters.role}
           onChange={(v) => setFilter("role", v)}
           options={[
-            { value: "all",      label: "All Roles" },
+            { value: "all", label: "All Roles" },
             { value: "customer", label: "Customer" },
-            { value: "driver",   label: "Driver" },
-            { value: "owner",    label: "Owner" },
-            { value: "admin",    label: "Admin" },
+            { value: "driver", label: "Driver" },
+            { value: "owner", label: "Owner" },
+            { value: "admin", label: "Admin" },
           ]}
         />
 
@@ -267,7 +267,7 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
           value={filters.status}
           onChange={(v) => setFilter("status", v)}
           options={[
-            { value: "all",    label: "All Status" },
+            { value: "all", label: "All Status" },
             { value: "active", label: "Active" },
             { value: "banned", label: "Banned" },
           ]}
@@ -278,9 +278,9 @@ export default function AdminUsers({ currentUserId }: { currentUserId: string })
           value={String(filters.pageSize)}
           onChange={(v) => setFilters((f) => ({ ...f, pageSize: Number(v), page: 1 }))}
           options={[
-            { value: "10",  label: "10 / page" },
-            { value: "25",  label: "25 / page" },
-            { value: "50",  label: "50 / page" },
+            { value: "10", label: "10 / page" },
+            { value: "25", label: "25 / page" },
+            { value: "50", label: "50 / page" },
           ]}
         />
       </div>
@@ -518,9 +518,9 @@ function UserRow({
   onBan: () => void;
   onDelete: () => void;
 }) {
-  const rm       = ROLE_META[u.role] ?? ROLE_META.customer;
+  const rm = ROLE_META[u.role] ?? ROLE_META.customer;
   const initials = u.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const joined   = new Date(u.createdAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  const joined = new Date(u.createdAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
   return (
     <div className="px-5 py-4 hover:bg-black/[0.015] transition-colors relative">
@@ -756,7 +756,7 @@ function UserFormFields({
   showEmail: boolean;
   showPassword: boolean;
 }) {
-  const [showPwd,     setShowPwd]     = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const passwordsMatch =
@@ -764,7 +764,7 @@ function UserFormFields({
     values.password === values.confirmPassword;
 
   const fieldBorder = { borderColor: "var(--dash-card-border)" };
-  const fieldBg     = { background: "var(--dash-bg)", color: "var(--dash-text-primary)" };
+  const fieldBg = { background: "var(--dash-bg)", color: "var(--dash-text-primary)" };
 
   return (
     <div className="space-y-3.5">

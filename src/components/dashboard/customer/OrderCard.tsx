@@ -8,9 +8,12 @@ import {
 import { cn } from "@/lib/utils";
 import { useOrderTimer } from "@/hooks/useOrderTimer";
 
+import { useOrders, type Order } from "@/context/OrderContext";
+import { type StatusConfig } from "@/app/dashboard/customer/orders/page";
+
 interface OrderCardProps {
-  order: any;
-  config: any;
+  order: Order;
+  config: StatusConfig;
   accent: string;
   gradientFrom: string;
   isPaying: boolean;
@@ -99,9 +102,9 @@ export default function OrderCard({
         </div>
 
         {/* Items list */}
-        {order.items?.length > 0 && (
+        {order.items && order.items.length > 0 && (
           <div className="mt-3 px-1">
-            {order.items.slice(0, 3).map((item: any, idx: number) => (
+            {order.items.slice(0, 3).map((item, idx) => (
               <div key={idx} className="flex items-center justify-between py-1">
                 <span className="text-[11px] text-gray-500 truncate">
                   <span className="font-bold text-gray-700">{item.quantity}× </span>

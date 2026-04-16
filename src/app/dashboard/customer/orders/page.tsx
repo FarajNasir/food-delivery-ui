@@ -14,10 +14,16 @@ import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
 import OrderCard from "@/components/dashboard/customer/OrderCard";
 import OrderSessionCard from "@/components/dashboard/customer/OrderSessionCard";
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; icon: any; color: string; hex: string; bg: string; description: string }
-> = {
+export interface StatusConfig {
+  label: string;
+  icon: any;
+  color: string;
+  hex: string;
+  bg: string;
+  description: string;
+}
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
   PENDING_CONFIRMATION: {
     label: "Confirming",
     icon: Clock,

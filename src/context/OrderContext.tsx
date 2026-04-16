@@ -6,29 +6,8 @@ import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { useFcmToken } from "@/hooks/useFcmToken";
 
-export interface Order {
-  id: string;
-  userId: string;
-  restaurantId: string;
-  status: string;
-  sessionId?: string | null;
-  totalAmount: string;
-  createdAt: string;
-  updatedAt: string;
-  paymentIntentId?: string | null;
-  restaurant?: {
-    name: string;
-  };
-  items?: {
-    id: string;
-    quantity: number;
-    price: string;
-    menuItem: {
-      name: string;
-      imageUrl?: string;
-    };
-  }[];
-}
+import { type Order } from "@/types/api.types";
+export { type Order };
 
 interface OrderContextType {
   orders: Order[];

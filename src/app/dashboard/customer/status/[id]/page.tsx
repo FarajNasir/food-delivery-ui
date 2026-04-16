@@ -299,7 +299,7 @@ export default function OrderStatusPage() {
             </div>
             <div className="flex justify-between text-xs font-sans font-medium text-gray-400">
               <span>Delivery Fee</span>
-              <span>FREE</span>
+              <span>{parseFloat(order.deliveryFee || "0") > 0 ? `£${parseFloat(order.deliveryFee).toFixed(2)}` : 'FREE'}</span>
             </div>
             <div className="h-px bg-gray-200/50 my-2" />
             <div className="flex justify-between items-center pt-1">
