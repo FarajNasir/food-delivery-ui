@@ -266,7 +266,7 @@ export default function CheckoutView() {
             </div>
 
             {/* Fixed Areas */}
-            {isFixedAreas && (
+            {(isFixedAreas || isDistSlabs) && (
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-600">Delivery Area</label>
                 <div className="relative">
@@ -276,8 +276,8 @@ export default function CheckoutView() {
                     className={cn(inputClass, "appearance-none pr-10")}
                   >
                     <option value="">Select your area…</option>
-                    {site.deliveryPricing?.rules.map((r: any) => (
-                      <option key={r.name} value={r.name}>{r.name} — £{r.fee.toFixed(2)}</option>
+                    {site.deliveryPricing?.rules.map((r: any, idx: number) => (
+                      <option key={`${r.name}-${idx}`} value={r.name}>{r.name} — £{r.fee.toFixed(2)}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -379,7 +379,7 @@ export default function CheckoutView() {
                 </span>
               </div>
 
-              {isFixedAreas && (
+{(isFixedAreas || isDistSlabs) && (
                 <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
                   <span className="text-amber-500 text-xs">ⓘ</span>
                   <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">
