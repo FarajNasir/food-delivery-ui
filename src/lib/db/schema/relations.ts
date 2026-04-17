@@ -6,6 +6,7 @@ import { orders, orderItems } from "./orders";
 import { orderSessions } from "./orderSessions";
 import { deliveryJobs } from "./deliveryJobs";
 import { reviews } from "./reviews";
+import { settlements } from "./settlements";
 
 /**
  * ── Restaurant Relations ─────────────────────────────────────
@@ -18,6 +19,7 @@ export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   orders: many(orders),
   menuItems: many(menuItems),
   reviews: many(reviews),
+  settlements: many(settlements),
 }));
 
 
@@ -108,4 +110,14 @@ export const orderSessionsRelations = relations(orderSessions, ({ one, many }) =
     references: [users.id],
   }),
   orders: many(orders),
+}));
+
+/**
+ * ── Settlement Relations ─────────────────────────────────────
+ */
+export const settlementsRelations = relations(settlements, ({ one }) => ({
+  restaurant: one(restaurants, {
+    fields: [settlements.restaurantId],
+    references: [restaurants.id],
+  }),
 }));

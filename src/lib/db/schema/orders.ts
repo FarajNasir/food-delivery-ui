@@ -30,6 +30,7 @@ export const orders = pgTable("orders", {
   customerPhone:   text("customer_phone"),
   currency:        text("currency").default("GBP").notNull(),
   paymentIntentId: text("payment_intent_id"),
+  isSettled:       text("is_settled").$type<"YES" | "NO">().default("NO").notNull(),
   sessionId:       uuid("session_id").references(() => orderSessions.id, { onDelete: "cascade" }),
   createdAt:       timestamp("created_at").defaultNow().notNull(),
   updatedAt:       timestamp("updated_at").defaultNow().notNull(),

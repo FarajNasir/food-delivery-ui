@@ -10,9 +10,14 @@ import type { Order } from "@/types/api.types";
 interface OrderState {
   orders: Order[];
   isLoading: boolean;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 
   // Actions
-  refreshOrders: () => Promise<void>;
+  refreshOrders: (page?: number) => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   updateSingleOrder: (order: Partial<Order> & { id: string }) => void;
   reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
@@ -21,13 +26,22 @@ interface OrderState {
 export const useOrderStore = create<OrderState>()((set, get) => ({
   orders: [],
   isLoading: false,
+  pagination: {
+    total: 0,
+    page: 1,
+    limit: 20,
+  },
 
-  refreshOrders: async () => {
+  refreshOrders: async (page) => {
     set({ isLoading: true });
     try {
-      const { success, data } = await customerService.getOrders();
+      const currentPage = page ?? get().pagination.page;
+      const { success, data } = await customerService.getOrders({ page: currentPage });
       if (success && data) {
-        set({ orders: data.orders });
+        set({ 
+          orders: data.orders,
+          pagination: data.pagination ?? get().pagination
+        });
       }
     } finally {
       set({ isLoading: false });

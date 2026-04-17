@@ -13,29 +13,30 @@ export class NotificationService {
    */
   static async sendFCM(notificationId: string) {
     try {
-      // 1. Fetch notification details
-      const [notification] = await db
-        .select()
+      // 1. Fetch notification and recipient details in a single JOIN
+      const [result] = await db
+        .select({
+          notification: notifications,
+          user: {
+            fcmToken: users.fcmToken
+          }
+        })
         .from(notifications)
+        .innerJoin(users, eq(notifications.recipientId, users.id))
         .where(eq(notifications.id, notificationId))
         .limit(1);
 
-      if (!notification) {
-        console.error(`[NotificationService] Notification ${notificationId} not found.`);
+      if (!result) {
+        console.error(`[NotificationService] Notification or User for ${notificationId} not found.`);
         return;
       }
+
+      const { notification, user } = result;
 
       if (notification.channel !== "FCM") {
         console.log(`[NotificationService] Notification ${notificationId} is not for FCM channel.`);
         return;
       }
-
-      // 2. Fetch recipient's FCM token
-      const [user] = await db
-        .select({ fcmToken: users.fcmToken })
-        .from(users)
-        .where(eq(users.id, notification.recipientId))
-        .limit(1);
 
       if (!user?.fcmToken) {
         console.warn(`[NotificationService] No FCM token found for user ${notification.recipientId}.`);

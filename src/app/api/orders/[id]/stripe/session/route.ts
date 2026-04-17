@@ -34,10 +34,6 @@ export async function POST(
         return fail("Order not found.", 404);
       }
 
-      if (order.status !== "CONFIRMED") {
-        return fail(`Payment is only allowed for orders that have been 'CONFIRMED' by the restaurant. Current status: ${order.status}`, 400);
-      }
-
       const host = (await headers()).get("host");
       const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
       const baseUrl = `${protocol}://${host}`;
@@ -59,6 +55,21 @@ export async function POST(
           quantity: item.quantity,
         };
       });
+
+      // Add delivery fee line item
+      if (parseFloat(order.deliveryFee as string) > 0) {
+        lineItems.push({
+          price_data: {
+            currency: (order.currency || "GBP").toLowerCase(),
+            product_data: {
+              name: "Delivery Fee",
+              description: "Restaurant delivery charge",
+            },
+            unit_amount: Math.round(parseFloat(order.deliveryFee as string) * 100),
+          },
+          quantity: 1,
+        } as any);
+      }
 
       // Create the session with a reasonable timeout (10 seconds)
       const sessionPromise = stripe.checkout.sessions.create({

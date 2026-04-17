@@ -7,10 +7,14 @@ import { useOwnerStore, OwnerOrder } from "@/store/useOwnerStore";
 
 interface OwnerOrderContextType {
   orders: OwnerOrder[];
+  historyOrders: OwnerOrder[];
   loading: boolean;
-  refreshOrders: () => Promise<void>;
+  refreshOrders: (params?: { scope?: "active" | "history"; page?: number; status?: string }) => Promise<void>;
   updateOrderStatus: (id: string, status: string) => Promise<boolean>;
   ownedRestaurantIds: string[];
+  pagination: { total: number; page: number; limit: number };
+  historyPagination: { total: number; page: number; limit: number };
+  historyStats: { totalRevenue: number; deliveredCount: number; cancelledCount: number };
 }
 
 const OwnerOrderContext = createContext<OwnerOrderContextType | undefined>(undefined);
@@ -18,8 +22,12 @@ const OwnerOrderContext = createContext<OwnerOrderContextType | undefined>(undef
 export function OwnerOrderProvider({ children }: { children: React.ReactNode }) {
   const {
     orders,
+    historyOrders,
     ownedRestaurantIds,
     isLoading: loading,
+    pagination,
+    historyPagination,
+    historyStats,
     refreshOrders,
     updateOrderStatus: storeUpdateOrderStatus
   } = useOwnerStore();
@@ -65,7 +73,17 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <OwnerOrderContext.Provider value={{ orders, loading, refreshOrders, updateOrderStatus, ownedRestaurantIds }}>
+    <OwnerOrderContext.Provider value={{ 
+      orders, 
+      historyOrders, 
+      loading, 
+      refreshOrders, 
+      updateOrderStatus, 
+      ownedRestaurantIds, 
+      pagination,
+      historyPagination,
+      historyStats
+    }}>
       {children}
     </OwnerOrderContext.Provider>
   );

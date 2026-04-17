@@ -60,7 +60,12 @@ export const customerService = {
   clearCart: () => http.post("/api/cart/clear", {}),
 
   /* ── Orders ── */
-  getOrders: () => http.get<{ orders: Order[] }>("/api/orders"),
+  getOrders: (params?: { page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return http.get<{ orders: Order[]; pagination: any }>(`/api/orders?${qs.toString()}`);
+  },
   
   getOrderById: (id: string) => http.get<Order>(`/api/orders/${id}`),
   

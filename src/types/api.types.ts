@@ -93,10 +93,13 @@ export interface Order {
   status: string;
   sessionId?: string | null;
   totalAmount: string;
+  deliveryFee: string;
+  currency: string;
   createdAt: string;
   updatedAt: string;
   paymentIntentId?: string | null;
   restaurant?: { name: string };
+  review?: any | null;
   items?: {
     id: string;
     quantity: number;

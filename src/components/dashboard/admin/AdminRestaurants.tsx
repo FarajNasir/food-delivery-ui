@@ -224,7 +224,7 @@ function PageBtn({ children, onClick, disabled, active }: {
 }
 
 /* ── Modal wrapper ── */
-function Modal({ title, onClose, children, icon }: {
+export function Modal({ title, onClose, children, icon }: {
   title: string; onClose: () => void; children: React.ReactNode; icon?: React.ReactNode;
 }) {
   return (
@@ -252,7 +252,7 @@ function Modal({ title, onClose, children, icon }: {
 }
 
 /* ── Modal actions ── */
-function ModalActions({ onCancel, onConfirm, confirmLabel, confirmColor, loading, disabled }: {
+export function ModalActions({ onCancel, onConfirm, confirmLabel, confirmColor, loading, disabled }: {
   onCancel: () => void; onConfirm: () => void; confirmLabel: string;
   confirmColor?: string; loading?: boolean; disabled?: boolean;
 }) {
@@ -278,7 +278,7 @@ function ModalActions({ onCancel, onConfirm, confirmLabel, confirmColor, loading
 }
 
 /* ── Field wrapper ── */
-function Field({ label, children, style }: {
+export function Field({ label, children, style }: {
   label: string; children: React.ReactNode; style?: React.CSSProperties;
 }) {
   return (

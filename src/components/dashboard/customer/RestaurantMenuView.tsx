@@ -6,22 +6,29 @@ import Link from "next/link";
 import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Store, Utensils } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
+import { cn } from "@/lib/utils";
 import { getMenu } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
 import type { AdminMenuItemResponse } from "@/lib/api";
+import ReviewSheet from "./ReviewSheet";
+import ReviewCard from "./ReviewCard";
+import { formatReviewCount } from "@/lib/utils/reviewUtils";
 
 interface RestaurantMenuViewProps {
   restaurant: any; // Allow flexible restaurant data
   initialMenuItems?: AdminMenuItemResponse[];
+  reviews?: any[];
 }
 
 export default function RestaurantMenuView({ 
   restaurant, 
-  initialMenuItems 
+  initialMenuItems,
+  reviews = []
 }: RestaurantMenuViewProps) {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const { cartItems, addItem: addToCart, updateQuantity } = useCart();
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // 1. Determine the menu source (DB vs Mock)
   const menu = useMemo(() => {
@@ -120,7 +127,20 @@ export default function RestaurantMenuView({
                 </span>
               )}
               
-              {restaurant.rating !== undefined && (
+              {reviews.length > 0 ? (
+                <button 
+                  onClick={() => setIsReviewOpen(true)}
+                  className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all hover:scale-105 active:scale-95 group"
+                >
+                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                  <span className="font-heading">{(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}</span>
+                  <span className="text-white/40 font-bold font-sans">({formatReviewCount(reviews.length)})</span>
+                  <div className="w-px h-3 bg-white/20 mx-1 ml-2" />
+                  <span className="text-[10px] uppercase tracking-tighter opacity-80 group-hover:opacity-100 flex items-center gap-1 font-heading">
+                    Reviews <ArrowLeft className="w-3 h-3 rotate-180" />
+                  </span>
+                </button>
+              ) : restaurant.rating !== undefined && (
                 <span className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/10">
                   <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
                   {restaurant.rating} {restaurant.reviews !== undefined && `(${restaurant.reviews})`}
@@ -264,7 +284,15 @@ export default function RestaurantMenuView({
             })}
           </div>
         )}
+
       </div>
+
+      <ReviewSheet 
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        reviews={reviews}
+        restaurantName={restaurant.name}
+      />
 
       {/* ── Sticky cart bar ── */}
       {cartCount > 0 && (

@@ -3,8 +3,8 @@ import { getRestaurants } from "@/data/restaurants";
 import RestaurantMenuView from "@/components/dashboard/customer/RestaurantMenuView";
 import { ALL_SITES } from "@/config/sites";
 import { db } from "@/lib/db";
-import { restaurants, menuItems } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { restaurants, menuItems, reviews, users } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export default async function RestaurantPage({
   params,
@@ -15,6 +15,7 @@ export default async function RestaurantPage({
 
   let restaurantData: any = null;
   let DBMenuItems: any[] = [];
+  let DBReviews: any[] = [];
 
   // 1. Try to find in Database (Admin-added)
   try {
@@ -36,9 +37,28 @@ export default async function RestaurantPage({
         .from(menuItems)
         .where(eq(menuItems.restaurantId, id))
         .orderBy(menuItems.category);
+
+      // Fetch active reviews for this restaurant
+      DBReviews = await db
+        .select({
+          id: reviews.id,
+          rating: reviews.rating,
+          comment: reviews.comment,
+          createdAt: reviews.createdAt,
+          userName: users.name,
+        })
+        .from(reviews)
+        .innerJoin(users, eq(reviews.userId, users.id))
+        .where(
+          and(
+            eq(reviews.restaurantId, id),
+            eq(reviews.status, "active")
+          )
+        )
+        .orderBy(desc(reviews.createdAt));
     }
   } catch (err) {
-    console.error("Failed to fetch restaurant from DB:", err);
+    console.error("Failed to fetch restaurant or reviews from DB:", err);
   }
 
   // 2. Fallback to mock data if not in DB
@@ -54,6 +74,7 @@ export default async function RestaurantPage({
     <RestaurantMenuView 
       restaurant={restaurantData} 
       initialMenuItems={DBMenuItems.length > 0 ? DBMenuItems : undefined}
+      reviews={DBReviews}
     />
   );
 }

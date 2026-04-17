@@ -38,11 +38,27 @@ export interface OwnerOrder {
 
 interface OwnerState {
   orders: OwnerOrder[];
+  historyOrders: OwnerOrder[];
   ownedRestaurantIds: string[];
   isLoading: boolean;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+  historyPagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+  historyStats: {
+    totalRevenue: number;
+    deliveredCount: number;
+    cancelledCount: number;
+  };
   
   // Actions
-  refreshOrders: () => Promise<void>;
+  refreshOrders: (params?: { scope?: "active" | "history"; page?: number; status?: string }) => Promise<void>;
   updateOrderStatus: (id: string, status: string) => Promise<boolean>;
   updateSingleOrder: (order: Partial<OwnerOrder> & { id: string }) => void;
 }
@@ -50,28 +66,75 @@ interface OwnerState {
 type OwnerOrdersResponse = {
   orders?: OwnerOrder[];
   ownedRestaurantIds?: string[];
+  stats?: {
+    totalRevenue: number;
+    deliveredCount: number;
+    cancelledCount: number;
+  };
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 };
 
 export const useOwnerStore = create<OwnerState>()((set, get) => ({
   orders: [],
+  historyOrders: [],
   ownedRestaurantIds: [],
   isLoading: false,
+  pagination: {
+    total: 0,
+    page: 1,
+    limit: 50,
+  },
+  historyPagination: {
+    total: 0,
+    page: 1,
+    limit: 10,
+  },
+  historyStats: {
+    totalRevenue: 0,
+    deliveredCount: 0,
+    cancelledCount: 0,
+  },
 
-  refreshOrders: async () => {
+  refreshOrders: async (params) => {
     set({ isLoading: true });
     try {
-      const response = await ownerService.getLiveOrders();
+      const scope = params?.scope ?? "active";
+      const status = params?.status;
+      const currentPage = params?.page ?? (scope === "history" ? get().historyPagination.page : get().pagination.page);
+      
+      const response = await ownerService.getLiveOrders({ 
+        page: currentPage,
+        scope,
+        status
+      });
       const data = response.data;
       const normalizedData: OwnerOrdersResponse = Array.isArray(data)
         ? { orders: data as OwnerOrder[] }
         : ((data as OwnerOrdersResponse | undefined) ?? {});
+      
       const fetchedOrders = normalizedData.orders ?? [];
       const fetchedRestaurantIds = normalizedData.ownedRestaurantIds ?? [];
+      const paginationData = normalizedData.pagination ?? (scope === "history" ? get().historyPagination : get().pagination);
+      const fetchedStats = normalizedData.stats;
       
-      set({ 
-        orders: fetchedOrders,
-        ownedRestaurantIds: fetchedRestaurantIds
-      });
+      if (scope === "history") {
+        set({ 
+          historyOrders: fetchedOrders,
+          ownedRestaurantIds: fetchedRestaurantIds,
+          historyPagination: paginationData,
+          ...(fetchedStats ? { historyStats: fetchedStats } : {})
+        });
+      } else {
+        set({ 
+          orders: fetchedOrders,
+          ownedRestaurantIds: fetchedRestaurantIds,
+          pagination: paginationData
+        });
+      }
     } finally {
       set({ isLoading: false });
     }
@@ -94,9 +157,19 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
 
     const serverOrder = (res.data as { order?: OwnerOrder } | undefined)?.order;
     if (serverOrder) {
-      set({
-        orders: get().orders.map((o) => (o.id === id ? { ...o, ...serverOrder } : o)),
-      });
+      const isHistorical = serverOrder.status === 'DELIVERED' || serverOrder.status === 'CANCELLED';
+      
+      if (isHistorical) {
+        // Remove from live if it was there
+        set({
+          orders: get().orders.filter(o => o.id !== id),
+          historyOrders: [serverOrder, ...get().historyOrders.filter(o => o.id !== id)]
+        });
+      } else {
+        set({
+          orders: get().orders.map((o) => (o.id === id ? { ...o, ...serverOrder } : o)),
+        });
+      }
     }
     
     toast.success(`Order #${id.slice(0, 6)} updated to ${serverOrder?.status ?? status}`);

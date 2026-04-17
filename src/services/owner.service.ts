@@ -64,10 +64,14 @@ export const ownerService = {
     http.delete<{ id: string }>(`/api/admin/menu/${id}`),
 
   /* ── Orders (for owner view) ── */
-  getLiveOrders: (restaurantId?: string) => {
+  getLiveOrders: (params?: { restaurantId?: string; page?: number; limit?: number; scope?: "active" | "history"; status?: string }) => {
     const qs = new URLSearchParams();
-    if (restaurantId) qs.set("restaurantId", restaurantId);
-    return http.get<{ orders: any[] }>(`/api/owner/orders?${qs.toString()}`);
+    if (params?.restaurantId) qs.set("restaurantId", params.restaurantId);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.scope) qs.set("scope", params.scope);
+    if (params?.status) qs.set("status", params.status);
+    return http.get<{ orders: any[]; ownedRestaurantIds: string[]; pagination: any }>(`/api/owner/orders?${qs.toString()}`);
   },
   
   updateOrderStatus: (orderId: string, status: string) => 

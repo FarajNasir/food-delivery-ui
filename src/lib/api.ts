@@ -445,3 +445,41 @@ export const ownerMenuApi = {
     return del<{ id: string }>(`/api/owner/menu/${id}`);
   },
 };
+
+/* ── Admin: Payments & Settlements API ── */
+
+export interface SettlementSummary {
+  restaurants: (AdminRestaurantItem & {
+    totalEarned: number;
+    totalPaid: number;
+    pendingBalance: number;
+    orderCount: number;
+  })[];
+  platformSummary: {
+    totalPendingPayouts: number;
+    totalPlatformRevenue: number;
+  };
+}
+
+export interface UnpaidOrdersDetail {
+  restaurant: AdminRestaurantItem;
+  unpaidOrders: {
+    id: string;
+    totalAmount: string;
+    createdAt: string;
+    status: string;
+    isSettled: string;
+  }[];
+}
+
+export const adminPaymentApi = {
+  getSummary() {
+    return get<SettlementSummary>("/api/admin/payments");
+  },
+  getUnpaidOrders(restaurantId: string) {
+    return get<UnpaidOrdersDetail>(`/api/admin/payments/${restaurantId}`);
+  },
+  settle(payload: { restaurantId: string; orderIds: string[]; transactionId?: string; notes?: string }) {
+    return post<{ settlement: any }>("/api/admin/payments/settle", payload);
+  },
+};

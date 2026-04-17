@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Check, ShoppingBag, Receipt, MapPin } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useAuthStore } from "@/store/useAuthStore";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -13,8 +14,12 @@ function SuccessContent() {
 
   const [verifying, setVerifying] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const { session, isReady } = useAuthStore();
 
   useEffect(() => {
+    // Only verify if the auth store is ready
+    if (!isReady) return;
+
     const verifyPayment = async () => {
       const sessionId = searchParams.get("session_id");
       if (!orderId || !sessionId) {
@@ -23,9 +28,14 @@ function SuccessContent() {
       }
 
       try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+
         const res = await fetch(`/api/orders/${orderId}/stripe/verify`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ sessionId }),
         });
         
@@ -41,7 +51,7 @@ function SuccessContent() {
     };
 
     verifyPayment();
-  }, [orderId, searchParams]);
+  }, [orderId, searchParams, isReady, session]);
 
   if (verifying) {
     return (

@@ -6,34 +6,18 @@ import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { useFcmToken } from "@/hooks/useFcmToken";
 
-export interface Order {
-  id: string;
-  userId: string;
-  restaurantId: string;
-  status: string;
-  sessionId?: string | null;
-  totalAmount: string;
-  createdAt: string;
-  updatedAt: string;
-  paymentIntentId?: string | null;
-  restaurant?: {
-    name: string;
-  };
-  items?: {
-    id: string;
-    quantity: number;
-    price: string;
-    menuItem: {
-      name: string;
-      imageUrl?: string;
-    };
-  }[];
-}
+import { type Order } from "@/types/api.types";
+export { type Order };
 
 interface OrderContextType {
   orders: Order[];
   loading: boolean;
-  refreshOrders: () => Promise<void>;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+  refreshOrders: (page?: number) => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
 }
@@ -48,6 +32,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const { 
     orders, 
     isLoading: loading, 
+    pagination,
     refreshOrders, 
     updateOrderStatus: storeUpdateOrderStatus,
     reorder: storeReorder
@@ -73,7 +58,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <OrderContext.Provider value={{ orders, loading, refreshOrders, updateOrderStatus, reorder: storeReorder }}>
+    <OrderContext.Provider value={{ orders, loading, pagination, refreshOrders, updateOrderStatus, reorder: storeReorder }}>
       {children}
     </OrderContext.Provider>
   );

@@ -1,28 +1,27 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import CustomerShell from "@/components/dashboard/customer/CustomerShell";
-import { OrderProvider } from "@/context/OrderContext";
+import { OwnerOrderProvider } from "@/context/OwnerOrderContext";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   admin:  "/dashboard/admin",
-  owner:  "/dashboard/owner",
+  customer: "/dashboard/customer",
   driver: "/dashboard/driver",
 };
 
-export default async function CustomerLayout({
+export default async function OwnerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
 
-  if (user && user.role !== "customer") {
+  if (user && user.role !== "owner") {
     redirect(ROLE_REDIRECTS[user.role] ?? "/dashboard");
   }
 
   return (
-    <OrderProvider>
-      <CustomerShell user={user}>{children}</CustomerShell>
-    </OrderProvider>
+    <OwnerOrderProvider>
+      {children}
+    </OwnerOrderProvider>
   );
 }

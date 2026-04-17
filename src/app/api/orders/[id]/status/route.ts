@@ -10,6 +10,7 @@ const StatusSchema = z.object({
     "CONFIRMED",
     "PAID",
     "PREPARING",
+    "DISPATCH_REQUESTED",
     "OUT_FOR_DELIVERY",
     "DELIVERED",
     "CANCELLED"
@@ -46,7 +47,8 @@ export async function PATCH(
       // 2. Permission Check: 
       if (status === "PAID") {
         // Only the customer who placed the order can mark it as PAID
-        if (order.userId !== user.id) {
+        // Admins can also mark orders as PAID (for manual confirmation)
+        if (order.userId !== user.id && user.role !== "admin") {
           return fail("You don't have permission to mark this order as paid.", 403);
         }
       } else if (status === "CANCELLED") {
@@ -82,7 +84,7 @@ export async function PATCH(
         // Manager status: CONFIRMED, PREPARING, etc.
         // Requires OWNER or ADMIN role and ownership of the restaurant
         if (user.role === "customer") {
-          return fail("Unauthorized. Only restaurant owners can update kitchen status.", 403);
+          return fail("Unauthorized. Only restaurant owners or admins can update kitchen status.", 403);
         }
 
         const [ownedResto] = await db

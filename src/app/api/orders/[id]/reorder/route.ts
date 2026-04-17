@@ -46,10 +46,15 @@ export async function POST(
 
       // 4. Create new order in a transaction
       const newOrder = await db.transaction(async (tx) => {
+
+        const subtotal = originalItems.reduce((sum, item) => sum + (parseFloat(item.price as string) * item.quantity), 0);
+        
+        const total = subtotal + parseFloat(originalOrder.deliveryFee || "0");
+
         const [insertedOrder] = await tx.insert(orders).values({
           userId: user.id,
           restaurantId: originalOrder.restaurantId,
-          totalAmount: originalOrder.totalAmount,
+          totalAmount: total.toFixed(2),
           deliveryFee: originalOrder.deliveryFee,
           deliveryAddress: originalOrder.deliveryAddress,
           deliveryArea: originalOrder.deliveryArea,
@@ -57,6 +62,7 @@ export async function POST(
           customerPhone: originalOrder.customerPhone,
           currency: originalOrder.currency,
           status: "PENDING_CONFIRMATION", // Reset status
+          isSettled: "NO",
         }).returning();
 
         await tx.insert(orderItems).values(
