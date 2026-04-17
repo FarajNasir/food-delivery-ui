@@ -37,7 +37,13 @@ export async function GET(
        return fail("Restaurant is not currently active.", 403);
     }
 
-    return ok(restaurant);
+    return new Response(JSON.stringify({ data: restaurant }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (err) {
     console.error("[public/restaurants GET]", err);
     return fail("Failed to fetch restaurant.", 500);

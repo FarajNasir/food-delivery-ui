@@ -3,8 +3,6 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { SiteProvider } from "@/context/SiteContext";
 import { CartProvider } from "@/context/CartContext";
-import { OrderProvider } from "@/context/OrderContext";
-import { OwnerOrderProvider } from "@/context/OwnerOrderContext";
 import SiteTitle from "@/components/layout/SiteTitle";
 import LocationManager from "@/components/shared/LocationManager";
 import { Toaster } from "sonner";
@@ -46,22 +44,18 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${poppins.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <SiteProvider>
+        <SiteProvider>              
           <CartProvider>
-            <OrderProvider>
-              <OwnerOrderProvider>
-                <SiteTitle />
-                <LocationManager />
-                {children}
-                <Toaster
-                  position="top-center"
-                  richColors
-                  toastOptions={{
-                    style: { fontSize: "14px" },
-                  }}
-                />
-              </OwnerOrderProvider>
-            </OrderProvider>
+            <SiteTitle />
+            <LocationManager />
+            {children}
+            <Toaster
+              position="top-center"
+              richColors
+              toastOptions={{
+                style: { fontSize: "14px" },
+              }}
+            />
           </CartProvider>
         </SiteProvider>
       </body>

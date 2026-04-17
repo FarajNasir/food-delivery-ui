@@ -6,6 +6,7 @@ import { useSite } from "@/context/SiteContext";
 import {
   ShoppingBag, Clock, CheckCircle2, CreditCard,
   Package, Truck, AlertCircle, Loader2, RefreshCw,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -91,7 +92,14 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
 };
 
 export default function CustomerOrdersPage() {
-  const { orders, loading, updateOrderStatus, refreshOrders, reorder } = useOrders();
+  const { 
+    orders, 
+    loading, 
+    pagination, 
+    updateOrderStatus, 
+    refreshOrders, 
+    reorder 
+  } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
@@ -140,6 +148,13 @@ export default function CustomerOrdersPage() {
     setRefreshing(true);
     await refreshOrders();
     setRefreshing(false);
+  };
+
+  const handlePageChange = async (p: number) => {
+    setRefreshing(true);
+    await refreshOrders(p);
+    setRefreshing(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSessionPayment = async (sessionId: string) => {
@@ -202,8 +217,29 @@ export default function CustomerOrdersPage() {
     ...groupedItems.sessions.map(s => ({ type: "session", data: sessionDetails[s.id] || s, date: new Date(s.createdAt) }))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  const activeItems = allItems.filter(item => item.type === "order" ? ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(item.data.status) : ["PENDING", "READY_TO_PAY", "PAID"].includes(item.data.status));
-  const pastItems = allItems.filter(item => item.type === "order" ? ["DELIVERED", "CANCELLED"].includes(item.data.status) : ["CANCELLED"].includes(item.data.status));
+  const activeItems = allItems.filter(item => {
+    if (item.type === "order") {
+      return ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(item.data.status);
+    } else {
+      const s = item.data;
+      if (s.orders && s.orders.length > 0) {
+        return s.orders.some((o: any) => ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status));
+      }
+      return ["PENDING", "READY_TO_PAY", "PAID"].includes(s.status);
+    }
+  });
+
+  const pastItems = allItems.filter(item => {
+    if (item.type === "order") {
+      return ["DELIVERED", "CANCELLED"].includes(item.data.status);
+    } else {
+      const s = item.data;
+      if (s.orders && s.orders.length > 0) {
+        return s.orders.every((o: any) => ["DELIVERED", "CANCELLED"].includes(o.status));
+      }
+      return ["CANCELLED"].includes(s.status);
+    }
+  });
 
 
   return (
@@ -326,6 +362,17 @@ export default function CustomerOrdersPage() {
               </div>
             </div>
           )}
+          
+          {/* Pagination */}
+          {!loading && (
+            <Pagination 
+              total={pagination.total}
+              page={pagination.page}
+              limit={pagination.limit}
+              onPageChange={handlePageChange}
+              accent={gradientFrom}
+            />
+          )}
         </div>
       )}
 
@@ -336,6 +383,71 @@ export default function CustomerOrdersPage() {
         site={site}
         onSuccess={refreshOrders}
       />
+    </div>
+  );
+}
+
+function Pagination({ 
+  total, 
+  page, 
+  limit, 
+  onPageChange, 
+  accent 
+}: { 
+  total: number; 
+  page: number; 
+  limit: number; 
+  onPageChange: (p: number) => void;
+  accent?: string;
+}) {
+  const totalPages = Math.ceil(total / limit);
+  if (totalPages <= 1) return null;
+
+  // Simple page range calculation
+  const pages = [];
+  const start = Math.max(1, page - 2);
+  const end = Math.min(totalPages, start + 4);
+  const adjustedStart = Math.max(1, end - 4);
+  
+  for (let i = adjustedStart; i <= end; i++) {
+    pages.push(i);
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-2 mt-12 py-6">
+      <button 
+        disabled={page === 1}
+        onClick={() => onPageChange(page - 1)}
+        className="p-2.5 rounded-2xl bg-white border border-gray-100 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
+      >
+        <ChevronLeft className="w-5 h-5 text-gray-500" />
+      </button>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm">
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => onPageChange(p)}
+            className={cn(
+              "w-11 h-11 rounded-2xl text-xs font-black transition-all duration-300 active:scale-90",
+              page === p 
+                ? "text-white shadow-md scale-105" 
+                : "text-gray-400 hover:bg-gray-50 hover:text-gray-900"
+            )}
+            style={page === p ? { background: accent || "black" } : {}}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
+      <button 
+        disabled={page === totalPages}
+        onClick={() => onPageChange(page + 1)}
+        className="p-2.5 rounded-2xl bg-white border border-gray-100 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
+      >
+        <ChevronRight className="w-5 h-5 text-gray-500" />
+      </button>
     </div>
   );
 }

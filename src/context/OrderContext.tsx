@@ -12,7 +12,12 @@ export { type Order };
 interface OrderContextType {
   orders: Order[];
   loading: boolean;
-  refreshOrders: () => Promise<void>;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+  refreshOrders: (page?: number) => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
 }
@@ -27,6 +32,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const { 
     orders, 
     isLoading: loading, 
+    pagination,
     refreshOrders, 
     updateOrderStatus: storeUpdateOrderStatus,
     reorder: storeReorder
@@ -52,7 +58,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <OrderContext.Provider value={{ orders, loading, refreshOrders, updateOrderStatus, reorder: storeReorder }}>
+    <OrderContext.Provider value={{ orders, loading, pagination, refreshOrders, updateOrderStatus, reorder: storeReorder }}>
       {children}
     </OrderContext.Provider>
   );

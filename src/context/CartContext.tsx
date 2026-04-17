@@ -199,11 +199,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ menuItemId: item.menuItemId, quantity: 1 }),
       });
       if (!res.ok) throw new Error();
-      await fetchDBCart();
+      
+      // Successfully updated on server, no need for fetchDBCart()
       toast.success(`'${item.name}' added to order`);
     } catch {
       toast.error("Failed to add item. Please try again.");
-      await fetchDBCart(); // rollback
+      await fetchDBCart(); // rollback to server state
     }
   };
 
@@ -239,10 +240,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ quantity }),
       });
       if (!res.ok) throw new Error();
+      
+      // Successfully updated on server, no need for fetchDBCart()
       if (quantity === 0) toast.info("Item removed from cart");
     } catch {
       toast.error("Failed to update quantity");
-      await fetchDBCart(); // rollback
+      await fetchDBCart(); // rollback to server state
     }
   };
 

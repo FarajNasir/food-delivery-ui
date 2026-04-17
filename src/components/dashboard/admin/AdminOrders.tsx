@@ -59,7 +59,18 @@ export default function AdminOrders() {
         const matchSearch = !q || o.id.toLowerCase().includes(q)
           || o.user.name.toLowerCase().includes(q)
           || o.restaurant.name.toLowerCase().includes(q);
-        const matchStatus = status === "all" || o.status === status;
+        const isTimeout = o.status === 'CANCELLED' && 
+          (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime() >= 290000);
+
+        let matchStatus = status === "all";
+        if (status === "TIMED_OUT") {
+          matchStatus = isTimeout;
+        } else if (status === "CANCELLED") {
+          matchStatus = o.status === "CANCELLED" && !isTimeout;
+        } else if (status !== "all") {
+          matchStatus = o.status === status;
+        }
+
         return matchSearch && matchStatus;
       })
       .sort((a, b) => {

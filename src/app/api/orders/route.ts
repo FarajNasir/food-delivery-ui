@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications, orderSessions } from "@/lib/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, asc, sql } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
@@ -38,9 +38,9 @@ export async function POST(req: Request) {
         // 2. Fetch the corresponding menu items to get prices and restaurantIds
         const itemIds = deletedCartItems.map(i => i.menuItemId);
         const menuDetails = await tx.select({
-           id: menuItems.id,
-           price: menuItems.price,
-           restaurantId: menuItems.restaurantId
+          id: menuItems.id,
+          price: menuItems.price,
+          restaurantId: menuItems.restaurantId
         }).from(menuItems).where(inArray(menuItems.id, itemIds));
 
         // Create a lookup map for menu details
@@ -48,15 +48,15 @@ export async function POST(req: Request) {
 
         // 3. Assemble the complete payload
         const userCartItems = deletedCartItems.map(item => {
-           const info = menuLookup.get(item.menuItemId);
-           if (!info) throw new Error("INVALID_MENU_ITEM");
-           return {
-             cartItemId: item.id,
-             menuItemId: item.menuItemId,
-             quantity: item.quantity,
-             price: info.price,
-             restaurantId: info.restaurantId
-           };
+          const info = menuLookup.get(item.menuItemId);
+          if (!info) throw new Error("INVALID_MENU_ITEM");
+          return {
+            cartItemId: item.id,
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            price: info.price,
+            restaurantId: info.restaurantId
+          };
         });
 
         // 1. Group by restaurant as before
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
           sessionTotalItems += itemTotal;
 
           // If breakdown exists, use it. Otherwise split evenly (Option B fallback)
-          const restaurantFee = fees[restaurantId] 
+          const restaurantFee = fees[restaurantId]
             || (deliveryFee / Object.keys(itemsByRestaurant).length);
 
           const [newOrder] = await tx.insert(orders).values({
@@ -200,6 +200,17 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   return withAuth(req, async (user) => {
     try {
+      const { searchParams } = new URL(req.url);
+      const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+      const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+      const offset = (page - 1) * limit;
+
+      // Step 0: fetch total count
+      const [{ count }] = await db
+        .select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(orders)
+        .where(eq(orders.userId, user.id));
+
       // Step 1: fetch orders + restaurant name
       const orderRows = await db
         .select({
@@ -222,7 +233,12 @@ export async function GET(req: Request) {
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
         .where(eq(orders.userId, user.id))
-        .orderBy(desc(orders.createdAt));
+        .orderBy(
+          sql`CASE WHEN ${orders.status} IN ('DELIVERED', 'CANCELLED') THEN 1 ELSE 0 END ASC`,
+          desc(orders.createdAt)
+        )
+        .limit(limit)
+        .offset(offset);
 
       if (orderRows.length === 0) return ok({ orders: [] });
 
@@ -268,7 +284,14 @@ export async function GET(req: Request) {
           })),
       }));
 
-      return ok({ orders: result });
+      return ok({ 
+        orders: result,
+        pagination: {
+          total: count,
+          page,
+          limit
+        }
+      });
     } catch (err) {
       console.error("[api/orders GET]", err);
       return fail("Failed to fetch orders.", 500);

@@ -87,15 +87,15 @@ function OrderCard({
         isPending ? "border-amber-200 ring-4 ring-amber-50" : "border-border/40"
       )}
     >
-      <div className={cn("h-1.5 w-full", STATUS_BAR[order.status] ?? "bg-slate-100")} />
+      <div className={cn("h-1 w-full", STATUS_BAR[order.status] ?? "bg-slate-100")} />
 
-      <div className="p-6">
+      <div className="p-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
-              <span className="text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 border border-primary/10 rounded-lg uppercase tracking-wider">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-gray-900 tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
+              <span className="text-[9px] font-black text-primary px-1.5 py-0.5 bg-primary/5 border border-primary/10 rounded-md uppercase tracking-wider">
                 {order.restaurant?.name}
               </span>
               {isPending && !isExpired && (
@@ -115,15 +115,15 @@ function OrderCard({
             </div>
           </div>
           <div className="text-right">
-            <p className="text-lg font-black text-gray-900 tracking-tight">£{parseFloat(order.totalAmount).toFixed(2)}</p>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+            <p className="text-lg font-black text-gray-900 tracking-tighter">£{parseFloat(order.totalAmount).toFixed(2)}</p>
+            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
               {order.items.length} Item{order.items.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-1 py-4 border-y border-slate-50 mb-4 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 py-3 border-y border-slate-50 mb-3 overflow-x-auto no-scrollbar">
           {PIPELINE.map((step, idx) => {
             const done = idx <= stepIndex;
             const Icon = step.icon;
@@ -162,11 +162,11 @@ function OrderCard({
         </div>
 
         {/* Items Grid */}
-        <div className="bg-slate-50/50 rounded-2xl p-4 mb-5 border border-slate-100/50">
-          <div className="space-y-2">
+        <div className="bg-slate-50/50 rounded-2xl p-3 mb-4 border border-slate-100/50">
+          <div className="space-y-1.5">
             {order.items.map((item, idx) => (
               <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white border border-slate-200 text-[10px] font-black text-primary shadow-sm">
                     {item.quantity}
                   </span>
@@ -185,7 +185,7 @@ function OrderCard({
               href={order.deliveryJob.trackingUrl}
               target="_blank"
               rel="noreferrer"
-              className="px-4 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-border/50 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-2 text-slate-600"
+              className="px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-border/50 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-2 text-slate-600"
             >
               Tracking
               <ExternalLink className="w-4 h-4" />
@@ -193,7 +193,7 @@ function OrderCard({
           )}
 
           {isDelivered && (
-            <div className="flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center gap-2">
+            <div className="flex-1 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Delivered
             </div>
@@ -204,7 +204,7 @@ function OrderCard({
               disabled={busy || nextAction.disabled || isDelivered}
               onClick={() => handleUpdate(nextAction.status)}
               className={cn(
-                "flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                "flex-1 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
                 nextAction.color,
                 !nextAction.disabled && "text-white shadow-elevated hover:scale-[1.02] active:scale-95",
                 "disabled:opacity-50"
@@ -223,7 +223,7 @@ function OrderCard({
             <button
               disabled={busy}
               onClick={() => handleUpdate("CANCELLED")}
-              className="px-5 py-3.5 rounded-2xl text-red-500 border border-red-50 bg-white hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50"
+              className="px-4 py-3 rounded-2xl text-red-500 border border-red-50 bg-white hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50"
             >
               <X className="w-4 h-4" />
             </button>
@@ -259,60 +259,52 @@ export default function LiveOrdersView() {
     }
   }, [newOrderAlert]);
 
-  const activeOrders = orders.filter((o) =>
-    ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status)
-  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
   return (
-    <div className="w-full space-y-8 pb-12 selection:bg-primary/20">
+    <div className="w-full space-y-4 pb-8 selection:bg-primary/20">
       
       {/* New Order Sticky Alert */}
       <AnimatePresence>
         {newOrderAlert && (
           <motion.div
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm"
           >
-            <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between border-2 border-emerald-400">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center animate-bounce">
-                  <Bell className="w-5 h-5" />
+            <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl border border-white/10 p-4 shadow-2xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 text-white">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center animate-pulse">
+                  <Bell className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black uppercase tracking-tight">New Order Received!</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest">New Order High Alert!</h4>
                   <p className="text-[10px] font-bold opacity-80 uppercase">Please check and confirm now.</p>
                 </div>
               </div>
               <button 
                 onClick={() => setNewOrderAlert(false)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-all"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 text-white" />
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Header with Stats */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Utensils className="w-5 h-5 text-primary" />
+      {/* Modern Dashboard Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 bg-white/40 backdrop-blur-sm rounded-3xl p-4 border border-white/20 shadow-sm">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
             </div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Kitchen Dashboard</h1>
+            <h1 className="text-xl font-black text-gray-900 tracking-tight uppercase">Kitchen Dashboard</h1>
           </div>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-            Managing <span className="text-gray-900 font-black">{activeOrders.length}</span> Active Tickets
-          </p>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className={cn(
-            "glass-premium flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all duration-1000",
+            "glass-premium flex items-center gap-3 px-3 py-1.5 rounded-2xl border transition-all duration-1000",
             newOrderAlert ? "border-emerald-500 bg-emerald-50/50" : "border-border/40"
           )}>
             <div className="flex items-center gap-2">
@@ -324,9 +316,9 @@ export default function LiveOrdersView() {
           </div>
           <button
             onClick={() => refreshOrders()}
-            className="p-3 rounded-2xl bg-white border border-border/40 shadow-soft hover:shadow-elevated transition-all active:rotate-180 duration-500"
+            className="p-2.5 rounded-2xl bg-white border border-border/40 shadow-soft hover:shadow-elevated transition-all active:rotate-180 duration-500"
           >
-            <RotateCcw className="w-5 h-5 text-gray-600" />
+            <RotateCcw className="w-4 h-4 text-gray-600" />
           </button>
         </div>
       </div>
@@ -338,7 +330,7 @@ export default function LiveOrdersView() {
             <div className="w-12 h-12 rounded-full border-4 border-muted/30 border-t-primary animate-spin" />
             <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground shimmer px-4 py-1 rounded-lg">Syncing Orders...</p>
           </div>
-        ) : activeOrders.length === 0 ? (
+        ) : orders.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -355,7 +347,7 @@ export default function LiveOrdersView() {
             layout
             className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
           >
-            {activeOrders.map((order) => (
+            {orders.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}

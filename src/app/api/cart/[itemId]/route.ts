@@ -31,7 +31,7 @@ export async function PATCH(
           );
         return ok({ message: "Item removed from cart" });
       } else {
-        await db
+        const [updated] = await db
           .update(cartItems)
           .set({ 
             quantity,
@@ -42,8 +42,13 @@ export async function PATCH(
               eq(cartItems.userId, user.id),
               eq(cartItems.menuItemId, menuItemId)
             )
-          );
-        return ok({ message: "Quantity updated" });
+          )
+          .returning();
+
+        return ok({ 
+          message: "Quantity updated",
+          item: updated 
+        });
       }
     } catch (err) {
       console.error("[api/cart PATCH]", err);
