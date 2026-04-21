@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { X, ShoppingBag, Plus, Minus, Trash2, ChevronRight, AlertTriangle } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 
 interface Props {
   isOpen: boolean;
@@ -18,9 +20,15 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
   const { gradientFrom, gradientTo, accent } = site.theme;
   const { cartItems, totalItems, totalPrice, updateQuantity, removeItem } = useCart();
   const { profile, isReady: authReady } = useAuthStore();
+  const router = useRouter();
   const isLoggedIn = authReady && !!profile;
 
   const drawerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -52,7 +60,9 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
     i => i.restaurantLocation && i.restaurantLocation !== site.location
   );
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -109,7 +119,10 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
                 </p>
               </div>
               <button
-                onClick={onClose}
+                onClick={() => {
+                  onClose();
+                  router.push("/dashboard/customer");
+                }}
                 className="px-6 py-2.5 rounded-2xl text-xs font-black text-white shadow"
                 style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
               >
@@ -244,6 +257,7 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
           </div>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

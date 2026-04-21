@@ -266,7 +266,7 @@ export default function CheckoutView() {
             </div>
 
             {/* Fixed Areas */}
-            {(isFixedAreas || isDistSlabs) && (
+            {isFixedAreas && (
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-600">Delivery Area</label>
                 <div className="relative">

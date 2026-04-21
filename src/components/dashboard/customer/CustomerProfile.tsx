@@ -14,7 +14,27 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
   const [phone, setPhone] = useState(user.phone);
   const [saving, setSaving] = useState(false);
 
+  const sanitizePhone = (value: string) => {
+    // Allow digits, spaces, and common international symbols.
+    return value.replace(/[^0-9+\-()\s]/g, "");
+  };
+
+  const isValidPhone = (value: string) => {
+    const normalized = value.replace(/\D/g, "");
+    return normalized.length >= 7;
+  };
+
   const handleSave = async () => {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      toast.error("Phone number is required.");
+      return;
+    }
+    if (!isValidPhone(trimmedPhone)) {
+      toast.error("Please enter a valid phone number.");
+      return;
+    }
+
     setSaving(true);
     // Placeholder — wire to API later
     await new Promise((r) => setTimeout(r, 800));
@@ -30,7 +50,7 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
     .slice(0, 2);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 space-y-5">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-5">
 
       {/* Page header */}
       <div>
@@ -133,7 +153,7 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(sanitizePhone(e.target.value))}
               className="flex-1 text-sm bg-transparent outline-none"
               style={{ color: "var(--dash-text-primary)" }}
             />

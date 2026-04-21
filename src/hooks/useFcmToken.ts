@@ -75,17 +75,50 @@ export const useFcmToken = (userId: string | undefined) => {
     const unsubscribe = onMessage(messaging!, (payload: MessagePayload) => {
       const isOrder = payload.data?.type === "ORDER";
       const isNewOrder = isOrder && (payload.data?.status === "PENDING_CONFIRMATION" || !payload.data?.status);
+      const role = useAuthStore.getState().role;
+      const incomingTitle = payload.notification?.title || "";
+      const incomingBody = payload.notification?.body || "";
 
-      toast.success(payload.notification?.title || "New Kitchen Alert", {
-        description: payload.notification?.body || "A live order update was received.",
+      const ownerAdminToast = (() => {
+        if (!isOrder) {
+          return {
+            title: incomingTitle || "Notification",
+            description: incomingBody || "A new update is available.",
+          };
+        }
+
+        if (isNewOrder) {
+          return {
+            title: "New order received",
+            description: "A customer placed a new order.",
+          };
+        }
+
+        const orderStatus = payload.data?.status;
+        if (orderStatus === "PAID") {
+          return {
+            title: "Payment received",
+            description: "An order payment was confirmed.",
+          };
+        }
+
+        return {
+          title: "Order update",
+          description: "An order status was updated.",
+        };
+      })();
+
+      toast.success(role === "owner" || role === "admin" ? ownerAdminToast.title : (incomingTitle || "New Kitchen Alert"), {
+        description: role === "owner" || role === "admin"
+          ? ownerAdminToast.description
+          : (incomingBody || "A live order update was received."),
         duration: 3000,
       });
 
       if (isOrder) {
         const orderId = payload.data?.orderId;
         const status = payload.data?.status;
-        // Get role once — only dispatch to the relevant store to avoid 403 errors
-        const role = useAuthStore.getState().role;
+        // Role already resolved above — only dispatch to relevant stores to avoid 403 errors
 
         if (orderId) {
           // Customer order store — always update (customer tracks their own orders)
