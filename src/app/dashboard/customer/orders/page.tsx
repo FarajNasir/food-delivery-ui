@@ -243,10 +243,10 @@ export default function CustomerOrdersPage() {
 
 
   return (
-    <div className="w-full max-w-xl mx-auto pb-20 px-4 space-y-8">
+    <div className="w-full max-w-xl mx-auto pt-6 sm:pt-8 pb-20 px-4 space-y-8">
 
       {/* Page Header */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black text-gray-900 tracking-tight">My Orders</h1>
           <p className="text-xs text-gray-400 mt-0.5">Track and manage your orders</p>

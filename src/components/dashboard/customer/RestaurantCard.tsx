@@ -114,14 +114,14 @@ export default function RestaurantCard({
         </div>
 
         {/* Separator / Metrics */}
-        <div className="mt-auto flex items-center justify-between pt-5 border-t border-border/40">
-          <div className="flex items-center gap-4 text-[12px] font-bold text-muted-foreground">
+        <div className="mt-auto flex items-center pt-5 border-t border-border/40">
+          <div className="flex min-h-[20px] items-center gap-4 text-[12px] font-bold text-muted-foreground">
             {deliveryTime && (
               <div 
                 className="flex items-center gap-1.5 transition-colors group-hover:text-gray-900"
               >
                 <Clock className="h-4 w-4" style={{ color: theme.accent }} />
-                <span>{deliveryTime} mins</span>
+                <span>{deliveryTime}</span>
               </div>
             )}
           </div>
@@ -133,7 +133,7 @@ export default function RestaurantCard({
               borderColor: `${theme.accent}40` 
             }}
             whileTap={{ scale: 0.98 }}
-            className="flex items-center justify-center rounded-full px-6 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all duration-300 border border-transparent shadow-sm"
+            className="ml-auto flex min-w-[140px] items-center justify-center whitespace-nowrap rounded-full px-6 py-2.5 text-[11px] font-black uppercase tracking-widest leading-none transition-all duration-300 border border-transparent shadow-sm"
             style={{ 
               color: theme.accent,
               backgroundColor: `${theme.accent}08`, 

@@ -49,7 +49,7 @@ export default function FoodCategories() {
             </p>
           </div>
           <a
-            href="#all-restaurants"
+            href="/dashboard/customer/all-restaurants"
             className="inline-flex items-center gap-1 text-sm font-semibold transition-all hover:gap-2"
             style={{ color: site.theme.primary }}
           >
