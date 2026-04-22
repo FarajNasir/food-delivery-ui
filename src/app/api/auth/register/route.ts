@@ -30,11 +30,17 @@ export async function POST(req: Request) {
   });
 
   if (signUpError) {
+    const message = signUpError.message.toLowerCase();
     console.error("[register] signUp error:", signUpError.status, signUpError.message);
-    if (signUpError.message.toLowerCase().includes("already")) {
+
+    if (message.includes("already")) {
       return fail("An account with this email already exists.", 409);
     }
-    return fail(signUpError.message, 400);
+    if (message.includes("rate limit")) {
+      return fail("Too many signup attempts. Please wait a few minutes before trying again.", 429);
+    }
+
+    return fail("Unable to create account right now. Please try again.", 400);
   }
 
   // Duplicate email with email-confirm OFF returns user but empty identities
@@ -56,11 +62,29 @@ export async function POST(req: Request) {
     });
   } catch (dbError) {
     console.error("[register] DB insert failed:", dbError);
+
+    const pgErr = dbError as { code?: string; constraint_name?: string; constraint?: string };
+    const constraint = (pgErr.constraint_name ?? pgErr.constraint ?? "").toLowerCase();
+
+    if (
+      pgErr.code === "23505" &&
+      (constraint.includes("users_pkey") || constraint.includes("users_email_key"))
+    ) {
+      return fail("An account with this email already exists. Please sign in instead.", 409);
+    }
+
     // Roll back the auth user so there's no orphan
     const admin = createAdminClient();
     await admin.auth.admin.deleteUser(userId).catch(() => null);
     return fail("Registration failed. Please try again.", 500);
   }
 
-  return ok({ id: userId, name, email, phone, role: "customer" });
+  return ok({
+    id: userId,
+    name,
+    email,
+    phone,
+    role: "customer",
+    needsEmailVerification: !authData.session,
+  });
 }

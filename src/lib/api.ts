@@ -16,6 +16,10 @@ export interface AuthUser {
   role: "customer" | "admin" | "driver" | "owner";
 }
 
+export interface RegisterResponse extends AuthUser {
+  needsEmailVerification: boolean;
+}
+
 export type UserRole   = "customer" | "driver" | "owner" | "admin";
 export type UserStatus = "active" | "banned";
 
@@ -103,7 +107,7 @@ export const authApi = {
     return post<AuthUser>("/api/auth/login", { email, password });
   },
   register(payload: { name: string; email: string; phone: string; password: string }) {
-    return post<AuthUser>("/api/auth/register", payload);
+    return post<RegisterResponse>("/api/auth/register", payload);
   },
   logout() {
     return post<null>("/api/auth/logout", {});
