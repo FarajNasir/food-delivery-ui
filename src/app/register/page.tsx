@@ -58,6 +58,7 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,6 +83,8 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     const errs = validate();
     if (Object.keys(errs).length) {
       setErrors(errs);
@@ -101,10 +104,17 @@ export default function RegisterPage() {
     setLoading(false);
 
     if (!result.success) {
-      toast.error(result.error ?? "Registration failed.");
+      if (result.error?.toLowerCase().includes("already exists")) {
+        toast.error("This email is already registered. Please sign in.");
+      } else if (result.error?.toLowerCase().includes("too many signup attempts")) {
+        toast.error("Too many attempts. Please wait a few minutes, then try again.");
+      } else {
+        toast.error(result.error ?? "Registration failed.");
+      }
       return;
     }
 
+    setNeedsEmailVerification(Boolean(result.data?.needsEmailVerification));
     setSuccess(true);
   };
 
@@ -125,7 +135,9 @@ export default function RegisterPage() {
           </div>
           <h3 className="font-heading font-bold text-gray-900 text-xl mb-2">Account Created!</h3>
           <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">
-            Welcome, {form.name.split(" ")[0]}! You can now sign in and start ordering from your favourite restaurants.
+            {needsEmailVerification
+              ? `Welcome, ${form.name.split(" ")[0]}! Please check your inbox and verify your email before signing in.`
+              : `Welcome, ${form.name.split(" ")[0]}! You can now sign in and start ordering from your favourite restaurants.`}
           </p>
           <Link
             href="/login"
