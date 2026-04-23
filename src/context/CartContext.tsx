@@ -27,7 +27,7 @@ interface CartContextType {
   addItem: (item: Omit<CartItem, "id" | "quantity">) => Promise<void>;
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
-  clearCart: () => Promise<void>;
+  clearCart: (silent?: boolean) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -51,11 +51,14 @@ function saveGuestCart(items: CartItem[]) {
 }
 
 import { useAuthStore } from "@/store/useAuthStore";
+import { useConfigStore } from "@/store/useConfigStore";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { session, isReady } = useAuthStore();
+  const { site } = useConfigStore();
+  const prevSiteRef = React.useRef(site.key);
   const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
@@ -255,11 +258,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Clear cart ───────────────────────────────────────────────
-  const clearCart = async () => {
+  const clearCart = useCallback(async (silent?: boolean) => {
     if (isGuest) {
       localStorage.removeItem(GUEST_CART_KEY);
       setCartItems([]);
-      toast.success("Cart cleared");
+      if (!silent) toast.success("Cart cleared");
       return;
     }
 
@@ -274,12 +277,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
       });
       if (!res.ok) throw new Error();
-      toast.success("Order cleared");
+      if (!silent) toast.success("Order cleared");
     } catch {
-      toast.error("Failed to clear cart");
+      if (!silent) toast.error("Failed to clear cart");
       setCartItems(backup);
     }
-  };
+  }, [isGuest, cartItems]);
+
+  useEffect(() => {
+    if (prevSiteRef.current !== site.key) {
+      prevSiteRef.current = site.key;
+      clearCart(true);
+    }
+  }, [site.key, clearCart]);
 
   const totalItems = useMemo(() => cartItems.reduce((acc, item) => acc + item.quantity, 0), [cartItems]);
   const totalPrice = useMemo(() => cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0), [cartItems]);

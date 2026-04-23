@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useSite } from "@/context/SiteContext";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -49,6 +51,14 @@ const strengthColor = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-lime-
 
 export default function RegisterPage() {
   const { site } = useSite();
+  const router = useRouter();
+  const { isReady, session } = useAuthStore();
+
+  useEffect(() => {
+    if (isReady && session) {
+      router.replace("/dashboard");
+    }
+  }, [isReady, session, router]);
 
   const [form, setForm] = useState<FormState>({
     name: "", email: "", password: "", confirmPassword: "", terms: false,

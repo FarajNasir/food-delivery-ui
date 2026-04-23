@@ -51,7 +51,7 @@ export default function CategoryDishes({ category }: CategoryDishesProps) {
     <div className="min-h-screen bg-[var(--dash-bg)]">
       {/* ── Header ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link 
               href="/dashboard/customer"
@@ -73,7 +73,7 @@ export default function CategoryDishes({ category }: CategoryDishesProps) {
       </header>
 
       {/* ── Content ── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

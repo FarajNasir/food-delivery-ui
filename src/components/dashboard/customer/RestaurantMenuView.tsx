@@ -7,7 +7,6 @@ import { ArrowLeft, Star, Clock, Truck, Minus, Plus, Leaf, Store, Utensils } fro
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
 import { cn } from "@/lib/utils";
-import { getMenu } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
 import type { AdminMenuItemResponse } from "@/lib/api";
 import ReviewSheet from "./ReviewSheet";
@@ -56,7 +55,7 @@ export default function RestaurantMenuView({
         }))
       }));
     }
-    return getMenu(restaurant.id);
+    return [];
   }, [restaurant.id, initialMenuItems]);
 
   const [activeTab, setActiveTab] = useState(menu[0]?.category ?? "");

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useSite } from "@/context/SiteContext";
 import AuthCard from "@/components/auth/AuthCard";
 import { Input } from "@/components/ui/input";
@@ -10,6 +12,14 @@ import { Mail, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-r
 
 export default function ForgotPasswordPage() {
   const { site } = useSite();
+  const router = useRouter();
+  const { isReady, session } = useAuthStore();
+
+  useEffect(() => {
+    if (isReady && session) {
+      router.replace("/dashboard");
+    }
+  }, [isReady, session, router]);
 
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);

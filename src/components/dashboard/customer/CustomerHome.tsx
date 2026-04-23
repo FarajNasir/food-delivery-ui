@@ -97,7 +97,7 @@ export default function CustomerHome({ user }: { user: SessionUser }) {
       <FeaturedRestaurants />
 
       {/* ── Main content wrapper ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Category chips ── */}
         <section className="pt-2 pb-10">
