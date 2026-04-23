@@ -2,6 +2,20 @@ import { messaging } from "@/lib/firebase-admin";
 import { db } from "@/lib/db";
 import { notifications, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+// Require twilio; gracefully handle if not installed
+let twilioClient: any = null;
+try {
+  const twilio = require("twilio");
+  const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  if (twilioAccountSid && twilioAuthToken) {
+    twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+  }
+} catch (e) {
+  console.warn("[NotificationService] Twilio package not found. WhatsApp notifications will not be sent.");
+}
+
+const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
 /**
  * notification.service.ts - Handles sending FCM notifications and tracking their status.
@@ -108,12 +122,108 @@ export class NotificationService {
   }
 
   /**
+   * Processes a pending notification and sends it via WhatsApp.
+   */
+  static async sendWhatsApp(notificationId: string) {
+    try {
+      const [result] = await db
+        .select({
+          notification: notifications,
+          user: {
+            phone: users.phone
+          }
+        })
+        .from(notifications)
+        .innerJoin(users, eq(notifications.recipientId, users.id))
+        .where(eq(notifications.id, notificationId))
+        .limit(1);
+
+      if (!result) {
+        console.error(`[NotificationService] Notification or User for ${notificationId} not found.`);
+        return;
+      }
+
+      const { notification, user } = result;
+
+      if (notification.channel !== "WHATSAPP") {
+        console.log(`[NotificationService] Notification ${notificationId} is not for WHATSAPP channel.`);
+        return;
+      }
+
+      if (!user?.phone) {
+        console.warn(`[NotificationService] No phone number found for user ${notification.recipientId}. WhatsApp skipped.`);
+        await db
+          .update(notifications)
+          .set({ status: "FAILED" })
+          .where(eq(notifications.id, notificationId));
+        return;
+      }
+
+      // Normalize phone: remove non-digits, ensure + prefix.
+      const cleaned = user.phone.replace(/\D/g, "");
+      const toPhone = user.phone.startsWith("+") ? `+${cleaned}` : `+${cleaned}`;
+
+      if (!twilioClient || !twilioWhatsAppNumber) {
+        console.error("[NotificationService] Twilio is not configured properly (missing client or number env vars).");
+        await db
+          .update(notifications)
+          .set({ status: "FAILED" })
+          .where(eq(notifications.id, notificationId));
+        return;
+      }
+
+      const messageBody = `*${notification.subject}*\n\n${notification.body}`;
+      console.log(`[NotificationService] Sending WhatsApp to ${toPhone}. Body:\n${messageBody}`);
+
+      await twilioClient.messages.create({
+        from: `whatsapp:${twilioWhatsAppNumber}`,
+        to: `whatsapp:${toPhone}`,
+        body: messageBody,
+      });
+
+      await db
+        .update(notifications)
+        .set({ status: "SENT" })
+        .where(eq(notifications.id, notificationId));
+
+      console.log(`[NotificationService] WhatsApp sent successfully for notification ${notificationId}`);
+    } catch (error) {
+      console.error(`[NotificationService] Error sending WhatsApp for ${notificationId}:`, error);
+      
+      await db
+        .update(notifications)
+        .set({ status: "FAILED" })
+        .where(eq(notifications.id, notificationId));
+    }
+  }
+
+  /**
    * Helper to trigger a new notification send.
    * Can be called after inserting a notification row.
    */
   static trigger(notificationId: string) {
-    // We run this without awaiting to not block the main request
-    this.sendFCM(notificationId).catch(err => {
+    const run = async () => {
+      const [notif] = await db
+        .select({ channel: notifications.channel })
+        .from(notifications)
+        .where(eq(notifications.id, notificationId))
+        .limit(1);
+
+      if (!notif) {
+        console.warn(`[NotificationService] Trigger failed: Notification ${notificationId} not found.`);
+        return;
+      }
+
+      console.log(`[NotificationService] Triggering channel ${notif.channel} for notification ${notificationId}`);
+
+      if (notif.channel === "FCM") {
+        await this.sendFCM(notificationId);
+      } else if (notif.channel === "WHATSAPP") {
+        await this.sendWhatsApp(notificationId);
+      }
+    };
+
+    run().catch(err => {
       console.error("[NotificationService] Background trigger failed:", err);
     });
   }

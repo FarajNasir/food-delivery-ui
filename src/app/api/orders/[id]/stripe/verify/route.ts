@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants, users, notifications } from "@/lib/db/schema";
+import { orders, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
@@ -65,52 +65,74 @@ export async function POST(
         .limit(1);
 
       if (restaurant) {
-        const [owner] = await db
-          .select({ lastActive: users.lastActive })
-          .from(users)
-          .where(eq(users.id, restaurant.ownerId))
-          .limit(1);
+        const subject = "Payment Received! 💰";
+        
+        const itemsRows = await db
+          .select({
+            name: menuItems.name,
+            quantity: orderItems.quantity,
+          })
+          .from(orderItems)
+          .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+          .where(eq(orderItems.orderId, order.id));
+        
+        const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+        const ownerBody = `Payment Confirmed! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
-        const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-        const [newNotification] = await db.insert(notifications).values({
+        // 1. WhatsApp for owner
+        const [waNotif] = await db.insert(notifications).values({
           recipientId: restaurant.ownerId,
           type: "ORDER",
-          subject: "Payment Received",
-          body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
-          channel: isActive ? "FCM" : "WHATSAPP",
+          subject,
+          body: ownerBody,
+          channel: "WHATSAPP",
           status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID" }
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" }
         }).returning();
+        if (waNotif) NotificationService.trigger(waNotif.id);
 
-        if (newNotification && newNotification.channel === "FCM") {
-          NotificationService.trigger(newNotification.id);
-        }
+        // 2. FCM for owner
+        const [fcmNotif] = await db.insert(notifications).values({
+          recipientId: restaurant.ownerId,
+          type: "ORDER",
+          subject,
+          body: `Payment confirmed for Order #${order.id.slice(0, 8)}.`,
+          channel: "FCM",
+          status: "PENDING",
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" }
+        }).returning();
+        if (fcmNotif) NotificationService.trigger(fcmNotif.id);
       }
 
       // 5. Notify Customer
       try {
-        const [customer] = await db
-          .select({ lastActive: users.lastActive })
-          .from(users)
-          .where(eq(users.id, order.userId))
-          .limit(1);
+        const subject = "Payment Confirmed! ✅";
+        const body = `Your payment was successful. The restaurant will start preparing your meal shortly.`;
 
-        const isActive = customer?.lastActive && (Date.now() - new Date(customer.lastActive).getTime() < 300000);
-
-        const [customerNotification] = await db.insert(notifications).values({
+        // 1. WhatsApp for customer
+        const [waNotif] = await db.insert(notifications).values({
           recipientId: order.userId,
           type: "ORDER",
-          subject: "Payment Confirmed",
-          body: `Your payment was successful. The restaurant will start preparing your meal shortly.`,
-          channel: isActive ? "FCM" : "WHATSAPP",
+          subject,
+          body,
+          channel: "WHATSAPP",
           status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID" }
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" }
         }).returning();
+        if (waNotif) NotificationService.trigger(waNotif.id);
 
-        if (customerNotification && customerNotification.channel === "FCM") {
-          NotificationService.trigger(customerNotification.id);
-        }
+        // 2. FCM for customer
+        const fcmNotifData = {
+          recipientId: order.userId,
+          type: "ORDER",
+          subject,
+          body,
+          channel: "FCM",
+          status: "PENDING",
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" }
+        } as const;
+        const [fcmNotif] = await db.insert(notifications).values(fcmNotifData).returning();
+        if (fcmNotif) NotificationService.trigger(fcmNotif.id);
       } catch (notifyErr) {
         console.error("[Stripe Verify] Failed to notify customer:", notifyErr);
       }

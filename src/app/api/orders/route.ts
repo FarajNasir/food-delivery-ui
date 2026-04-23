@@ -146,34 +146,81 @@ export async function POST(req: Request) {
       // --- Notification Logic (Outside Transaction) ---
       for (const newOrder of createdOrders.orders) {
         try {
+          // 1. Fetch restaurant and items details
           const [restaurant] = await db
             .select({ ownerId: restaurants.ownerId, name: restaurants.name })
             .from(restaurants)
             .where(eq(restaurants.id, newOrder.restaurantId))
             .limit(1);
 
+          const itemsRows = await db
+            .select({
+              name: menuItems.name,
+              quantity: orderItems.quantity,
+              price: orderItems.price,
+            })
+            .from(orderItems)
+            .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .where(eq(orderItems.orderId, newOrder.id));
+
           if (restaurant) {
-            const [owner] = await db
-              .select({ lastActive: users.lastActive })
-              .from(users)
-              .where(eq(users.id, restaurant.ownerId))
-              .limit(1);
+            const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+            const totalAmount = newOrder.totalAmount;
+            const body = `New Order Received!\n\nOrder #${newOrder.id.slice(0, 8)}\nItems:\n${itemsSummary}\n\nTotal: £${totalAmount}\n\nAddress: ${newOrder.deliveryAddress}`;
 
-            const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-            const [newNotification] = await db.insert(notifications).values({
+            // 1. FCM Notification (Live Dashboard)
+            const [fcmNotif] = await db.insert(notifications).values({
               recipientId: restaurant.ownerId,
               type: "ORDER",
               subject: "New Order Received!",
-              body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
-              channel: isActive ? "FCM" : "WHATSAPP",
+              body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.\nTotal: £${totalAmount}\nItems:\n${itemsSummary}`,
+              channel: "FCM",
               status: "PENDING",
-              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" }
             }).returning();
-
-            if (newNotification && newNotification.channel === "FCM") {
-              NotificationService.trigger(newNotification.id);
+            
+            if (fcmNotif) {
+              NotificationService.trigger(fcmNotif.id);
             }
+
+            // 2. WhatsApp Notification
+            const [waNotif] = await db.insert(notifications).values({
+              recipientId: restaurant.ownerId,
+              type: "ORDER",
+              subject: "New Order!",
+              body: body,
+              channel: "WHATSAPP",
+              status: "PENDING",
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" }
+            }).returning();
+            
+            if (waNotif) {
+              NotificationService.trigger(waNotif.id);
+            }
+
+            // 3. WhatsApp for customer
+            const [waCustomerNotif] = await db.insert(notifications).values({
+              recipientId: newOrder.userId,
+              type: "ORDER",
+              subject: "Order Received! 🛍️",
+              body: `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`,
+              channel: "WHATSAPP",
+              status: "PENDING",
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" }
+            }).returning();
+            if (waCustomerNotif) NotificationService.trigger(waCustomerNotif.id);
+
+            // 4. FCM for customer
+            const [fcmCustomerNotif] = await db.insert(notifications).values({
+              recipientId: newOrder.userId,
+              type: "ORDER",
+              subject: "Order Received! 🛍️",
+              body: `We've received your order #${newOrder.id.slice(0, 8)} from ${restaurant.name}! We'll notify you when it's confirmed.`,
+              channel: "FCM",
+              status: "PENDING",
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" }
+            }).returning();
+            if (fcmCustomerNotif) NotificationService.trigger(fcmCustomerNotif.id);
           }
         } catch (notifyErr) {
           console.error("Failed to queue notification:", notifyErr);

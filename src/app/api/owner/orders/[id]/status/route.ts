@@ -1,6 +1,6 @@
 import { ok, fail, withOwnerAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants, users, notifications, deliveryJobs } from "@/lib/db/schema";
+import { orders, restaurants, users, notifications, deliveryJobs, orderItems, menuItems } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 import { syncSessionStatus } from "@/lib/order-session";
@@ -8,11 +8,13 @@ import { createShipdayOrder } from "@/lib/shipday";
 
 // Human-readable labels for customer-facing notifications
 const STATUS_LABELS: Record<string, { subject: string; body: (id: string, restaurant: string) => string }> = {
-  CONFIRMED:       { subject: "Order Confirmed", body: (id, r) => `Your order #${id} at ${r} has been confirmed and is being prepared.` },
-  PREPARING:       { subject: "Kitchen is Cooking", body: (id, r) => `Your order #${id} at ${r} is now being prepared.` },
-  DISPATCH_REQUESTED:{ subject: "Dispatch Requested", body: (id, r) => `Your order #${id} from ${r} has been handed to dispatch.` },
-  OUT_FOR_DELIVERY:{ subject: "On the Way", body: (id, r) => `Your order #${id} from ${r} is out for delivery.` },
-  DELIVERED:       { subject: "Delivered", body: (id, r) => `Your order #${id} from ${r} has been delivered. Enjoy!` },
+  PENDING_CONFIRMATION: { subject: "Order Received", body: (id, r) => `Your order #${id} from ${r} has been received and is pending confirmation.` },
+  PAID:            { subject: "Payment Confirmed", body: (id, r) => `Your payment for order #${id} at ${r} was successful. The restaurant will start preparing it soon.` },
+  CONFIRMED:       { subject: "Order Confirmed", body: (id, r) => `Restaurant confirmed your order #${id} at ${r}. It's now in the kitchen!` },
+  PREPARING:       { subject: "Kitchen is Cooking", body: (id, r) => `Your order #${id} at ${r} is in the kitchen and being prepared.` },
+  DISPATCH_REQUESTED:{ subject: "Order Dispatched", body: (id, r) => `Your order #${id} from ${r} is now dispatched!` },
+  OUT_FOR_DELIVERY:{ subject: "On the Way", body: (id, r) => `Your order #${id} from ${r} is now out for delivery.` },
+  DELIVERED:       { subject: "Delivered", body: (id, r) => `Congratulations! Your order #${id} from ${r} is successfully delivered. Enjoy!` },
   CANCELLED:       { subject: "Order Cancelled", body: (id, r) => `Your order #${id} from ${r} has been cancelled.` },
 };
 
@@ -42,7 +44,12 @@ export async function PATCH(
 
       // 1. Ownership Validation: 
       const [ownedOrder] = await db
-        .select({ id: orders.id, userId: orders.userId, restaurantId: orders.restaurantId })
+        .select({ 
+          id: orders.id, 
+          userId: orders.userId, 
+          restaurantId: orders.restaurantId,
+          totalAmount: orders.totalAmount 
+        })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
         .where(and(
@@ -132,39 +139,101 @@ export async function PATCH(
             }
           }
 
-          // C. Notify the customer via FCM
-          const label = STATUS_LABELS[nextStatus];
-          if (label && ownedOrder.userId) {
-            const [restaurantRow] = await db
-              .select({ name: restaurants.name })
-              .from(restaurants)
-              .where(eq(restaurants.id, ownedOrder.restaurantId))
-              .limit(1);
+          // 2. Fetch Restaurant Info for notifications
+          const [restaurantInfo] = await db
+            .select({ name: restaurants.name })
+            .from(restaurants)
+            .where(eq(restaurants.id, ownedOrder.restaurantId))
+            .limit(1);
 
-            const [customer] = await db
-              .select({ lastActive: users.lastActive })
-              .from(users)
-              .where(eq(users.id, ownedOrder.userId))
-              .limit(1);
+          // C. Notify the customer
+          const label = STATUS_LABELS[nextStatus] || { 
+            subject: "Order Update", 
+            body: (id: string, r: string) => `Your order #${id} from ${r} is now ${nextStatus.toLowerCase().replace(/_/g, " ")}.` 
+          };
 
-            const isActive = customer?.lastActive &&
-              (Date.now() - new Date(customer.lastActive).getTime() < 300000);
+          if (ownedOrder.userId) {
+            const customerId = ownedOrder.userId;
+            const restaurantName = restaurantInfo?.name ?? "restaurant";
+            const subject = label.subject;
+            const body = label.body(id.slice(0, 8), restaurantName);
 
-            if (isActive) {
-              const [newNotification] = await db.insert(notifications).values({
-                recipientId: ownedOrder.userId,
-                type: "ORDER",
-                subject: label.subject,
-                body: label.body(id.slice(0, 8), restaurantRow?.name ?? "restaurant"),
-                channel: "FCM",
-                status: "PENDING",
-                metadata: { orderId: id, orderStatus: nextStatus },
-              }).returning();
+            // 1. WhatsApp for customer
+            const [waNotif] = await db.insert(notifications).values({
+              recipientId: customerId,
+              type: "ORDER",
+              subject,
+              body,
+              channel: "WHATSAPP",
+              status: "PENDING",
+              metadata: { orderId: id, orderStatus: nextStatus, targetRole: "customer" }
+            }).returning();
+            if (waNotif) NotificationService.trigger(waNotif.id);
 
-              if (newNotification) {
-                NotificationService.trigger(newNotification.id);
-              }
-            }
+            // 2. FCM for customer
+            const [fcmNotif] = await db.insert(notifications).values({
+              recipientId: customerId,
+              type: "ORDER",
+              subject,
+              body,
+              channel: "FCM",
+              status: "PENDING",
+              metadata: { orderId: id, orderStatus: nextStatus, targetRole: "customer" }
+            }).returning();
+            if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+          }
+
+          // D. Notify the owner
+          try {
+            const restaurantName = restaurantInfo?.name ?? "your restaurant";
+            const statusText = nextStatus.replace(/_/g, " ").toLowerCase();
+            const subject = `Order Update: #${id.slice(0, 8)}`;
+            
+            // Fetch order items and total with LEFT JOIN to be safe
+            const itemsRows = await db
+              .select({
+                name: menuItems.name,
+                quantity: orderItems.quantity,
+              })
+              .from(orderItems)
+              .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+              .where(eq(orderItems.orderId, id));
+
+            const totalAmount = ownedOrder.totalAmount || "0.00";
+
+            const itemsSummary = itemsRows.length > 0 
+              ? itemsRows.map(i => `${i.quantity}x ${i.name || "Unknown Item"}`).join("\n") 
+              : "No specific items found for this order.";
+              
+            const detailedBody = `*Order Update: #${id.slice(0, 8)}*\nRestaurant: ${restaurantName}\nStatus: ${statusText.toUpperCase()}\n\n*Items:*\n${itemsSummary}\n\n*Total:* £${totalAmount}`;
+
+            console.log(`[owner/orders/status] Sending detailed owner alert. Items: ${itemsRows.length}`);
+
+            // 1. WhatsApp for owner (Detailed)
+            const [waNotif] = await db.insert(notifications).values({
+              recipientId: user.id,
+              type: "ORDER",
+              subject,
+              body: detailedBody,
+              channel: "WHATSAPP",
+              status: "PENDING",
+              metadata: { orderId: id, orderStatus: nextStatus, targetRole: "owner" }
+            }).returning();
+            if (waNotif) NotificationService.trigger(waNotif.id);
+
+            // 2. FCM for owner (Detailed fallback)
+            const [fcmNotif] = await db.insert(notifications).values({
+              recipientId: user.id,
+              type: "ORDER",
+              subject,
+              body: detailedBody, // Using detailed body for FCM too as per user request for price/menu
+              channel: "FCM",
+              status: "PENDING",
+              metadata: { orderId: id, orderStatus: nextStatus, targetRole: "owner" }
+            }).returning();
+            if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+          } catch (notifyOwnerErr) {
+            console.error("[owner/orders/status] Failed to notify owner:", notifyOwnerErr);
           }
         } catch (bgErr) {
           console.error("[owner/orders/status] Background Task Error:", bgErr);

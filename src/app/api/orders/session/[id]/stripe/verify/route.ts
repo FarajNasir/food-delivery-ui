@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderSessions, restaurants, users, notifications } from "@/lib/db/schema";
+import { orders, orderSessions, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
@@ -65,27 +65,43 @@ export async function POST(
               .limit(1);
 
             if (restaurant) {
-              const [owner] = await tx
-                .select({ lastActive: users.lastActive })
-                .from(users)
-                .where(eq(users.id, restaurant.ownerId))
-                .limit(1);
+              const subject = "Payment Received! 💰";
+              
+              const itemsRows = await tx
+                .select({
+                  name: menuItems.name,
+                  quantity: orderItems.quantity,
+                })
+                .from(orderItems)
+                .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+                .where(eq(orderItems.orderId, order.id));
+              
+              const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+              const ownerBody = `Payment Confirmed! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
-              const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-              const [newNotification] = await tx.insert(notifications).values({
+              // 1. WhatsApp for owner
+              const [waNotif] = await tx.insert(notifications).values({
                 recipientId: restaurant.ownerId,
                 type: "ORDER",
-                subject: "Payment Received",
-                body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
-                channel: isActive ? "FCM" : "WHATSAPP",
+                subject,
+                body: ownerBody,
+                channel: "WHATSAPP",
                 status: "PENDING",
                 metadata: { orderId: order.id, orderStatus: "PAID" }
               }).returning();
+              if (waNotif) NotificationService.trigger(waNotif.id);
 
-              if (newNotification && newNotification.channel === "FCM") {
-                NotificationService.trigger(newNotification.id);
-              }
+              // 2. FCM for owner
+              const [fcmNotif] = await tx.insert(notifications).values({
+                recipientId: restaurant.ownerId,
+                type: "ORDER",
+                subject,
+                body: `Payment confirmed for Order #${order.id.slice(0, 8)}.`,
+                channel: "FCM",
+                status: "PENDING",
+                metadata: { orderId: order.id, orderStatus: "PAID" }
+              }).returning();
+              if (fcmNotif) NotificationService.trigger(fcmNotif.id);
             }
           } catch (notifyErr) {
             console.error("Failed to notify restaurant:", notifyErr);
@@ -94,27 +110,32 @@ export async function POST(
 
         // 5. Notify Customer (once)
         try {
-          const [customer] = await tx
-            .select({ lastActive: users.lastActive })
-            .from(users)
-            .where(eq(users.id, user.id))
-            .limit(1);
+          const subject = "Payment Confirmed! ✅";
+          const body = `Your payment was successful. The restaurants will start preparing your meal shortly.`;
 
-          const isActive = customer?.lastActive && (Date.now() - new Date(customer.lastActive).getTime() < 300000);
-
-          const [customerNotification] = await tx.insert(notifications).values({
+          // 1. WhatsApp for customer
+          const [waNotif] = await tx.insert(notifications).values({
             recipientId: user.id,
             type: "ORDER",
-            subject: "Payment Confirmed",
-            body: `Your payment was successful. The restaurants will start preparing your meal shortly.`,
-            channel: isActive ? "FCM" : "WHATSAPP",
+            subject,
+            body,
+            channel: "WHATSAPP",
             status: "PENDING",
             metadata: { sessionId: id, status: "PAID" }
           }).returning();
+          if (waNotif) NotificationService.trigger(waNotif.id);
 
-          if (customerNotification && customerNotification.channel === "FCM") {
-            NotificationService.trigger(customerNotification.id);
-          }
+          // 2. FCM for customer
+          const [fcmNotif] = await tx.insert(notifications).values({
+            recipientId: user.id,
+            type: "ORDER",
+            subject,
+            body,
+            channel: "FCM",
+            status: "PENDING",
+            metadata: { sessionId: id, status: "PAID" }
+          }).returning();
+          if (fcmNotif) NotificationService.trigger(fcmNotif.id);
         } catch (notifyErr) {
           console.error("Failed to notify customer:", notifyErr);
         }

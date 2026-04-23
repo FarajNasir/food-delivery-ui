@@ -1,6 +1,6 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, restaurants, users, notifications } from "@/lib/db/schema";
+import { orders, orderItems, restaurants, users, notifications, menuItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
@@ -86,27 +86,43 @@ export async function POST(
           .limit(1);
 
         if (restaurant) {
-          const [owner] = await db
-            .select({ lastActive: users.lastActive })
-            .from(users)
-            .where(eq(users.id, restaurant.ownerId))
-            .limit(1);
+          const subject = "New Order Received! 🛍️";
+          
+          const itemsRows = await db
+            .select({
+              name: menuItems.name,
+              quantity: orderItems.quantity,
+            })
+            .from(orderItems)
+            .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .where(eq(orderItems.orderId, newOrder.id));
+          
+          const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+          const ownerBody = `New Order! 🛍️\nOrder: #${newOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: NEW\n\nItems:\n${itemsSummary}\n\nTotal: £${newOrder.totalAmount}`;
 
-          const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-          const [newNotification] = await db.insert(notifications).values({
+          // 1. WhatsApp for owner
+          const [waNotif] = await db.insert(notifications).values({
             recipientId: restaurant.ownerId,
             type: "ORDER",
-            subject: "New Reorder Received!",
-            body: `Reorder #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
-            channel: isActive ? "FCM" : "WHATSAPP",
+            subject,
+            body: ownerBody,
+            channel: "WHATSAPP",
             status: "PENDING",
             metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
           }).returning();
+          if (waNotif) NotificationService.trigger(waNotif.id);
 
-          if (newNotification && newNotification.channel === "FCM") {
-            NotificationService.trigger(newNotification.id);
-          }
+          // 2. FCM for owner
+          const [fcmNotif] = await db.insert(notifications).values({
+            recipientId: restaurant.ownerId,
+            type: "ORDER",
+            subject,
+            body: `New order #${newOrder.id.slice(0, 8)} for ${restaurant.name}.`,
+            channel: "FCM",
+            status: "PENDING",
+            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
+          }).returning();
+          if (fcmNotif) NotificationService.trigger(fcmNotif.id);
         }
       } catch (notifyErr) {
         console.error("Failed to queue notification for reorder:", notifyErr);
