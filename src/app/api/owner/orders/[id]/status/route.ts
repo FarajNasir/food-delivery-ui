@@ -57,87 +57,12 @@ export async function PATCH(
 
       let nextStatus = status;
 
+      // 2. Perform the DB Update IMMEDIATELY
+      // We handle the Shipday logic in the background if status is OUT_FOR_DELIVERY
       if (status === "OUT_FOR_DELIVERY") {
-        const [existingDeliveryJob] = await db
-          .select({ id: deliveryJobs.id, status: deliveryJobs.status })
-          .from(deliveryJobs)
-          .where(eq(deliveryJobs.orderId, id))
-          .limit(1);
-
-        if (existingDeliveryJob) {
-          nextStatus = normalizeDeliveryStatus(existingDeliveryJob.status);
-        } else {
-          const orderDetails = await db.query.orders.findFirst({
-            where: eq(orders.id, id),
-            with: {
-              user: {
-                columns: {
-                  name: true,
-                  phone: true,
-                },
-              },
-              restaurant: {
-                columns: {
-                  name: true,
-                  location: true,
-                  contactPhone: true,
-                },
-              },
-              items: {
-                with: {
-                  menuItem: {
-                    columns: {
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
-          });
-
-          if (!orderDetails?.restaurant || !orderDetails.user) {
-            return fail("Unable to build Shipday payload for this order.", 400);
-          }
-
-          if (!orderDetails.deliveryAddress || !orderDetails.customerPhone) {
-            return fail("Order is missing delivery address or customer phone.", 400);
-          }
-
-          const shipdayOrder = await createShipdayOrder({
-            orderId: orderDetails.id,
-            customerName: orderDetails.user.name,
-            customerPhoneNumber: orderDetails.customerPhone || orderDetails.user.phone,
-            customerAddress: orderDetails.deliveryAddress,
-            restaurantName: orderDetails.restaurant.name,
-            restaurantAddress: orderDetails.restaurant.location || orderDetails.restaurant.name,
-            restaurantPhoneNumber: orderDetails.restaurant.contactPhone,
-            orderItems: orderDetails.items.map((item) => ({
-              name: item.menuItem.name,
-              quantity: item.quantity,
-              unitPrice: Number.parseFloat(item.price),
-            })),
-            totalAmount: orderDetails.totalAmount,
-            deliveryFee: orderDetails.deliveryFee,
-          });
-
-          await db.insert(deliveryJobs).values({
-            orderId: orderDetails.id,
-            provider: "shipday",
-            status: "DISPATCH_REQUESTED",
-            providerOrderId: shipdayOrder.providerOrderId,
-            trackingId: shipdayOrder.trackingId,
-            trackingUrl: shipdayOrder.trackingUrl,
-            driverName: shipdayOrder.driverName,
-            driverPhone: shipdayOrder.driverPhone,
-            eta: shipdayOrder.eta,
-            updatedAt: new Date(),
-          });
-
-          nextStatus = "DISPATCH_REQUESTED";
-        }
+        nextStatus = "DISPATCH_REQUESTED";
       }
 
-      // 2. Update the status
       const [updated] = await db
         .update(orders)
         .set({
@@ -147,50 +72,106 @@ export async function PATCH(
         .where(eq(orders.id, id))
         .returning();
 
-      // 3. Sync Session Status (Aggregation)
-      if (updated.sessionId && (nextStatus === "CONFIRMED" || nextStatus === "CANCELLED")) {
-        await syncSessionStatus(updated.sessionId);
-      }
+      // 3. Fire-and-forget BACKGROUND tasks
+      (async () => {
+        try {
+          // A. Sync Session Status
+          if (updated.sessionId && (nextStatus === "CONFIRMED" || nextStatus === "CANCELLED")) {
+            await syncSessionStatus(updated.sessionId);
+          }
 
-      // 4. Notify the customer via FCM
-      try {
-        const label = STATUS_LABELS[nextStatus];
-        if (label && ownedOrder.userId) {
-          const [restaurantRow] = await db
-            .select({ name: restaurants.name })
-            .from(restaurants)
-            .where(eq(restaurants.id, ownedOrder.restaurantId))
-            .limit(1);
+          // B. Handle Shipday for Dispatch
+          if (status === "OUT_FOR_DELIVERY") {
+            const [existingDeliveryJob] = await db
+              .select({ id: deliveryJobs.id, status: deliveryJobs.status })
+              .from(deliveryJobs)
+              .where(eq(deliveryJobs.orderId, id))
+              .limit(1);
 
-          const [customer] = await db
-            .select({ lastActive: users.lastActive })
-            .from(users)
-            .where(eq(users.id, ownedOrder.userId))
-            .limit(1);
+            if (!existingDeliveryJob) {
+              const orderDetails = await db.query.orders.findFirst({
+                where: eq(orders.id, id),
+                with: {
+                  user: { columns: { name: true, phone: true } },
+                  restaurant: { columns: { name: true, location: true, contactPhone: true } },
+                  items: { with: { menuItem: { columns: { name: true } } } },
+                },
+              });
 
-          const isActive = customer?.lastActive &&
-            (Date.now() - new Date(customer.lastActive).getTime() < 300000); // 5 min window for customers
+              if (orderDetails?.restaurant && orderDetails.user && orderDetails.deliveryAddress && orderDetails.customerPhone) {
+                const shipdayOrder = await createShipdayOrder({
+                  orderId: orderDetails.id,
+                  customerName: orderDetails.user.name,
+                  customerPhoneNumber: orderDetails.customerPhone || orderDetails.user.phone,
+                  customerAddress: orderDetails.deliveryAddress,
+                  restaurantName: orderDetails.restaurant.name,
+                  restaurantAddress: orderDetails.restaurant.location || orderDetails.restaurant.name,
+                  restaurantPhoneNumber: orderDetails.restaurant.contactPhone,
+                  orderItems: orderDetails.items.map((item) => ({
+                    name: item.menuItem.name,
+                    quantity: item.quantity,
+                    unitPrice: Number.parseFloat(item.price),
+                  })),
+                  totalAmount: orderDetails.totalAmount,
+                  deliveryFee: orderDetails.deliveryFee,
+                });
 
-          if (isActive) {
-            const [newNotification] = await db.insert(notifications).values({
-              recipientId: ownedOrder.userId,
-              type: "ORDER",
-              subject: label.subject,
-              body: label.body(id.slice(0, 8), restaurantRow?.name ?? "restaurant"),
-              channel: "FCM",
-              status: "PENDING",
-              metadata: { orderId: id, orderStatus: nextStatus },
-            }).returning();
-
-            if (newNotification) {
-              NotificationService.trigger(newNotification.id);
+                await db.insert(deliveryJobs).values({
+                  orderId: orderDetails.id,
+                  provider: "shipday",
+                  status: "DISPATCH_REQUESTED",
+                  providerOrderId: shipdayOrder.providerOrderId,
+                  trackingId: shipdayOrder.trackingId,
+                  trackingUrl: shipdayOrder.trackingUrl,
+                  driverName: shipdayOrder.driverName,
+                  driverPhone: shipdayOrder.driverPhone,
+                  eta: shipdayOrder.eta,
+                  updatedAt: new Date(),
+                });
+              }
             }
           }
-        }
-      } catch (notifyErr) {
-        console.error("[owner/orders/status] Failed to notify customer:", notifyErr);
-      }
 
+          // C. Notify the customer via FCM
+          const label = STATUS_LABELS[nextStatus];
+          if (label && ownedOrder.userId) {
+            const [restaurantRow] = await db
+              .select({ name: restaurants.name })
+              .from(restaurants)
+              .where(eq(restaurants.id, ownedOrder.restaurantId))
+              .limit(1);
+
+            const [customer] = await db
+              .select({ lastActive: users.lastActive })
+              .from(users)
+              .where(eq(users.id, ownedOrder.userId))
+              .limit(1);
+
+            const isActive = customer?.lastActive &&
+              (Date.now() - new Date(customer.lastActive).getTime() < 300000);
+
+            if (isActive) {
+              const [newNotification] = await db.insert(notifications).values({
+                recipientId: ownedOrder.userId,
+                type: "ORDER",
+                subject: label.subject,
+                body: label.body(id.slice(0, 8), restaurantRow?.name ?? "restaurant"),
+                channel: "FCM",
+                status: "PENDING",
+                metadata: { orderId: id, orderStatus: nextStatus },
+              }).returning();
+
+              if (newNotification) {
+                NotificationService.trigger(newNotification.id);
+              }
+            }
+          }
+        } catch (bgErr) {
+          console.error("[owner/orders/status] Background Task Error:", bgErr);
+        }
+      })();
+
+      // 4. Respond to owner IMMEDIATELY after DB status update
       return ok({ order: updated });
     } catch (err) {
       console.error("[api/owner/orders/[id]/status PATCH]", err);

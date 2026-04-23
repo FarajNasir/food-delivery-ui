@@ -1,17 +1,11 @@
 import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser, invalidateUserCache } from "@/lib/auth";
+import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
+import { invalidateUserCache } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user)                 return { user: null, res: fail("Unauthorized.", 401) };
-  if (user.role !== "admin") return { user: null, res: fail("Forbidden.", 403) };
-  return { user, res: null };
-}
+import type { SessionUser } from "@/lib/auth";
 
 const UpdateUserSchema = z.object({
   name:   z.string().min(2).max(150).optional(),
@@ -25,68 +19,66 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { user: admin, res } = await requireAdmin();
-  if (res) return res;
+  return withAuth(req, async (admin: SessionUser) => {
+    const { id } = await params;
 
-  const { id } = await params;
+    const parsed = await parseBody(req, UpdateUserSchema);
+    if ("error" in parsed) return parsed.error;
+    const updates = parsed.data;
 
-  const parsed = await parseBody(req, UpdateUserSchema);
-  if ("error" in parsed) return parsed.error;
-  const updates = parsed.data;
+    if (Object.keys(updates).length === 0) {
+      return fail("No fields to update.");
+    }
 
-  if (Object.keys(updates).length === 0) {
-    return fail("No fields to update.");
-  }
+    /* Prevent admin from banning themselves */
+    if (id === admin.id && updates.status === "banned") {
+      return fail("You cannot ban your own account.", 403);
+    }
 
-  /* Prevent admin from banning themselves */
-  if (id === admin!.id && updates.status === "banned") {
-    return fail("You cannot ban your own account.", 403);
-  }
+    const [updated] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
 
-  const [updated] = await db
-    .update(users)
-    .set({ ...updates, updatedAt: new Date() })
-    .where(eq(users.id, id))
-    .returning();
+    if (!updated) return fail("User not found.", 404);
 
-  if (!updated) return fail("User not found.", 404);
+    // Evict from cache — role/status change must take effect immediately.
+    invalidateUserCache(id);
 
-  // Evict from cache — role/status change must take effect immediately.
-  invalidateUserCache(id);
-
-  return ok(updated);
+    return ok(updated);
+  }, ["admin"]);
 }
 
 /* ── DELETE /api/admin/users/[id] ── */
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { user: admin, res } = await requireAdmin();
-  if (res) return res;
+  return withAuth(req, async (admin: SessionUser) => {
+    const { id } = await params;
 
-  const { id } = await params;
+    /* Prevent admin from deleting themselves */
+    if (id === admin.id) {
+      return fail("You cannot delete your own account.", 403);
+    }
 
-  /* Prevent admin from deleting themselves */
-  if (id === admin!.id) {
-    return fail("You cannot delete your own account.", 403);
-  }
+    const [deleted] = await db
+      .delete(users)
+      .where(eq(users.id, id))
+      .returning({ id: users.id });
 
-  const [deleted] = await db
-    .delete(users)
-    .where(eq(users.id, id))
-    .returning({ id: users.id });
+    if (!deleted) return fail("User not found.", 404);
 
-  if (!deleted) return fail("User not found.", 404);
+    // Evict from cache — user no longer exists.
+    invalidateUserCache(id);
 
-  // Evict from cache — user no longer exists.
-  invalidateUserCache(id);
+    /* Also remove from Supabase Auth */
+    const adminClient = createAdminClient();
+    await adminClient.auth.admin.deleteUser(id).catch((err) => {
+      console.error("[admin/users DELETE] auth delete failed:", err);
+    });
 
-  /* Also remove from Supabase Auth */
-  const adminClient = createAdminClient();
-  await adminClient.auth.admin.deleteUser(id).catch((err) => {
-    console.error("[admin/users DELETE] auth delete failed:", err);
-  });
-
-  return ok({ id });
+    return ok({ id });
+  }, ["admin"]);
 }

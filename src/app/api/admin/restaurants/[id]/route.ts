@@ -1,16 +1,9 @@
 import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
+import { invalidateUserCache } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { restaurants, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user)                 return { user: null, res: fail("Unauthorized.", 401) };
-  if (user.role !== "admin") return { user: null, res: fail("Forbidden.", 403) };
-  return { user, res: null };
-}
 
 const DayHoursSchema = z.object({ open: z.string(), close: z.string() }).nullable();
 
@@ -32,60 +25,58 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { res } = await requireAdmin();
-  if (res) return res;
+  return withAuth(req, async () => {
+    const { id } = await params;
 
-  const { id } = await params;
+    const parsed = await parseBody(req, UpdateRestaurantSchema);
+    if ("error" in parsed) return parsed.error;
+    const updates = parsed.data;
 
-  const parsed = await parseBody(req, UpdateRestaurantSchema);
-  if ("error" in parsed) return parsed.error;
-  const updates = parsed.data;
+    if (Object.keys(updates).length === 0) {
+      return fail("No fields to update.");
+    }
 
-  if (Object.keys(updates).length === 0) {
-    return fail("No fields to update.");
-  }
+    /* Verify new owner exists if changing */
+    if (updates.ownerId) {
+      const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.id, updates.ownerId));
+      if (!owner) return fail("Owner user not found.", 404);
+    }
 
-  /* Verify new owner exists if changing */
-  if (updates.ownerId) {
-    const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.id, updates.ownerId));
-    if (!owner) return fail("Owner user not found.", 404);
-  }
+    try {
+      const [updated] = await db
+        .update(restaurants)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(restaurants.id, id))
+        .returning();
 
-  try {
-    const [updated] = await db
-      .update(restaurants)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(restaurants.id, id))
-      .returning();
-
-    if (!updated) return fail("Restaurant not found.", 404);
-    return ok(updated);
-  } catch (err) {
-    console.error("[admin/restaurants PUT]", err);
-    return fail("Failed to update restaurant.", 500);
-  }
+      if (!updated) return fail("Restaurant not found.", 404);
+      return ok(updated);
+    } catch (err) {
+      console.error("[admin/restaurants PUT]", err);
+      return fail("Failed to update restaurant.", 500);
+    }
+  }, ["admin"]);
 }
 
 /* ── DELETE /api/admin/restaurants/[id] ── */
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { res } = await requireAdmin();
-  if (res) return res;
+  return withAuth(req, async () => {
+    const { id } = await params;
 
-  const { id } = await params;
+    try {
+      const [deleted] = await db
+        .delete(restaurants)
+        .where(eq(restaurants.id, id))
+        .returning({ id: restaurants.id });
 
-  try {
-    const [deleted] = await db
-      .delete(restaurants)
-      .where(eq(restaurants.id, id))
-      .returning({ id: restaurants.id });
-
-    if (!deleted) return fail("Restaurant not found.", 404);
-    return ok({ id: deleted.id });
-  } catch (err) {
-    console.error("[admin/restaurants DELETE]", err);
-    return fail("Failed to delete restaurant.", 500);
-  }
+      if (!deleted) return fail("Restaurant not found.", 404);
+      return ok({ id: deleted.id });
+    } catch (err) {
+      console.error("[admin/restaurants DELETE]", err);
+      return fail("Failed to delete restaurant.", 500);
+    }
+  }, ["admin"]);
 }

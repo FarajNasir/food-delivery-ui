@@ -82,8 +82,8 @@ export default function AdminReviews() {
   if (loading) {
     return (
       <div className="py-24 flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Loading reviews...</p>
+        <Loader2 className="w-8 h-8 text-[#3b82f6] animate-spin" />
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--dash-text-secondary)" }}>Loading reviews...</p>
       </div>
     );
   }
@@ -112,9 +112,9 @@ export default function AdminReviews() {
               key={s}
               onClick={() => setStatusFilter(s)}
               className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm",
+                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border shadow-sm",
                 statusFilter === s 
-                  ? "bg-blue-600 text-white border-blue-600" 
+                  ? "bg-[#3b82f6] text-white border-[#3b82f6]" 
                   : "bg-white text-gray-500 border-gray-100 hover:border-gray-200"
               )}
             >
@@ -129,7 +129,7 @@ export default function AdminReviews() {
         {filteredReviews.length === 0 ? (
           <div className="py-20 text-center bg-white rounded-3xl border border-gray-50 shadow-sm">
             <MessageSquare className="w-12 h-12 text-gray-100 mx-auto mb-4" />
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No reviews found</p>
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--dash-text-secondary)" }}>No reviews found</p>
           </div>
         ) : (
           filteredReviews.map((review) => (
@@ -153,7 +153,7 @@ export default function AdminReviews() {
                       ))}
                     </div>
                     <span className={cn(
-                      "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                      "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border",
                       review.status === 'active' ? "bg-green-50 text-green-600 border-green-100" :
                       review.status === 'ban' ? "bg-red-50 text-red-600 border-red-100" :
                       "bg-amber-50 text-amber-600 border-amber-100"
@@ -171,65 +171,65 @@ export default function AdminReviews() {
                        <div className="p-1.5 rounded-lg bg-gray-50 select-none">
                          <User className="w-3 h-3 text-gray-400" />
                        </div>
-                       <div className="text-[10px]">
-                         <p className="font-black text-gray-900 uppercase">{review.user?.name}</p>
-                         <p className="font-bold text-gray-400 lowercase">{review.user?.email}</p>
+                       <div className="text-xs">
+                         <p className="font-bold uppercase" style={{ color: "var(--dash-text-primary)" }}>{review.user?.name}</p>
+                         <p className="font-medium lowercase" style={{ color: "var(--dash-text-secondary)" }}>{review.user?.email}</p>
                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                        <div className="p-1.5 rounded-lg bg-gray-50 select-none">
                          <Store className="w-3 h-3 text-gray-400" />
                        </div>
-                       <div className="text-[10px]">
-                         <p className="font-black text-gray-900 uppercase">{review.restaurant?.name}</p>
-                         <p className="font-bold text-gray-400">Order #{review.order?.id?.slice(0, 8)}</p>
+                       <div className="text-xs">
+                         <p className="font-bold uppercase" style={{ color: "var(--dash-text-primary)" }}>{review.restaurant?.name}</p>
+                         <p className="font-medium" style={{ color: "var(--dash-text-secondary)" }}>Order #{review.order?.id?.slice(0, 8)}</p>
                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                        <div className="p-1.5 rounded-lg bg-gray-50 select-none">
                          <Clock className="w-3 h-3 text-gray-400" />
                        </div>
-                       <div className="text-[10px]">
-                         <p className="font-black text-gray-900 uppercase">Submitted</p>
-                         <p className="font-bold text-gray-400">{format(new Date(review.createdAt), "MMM d, yyyy")}</p>
+                       <div className="text-xs">
+                         <p className="font-bold uppercase" style={{ color: "var(--dash-text-primary)" }}>Submitted</p>
+                         <p className="font-medium" style={{ color: "var(--dash-text-secondary)" }}>{format(new Date(review.createdAt), "MMM d, yyyy")}</p>
                        </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[140px]">
-                  {review.status !== 'active' && (
-                    <button
-                      onClick={() => handleStatusUpdate(review.id, 'active')}
-                      disabled={!!updatingId}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-green-500 text-white font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Approve
-                    </button>
-                  )}
-                  {review.status !== 'ban' && (
-                    <button
-                      onClick={() => handleStatusUpdate(review.id, 'ban')}
-                      disabled={!!updatingId}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white border border-red-100 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-50"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                      Block/Ban
-                    </button>
-                  )}
-                  {review.status === 'active' && (
+                 <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[140px]">
+                   {review.status !== 'active' && (
                      <button
-                      onClick={() => handleStatusUpdate(review.id, 'inactive')}
-                      disabled={!!updatingId}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 text-gray-500 font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all disabled:opacity-50"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      Hold/Hide
-                    </button>
-                  )}
-                </div>
+                       onClick={() => handleStatusUpdate(review.id, 'active')}
+                       disabled={!!updatingId}
+                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#22c55e] text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"
+                     >
+                       <CheckCircle className="w-3.5 h-3.5" />
+                       Approve
+                     </button>
+                   )}
+                   {review.status !== 'ban' && (
+                     <button
+                       onClick={() => handleStatusUpdate(review.id, 'ban')}
+                       disabled={!!updatingId}
+                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white border border-red-100 text-[#ef4444] font-bold text-xs uppercase tracking-wider hover:bg-red-50 transition-all shadow-sm disabled:opacity-50"
+                     >
+                       <Ban className="w-3.5 h-3.5" />
+                       Block/Ban
+                     </button>
+                   )}
+                   {review.status === 'active' && (
+                      <button
+                       onClick={() => handleStatusUpdate(review.id, 'inactive')}
+                       disabled={!!updatingId}
+                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider hover:bg-gray-100 transition-all disabled:opacity-50"
+                     >
+                       <Clock className="w-3.5 h-3.5" />
+                       Hold/Hide
+                     </button>
+                   )}
+                 </div>
               </div>
             </div>
           ))

@@ -1,16 +1,8 @@
 import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and, ilike, count, asc, SQL } from "drizzle-orm";
-
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user)                 return { user: null, res: fail("Unauthorized.", 401) };
-  if (user.role !== "admin") return { user: null, res: fail("Forbidden.", 403) };
-  return { user, res: null };
-}
 
 const CreateMenuItemSchema = z.object({
   restaurantId: z.string().uuid(),
@@ -24,19 +16,17 @@ const CreateMenuItemSchema = z.object({
 
 /* ── GET /api/admin/menu ── */
 export async function GET(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
+  return withAuth(req, async () => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const search       = searchParams.get("search")       ?? "";
+      const restaurantId = searchParams.get("restaurantId") ?? "";
+      const status       = searchParams.get("status")       ?? "all";
+      const page         = Math.max(1, Number(searchParams.get("page")  ?? "1"));
+      const pageSize     = Math.min(200, Math.max(10, Number(searchParams.get("limit") ?? "100")));
+      const offset       = (page - 1) * pageSize;
 
-    const { searchParams } = new URL(req.url);
-    const search       = searchParams.get("search")       ?? "";
-    const restaurantId = searchParams.get("restaurantId") ?? "";
-    const status       = searchParams.get("status")       ?? "all";
-    const page         = Math.max(1, Number(searchParams.get("page")  ?? "1"));
-    const pageSize     = Math.min(200, Math.max(10, Number(searchParams.get("limit") ?? "100")));
-    const offset       = (page - 1) * pageSize;
-
-    const conditions: SQL[] = [];
+      const conditions: SQL[] = [];
 
     if (search) {
       conditions.push(ilike(menuItems.name, `%${search}%`));
@@ -79,23 +69,22 @@ export async function GET(req: Request) {
       price: parseFloat(r.price as unknown as string),
     }));
 
-    return ok({ items, total: countRows[0].total, page, pageSize });
-  } catch (err) {
-    console.error("[admin/menu GET]", err);
-    return fail("Failed to load menu items.", 500);
-  }
+      return ok({ items, total: countRows[0].total, page, pageSize });
+    } catch (err) {
+      console.error("[admin/menu GET]", err);
+      return fail("Failed to load menu items.", 500);
+    }
+  }, ["admin"]);
 }
 
 /* ── POST /api/admin/menu ── */
 export async function POST(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
+  return withAuth(req, async () => {
+    try {
+      const parsed = await parseBody(req, CreateMenuItemSchema);
+      if ("error" in parsed) return parsed.error;
 
-    const parsed = await parseBody(req, CreateMenuItemSchema);
-    if ("error" in parsed) return parsed.error;
-
-    const { restaurantId, name, description, category, price, status, imageUrl } = parsed.data;
+      const { restaurantId, name, description, category, price, status, imageUrl } = parsed.data;
 
     /* Verify restaurant exists */
     const [restaurant] = await db
@@ -110,14 +99,15 @@ export async function POST(req: Request) {
       .values({ restaurantId, name, description, category, price: String(price), status, imageUrl })
       .returning();
 
-    return ok({
-      ...created,
-      restaurantName:     restaurant.name,
-      restaurantLocation: restaurant.location ?? null,
-      price:              parseFloat(created.price as unknown as string),
-    });
-  } catch (err) {
-    console.error("[admin/menu POST]", err);
-    return fail("Failed to create menu item.", 500);
-  }
+      return ok({
+        ...created,
+        restaurantName:     restaurant.name,
+        restaurantLocation: restaurant.location ?? null,
+        price:              parseFloat(created.price as unknown as string),
+      });
+    } catch (err) {
+      console.error("[admin/menu POST]", err);
+      return fail("Failed to create menu item.", 500);
+    }
+  }, ["admin"]);
 }

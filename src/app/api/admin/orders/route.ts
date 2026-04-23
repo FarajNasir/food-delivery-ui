@@ -33,59 +33,37 @@ export async function GET(req: Request) {
 
         const filterCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-        // 2. Fetch aggregate stats (stats are usually independent of current page but maybe affected by filters)
-        // For admin dashboard, we often want GLOBAL stats plus filtered list.
-        const statsRes = await db
-          .select({
+        // 2. Fetch stats, count, and data in PARALLEL
+        const [statsRes, [{ count: totalCount }], allOrders] = await Promise.all([
+          // A. Aggregate stats
+          db.select({
             totalRevenue: sql<string>`COALESCE(SUM(${orders.totalAmount}), 0)`,
             totalOrders: sql<number>`CAST(COUNT(*) AS INT)`,
             pendingOrders: sql<number>`CAST(COUNT(*) FILTER (WHERE ${orders.status} = 'PENDING_CONFIRMATION') AS INT)`,
           })
           .from(orders)
-          .where(ne(orders.status, "CANCELLED"));
+          .where(ne(orders.status, "CANCELLED")),
+
+          // B. Count for pagination
+          db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+          .from(orders)
+          .where(filterCondition),
+
+          // C. Detailed order list
+          db.query.orders.findMany({
+            where: filterCondition,
+            with: {
+              user: { columns: { id: true, name: true, email: true, phone: true } },
+              restaurant: { columns: { id: true, name: true } },
+              items: { with: { menuItem: { columns: { name: true } } } },
+            },
+            orderBy: [desc(orders.createdAt)],
+            limit: limit,
+            offset: offset,
+          })
+        ]);
 
         const stats = statsRes[0] || { totalRevenue: "0", totalOrders: 0, pendingOrders: 0 };
-
-        // 3. Fetch detailed order list with pagination
-        const allOrders = await db.query.orders.findMany({
-          where: filterCondition,
-          with: {
-            user: {
-              columns: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-              },
-            },
-            restaurant: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-            // Load items only if we are not fetching 100 orders at once, 
-            // but for admin usually essential.
-            items: {
-              with: {
-                menuItem: {
-                  columns: {
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: [desc(orders.createdAt)],
-          limit: limit,
-          offset: offset,
-        });
-
-        // 4. Get total count for pagination UI
-        const [{ count }] = await db
-          .select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
-          .from(orders)
-          .where(filterCondition);
 
         return ok({
           orders: allOrders,
@@ -95,7 +73,7 @@ export async function GET(req: Request) {
             pendingOrders: stats.pendingOrders || 0,
           },
           pagination: {
-            total: count,
+            total: totalCount,
             limit,
             offset,
           }

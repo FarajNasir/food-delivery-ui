@@ -1,27 +1,26 @@
-import { ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 /* ── PATCH /api/owner/menu/[id] ── */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
+  return withAuth(req, async (user) => {
+    try {
+      if (user.role !== "owner") return fail("Unauthorized.", 401);
 
-    const body = await req.json();
-    const { id } = await params;
-    const updateData = { ...body };
+      const body = await req.json();
+      const { id } = await params;
+      const updateData = { ...body };
 
-    /* 1. Verify item exists and belongs to a restaurant owned by the user */
-    const [item] = await db
-      .select({ id: menuItems.id, restaurantId: menuItems.restaurantId })
-      .from(menuItems)
-      .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
-      .where(and(eq(menuItems.id, id), eq(restaurants.ownerId, user.id)));
+      /* 1. Verify item exists and belongs to a restaurant owned by the user */
+      const [item] = await db
+        .select({ id: menuItems.id, restaurantId: menuItems.restaurantId })
+        .from(menuItems)
+        .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
+        .where(and(eq(menuItems.id, id), eq(restaurants.ownerId, user.id)));
 
-    if (!item) return fail("Menu item not found or permission denied.", 403);
+      if (!item) return fail("Menu item not found or permission denied.", 403);
 
     /* 2. Prepare payload */
     const updatePayload: any = { ...updateData };
@@ -37,23 +36,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(menuItems.id, id))
       .returning();
 
-    return ok({
-      ...updated,
-      price: parseFloat(updated.price as unknown as string),
-    });
-  } catch (err) {
-    console.error("[owner/menu PUT]", err);
-    return fail("Failed to update menu item.", 500);
-  }
+      return ok({
+        ...updated,
+        price: parseFloat(updated.price as unknown as string),
+      });
+    } catch (err) {
+      console.error("[owner/menu PUT]", err);
+      return fail("Failed to update menu item.", 500);
+    }
+  }, ["owner"]);
 }
 
 /* ── DELETE /api/owner/menu/[id] ── */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "owner") return fail("Unauthorized.", 401);
+  return withAuth(req, async (user) => {
+    try {
+      if (user.role !== "owner") return fail("Unauthorized.", 401);
 
-    const { id } = await params;
+      const { id } = await params;
 
     /* 1. Verify ownership */
     const [item] = await db
@@ -67,9 +67,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     /* 2. Delete */
     await db.delete(menuItems).where(eq(menuItems.id, id));
 
-    return ok({ id });
-  } catch (err) {
-    console.error("[owner/menu DELETE]", err);
-    return fail("Failed to delete menu item.", 500);
-  }
+      return ok({ id });
+    } catch (err) {
+      console.error("[owner/menu DELETE]", err);
+      return fail("Failed to delete menu item.", 500);
+    }
+  }, ["owner"]);
 }
