@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { deliveryJobs, orders, restaurants, notifications, orderItems, menuItems } from "@/lib/db/schema";
+import { deliveryJobs, orders, restaurants, notifications, orderItems, menuItems, notificationChannelEnum } from "@/lib/db/schema";
 import { NotificationService } from "@/services/notification.service";
 
 type ShipdayWebhookPayload = Record<string, unknown>;
@@ -299,54 +299,32 @@ export async function POST(req: Request) {
               customerBody = `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is now dispatched!`;
             }
 
-            // 1. WhatsApp for owner
-            const [waNotif] = await db.insert(notifications).values({
-              recipientId: orderData.ownerId,
+            // 1. Notify Owner (WhatsApp + FCM)
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.ownerId,
               type: "ORDER",
               subject,
               body: ownerBody,
-              channel: "WHATSAPP",
-              status: "PENDING",
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" }
-            }).returning();
-            if (waNotif) NotificationService.trigger(waNotif.id);
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
+              channels: ["FCM", "WHATSAPP"]
+            });
 
-            // 2. FCM for owner
-            const [fcmNotif] = await db.insert(notifications).values({
-              recipientId: orderData.ownerId,
-              type: "ORDER",
-              subject,
-              body: ownerBody,
-              channel: "FCM",
-              status: "PENDING",
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" }
-            }).returning();
-            if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+            // 2. Notify Customer (FCM + WhatsApp + Optional Email)
+            const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+            if (mappedStatus === "DELIVERED") {
+              customerChannels.push("EMAIL");
+            }
 
-            // 3. WhatsApp for customer
-            const [waCustomerNotif] = await db.insert(notifications).values({
-              recipientId: orderData.userId,
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.userId,
               type: "ORDER",
               subject,
               body: customerBody,
-              channel: "WHATSAPP",
-              status: "PENDING",
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" }
-            }).returning();
-            if (waCustomerNotif) NotificationService.trigger(waCustomerNotif.id);
-
-            // 4. FCM for customer
-            const [fcmCustomerNotif] = await db.insert(notifications).values({
-              recipientId: orderData.userId,
-              type: "ORDER",
-              subject,
-              body: customerBody,
-              channel: "FCM",
-              status: "PENDING",
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" }
-            }).returning();
-            if (fcmCustomerNotif) NotificationService.trigger(fcmCustomerNotif.id);
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
+              channels: customerChannels
+            });
           }
+
       } catch (notifyErr) {
         console.error("[Shipday Webhook] Failed to notify owner:", notifyErr);
       }

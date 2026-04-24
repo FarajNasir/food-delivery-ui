@@ -65,7 +65,7 @@ export async function POST(
         .limit(1);
 
       if (restaurant) {
-        const subject = "Payment Received! 💰";
+        const subject = "Payment Received";
         
         const itemsRows = await db
           .select({
@@ -77,62 +77,33 @@ export async function POST(
           .where(eq(orderItems.orderId, order.id));
         
         const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
-        const ownerBody = `Payment Confirmed! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
+        const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
-        // 1. WhatsApp for owner
-        const [waNotif] = await db.insert(notifications).values({
-          recipientId: restaurant.ownerId,
+        // Dispatch Owner Notifications
+        await NotificationService.dispatchOrderNotifications({
+          userId: restaurant.ownerId,
           type: "ORDER",
           subject,
           body: ownerBody,
-          channel: "WHATSAPP",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" }
-        }).returning();
-        if (waNotif) NotificationService.trigger(waNotif.id);
-
-        // 2. FCM for owner
-        const [fcmNotif] = await db.insert(notifications).values({
-          recipientId: restaurant.ownerId,
-          type: "ORDER",
-          subject,
-          body: `Payment confirmed for Order #${order.id.slice(0, 8)}.`,
-          channel: "FCM",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" }
-        }).returning();
-        if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
+          channels: ["FCM", "WHATSAPP"]
+        });
       }
 
       // 5. Notify Customer
       try {
-        const subject = "Payment Confirmed! ✅";
+        const subject = "Payment Confirmed";
         const body = `Your payment was successful. The restaurant will start preparing your meal shortly.`;
 
-        // 1. WhatsApp for customer
-        const [waNotif] = await db.insert(notifications).values({
-          recipientId: order.userId,
+        // Dispatch Customer Notifications
+        await NotificationService.dispatchOrderNotifications({
+          userId: order.userId,
           type: "ORDER",
           subject,
           body,
-          channel: "WHATSAPP",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" }
-        }).returning();
-        if (waNotif) NotificationService.trigger(waNotif.id);
-
-        // 2. FCM for customer
-        const fcmNotifData = {
-          recipientId: order.userId,
-          type: "ORDER",
-          subject,
-          body,
-          channel: "FCM",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" }
-        } as const;
-        const [fcmNotif] = await db.insert(notifications).values(fcmNotifData).returning();
-        if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" },
+          channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+        });
       } catch (notifyErr) {
         console.error("[Stripe Verify] Failed to notify customer:", notifyErr);
       }

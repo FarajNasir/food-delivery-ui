@@ -65,7 +65,7 @@ export async function POST(
               .limit(1);
 
             if (restaurant) {
-              const subject = "Payment Received! 💰";
+              const subject = "Payment Received";
               
               const itemsRows = await tx
                 .select({
@@ -77,65 +77,37 @@ export async function POST(
                 .where(eq(orderItems.orderId, order.id));
               
               const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
-              const ownerBody = `Payment Confirmed! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
+              const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
-              // 1. WhatsApp for owner
-              const [waNotif] = await tx.insert(notifications).values({
-                recipientId: restaurant.ownerId,
+              // Dispatch Owner Notifications
+              await NotificationService.dispatchOrderNotifications({
+                userId: restaurant.ownerId,
                 type: "ORDER",
                 subject,
                 body: ownerBody,
-                channel: "WHATSAPP",
-                status: "PENDING",
-                metadata: { orderId: order.id, orderStatus: "PAID" }
-              }).returning();
-              if (waNotif) NotificationService.trigger(waNotif.id);
-
-              // 2. FCM for owner
-              const [fcmNotif] = await tx.insert(notifications).values({
-                recipientId: restaurant.ownerId,
-                type: "ORDER",
-                subject,
-                body: `Payment confirmed for Order #${order.id.slice(0, 8)}.`,
-                channel: "FCM",
-                status: "PENDING",
-                metadata: { orderId: order.id, orderStatus: "PAID" }
-              }).returning();
-              if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+                metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
+                channels: ["FCM", "WHATSAPP"]
+              });
             }
           } catch (notifyErr) {
             console.error("Failed to notify restaurant:", notifyErr);
           }
         }
 
-        // 5. Notify Customer (once)
+        // 5. Notify Customer (once per session)
         try {
-          const subject = "Payment Confirmed! ✅";
-          const body = `Your payment was successful. The restaurants will start preparing your meal shortly.`;
+          const subject = "Payment Confirmed";
+          const body = "Your payment was successful. The restaurants will start preparing your meal shortly.";
 
-          // 1. WhatsApp for customer
-          const [waNotif] = await tx.insert(notifications).values({
-            recipientId: user.id,
+          // Dispatch Customer Notifications
+          await NotificationService.dispatchOrderNotifications({
+            userId: user.id,
             type: "ORDER",
             subject,
             body,
-            channel: "WHATSAPP",
-            status: "PENDING",
-            metadata: { sessionId: id, status: "PAID" }
-          }).returning();
-          if (waNotif) NotificationService.trigger(waNotif.id);
-
-          // 2. FCM for customer
-          const [fcmNotif] = await tx.insert(notifications).values({
-            recipientId: user.id,
-            type: "ORDER",
-            subject,
-            body,
-            channel: "FCM",
-            status: "PENDING",
-            metadata: { sessionId: id, status: "PAID" }
-          }).returning();
-          if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+            metadata: { sessionId: id, status: "PAID", targetRole: "customer" },
+            channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+          });
         } catch (notifyErr) {
           console.error("Failed to notify customer:", notifyErr);
         }

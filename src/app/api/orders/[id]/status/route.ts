@@ -1,6 +1,6 @@
 import { ok, fail, parseBody, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants, orderSessions, notifications, orderItems, menuItems } from "@/lib/db/schema";
+import { orders, restaurants, orderSessions, notifications, orderItems, menuItems, notificationChannelEnum } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { syncSessionStatus } from "@/lib/order-session";
@@ -142,7 +142,7 @@ export async function PATCH(
 
         if (resto) {
           const statusText = status.replace(/_/g, " ").toLowerCase();
-          const subject = `Order Update: #${id.slice(0, 8)}`;
+          const subject = status === "PAID" ? "Payment Confirmed" : `Order Update: #${id.slice(0, 8)}`;
           
           const itemsRows = await db
             .select({
@@ -156,55 +156,32 @@ export async function PATCH(
           const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
           const ownerBody = `Order Update: #${id.slice(0, 8)}\nRestaurant: ${resto.name}\nStatus: ${statusText.toUpperCase()}\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
-          // 1. WhatsApp for owner
-          const [waNotif] = await db.insert(notifications).values({
-            recipientId: resto.ownerId,
+          // Dispatch Owner Notifications
+          await NotificationService.dispatchOrderNotifications({
+            userId: resto.ownerId,
             type: "ORDER",
             subject,
             body: ownerBody,
-            channel: "WHATSAPP",
-            status: "PENDING",
-            metadata: { orderId: id, orderStatus: status }
-          }).returning();
-          if (waNotif) NotificationService.trigger(waNotif.id);
-
-          // 2. FCM for owner
-          const [fcmNotif] = await db.insert(notifications).values({
-            recipientId: resto.ownerId,
-            type: "ORDER",
-            subject,
-            body: `Order #${id.slice(0, 8)} is now ${statusText.toUpperCase()}.`,
-            channel: "FCM",
-            status: "PENDING",
-            metadata: { orderId: id, orderStatus: status }
-          }).returning();
-          if (fcmNotif) NotificationService.trigger(fcmNotif.id);
+            metadata: { orderId: id, orderStatus: status },
+            channels: ["FCM", "WHATSAPP"]
+          });
 
           const customerBody = `Your order #${id.slice(0, 8)} from ${resto.name} is now ${statusText.toUpperCase()}.`;
 
-          // 3. WhatsApp for customer
-          const [waCustomerNotif] = await db.insert(notifications).values({
-            recipientId: order.userId,
-            type: "ORDER",
-            subject,
-            body: customerBody,
-            channel: "WHATSAPP",
-            status: "PENDING",
-            metadata: { orderId: id, orderStatus: status }
-          }).returning();
-          if (waCustomerNotif) NotificationService.trigger(waCustomerNotif.id);
+          // Dispatch Customer Notifications
+          const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+          if (["CONFIRMED", "PAID", "DELIVERED"].includes(status)) {
+            customerChannels.push("EMAIL");
+          }
 
-          // 4. FCM for customer
-          const [fcmCustomerNotif] = await db.insert(notifications).values({
-            recipientId: order.userId,
+          await NotificationService.dispatchOrderNotifications({
+            userId: order.userId,
             type: "ORDER",
             subject,
             body: customerBody,
-            channel: "FCM",
-            status: "PENDING",
-            metadata: { orderId: id, orderStatus: status }
-          }).returning();
-          if (fcmCustomerNotif) NotificationService.trigger(fcmCustomerNotif.id);
+            metadata: { orderId: id, orderStatus: status },
+            channels: customerChannels
+          });
         }
       } catch (notifyErr) {
         console.error("[api/orders/status] Failed to notify owner:", notifyErr);

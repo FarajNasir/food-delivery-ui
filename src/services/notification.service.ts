@@ -1,7 +1,8 @@
 import { messaging } from "@/lib/firebase-admin";
 import { db } from "@/lib/db";
-import { notifications, users } from "@/lib/db/schema";
+import { notifications, users, type notificationTypeEnum, type notificationChannelEnum } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import sgMail from "@sendgrid/mail";
 // Require twilio; gracefully handle if not installed
 let twilioClient: any = null;
 try {
@@ -16,6 +17,10 @@ try {
 }
 
 const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 /**
  * notification.service.ts - Handles sending FCM notifications and tracking their status.
@@ -198,6 +203,123 @@ export class NotificationService {
   }
 
   /**
+   * Processes a pending notification and sends it via SendGrid Email.
+   */
+  static async sendEmail(notificationId: string) {
+    try {
+      const [result] = await db
+        .select({
+          notification: notifications,
+          user: {
+            email: users.email
+          }
+        })
+        .from(notifications)
+        .innerJoin(users, eq(notifications.recipientId, users.id))
+        .where(eq(notifications.id, notificationId))
+        .limit(1);
+
+      if (!result) {
+        console.error(`[NotificationService] Notification or User for ${notificationId} not found.`);
+        return;
+      }
+
+      const { notification, user } = result;
+
+      if (notification.channel !== "EMAIL") {
+        console.log(`[NotificationService] Notification ${notificationId} is not for EMAIL channel.`);
+        return;
+      }
+
+      if (!user?.email) {
+        console.warn(`[NotificationService] No email found for user ${notification.recipientId}. EMAIL skipped.`);
+        await db
+          .update(notifications)
+          .set({ status: "FAILED" })
+          .where(eq(notifications.id, notificationId));
+        return;
+      }
+
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+      if (!fromEmail) {
+        console.error("[NotificationService] SENDGRID_FROM_EMAIL is not configured.");
+        await db
+          .update(notifications)
+          .set({ status: "FAILED" })
+          .where(eq(notifications.id, notificationId));
+        return;
+      }
+
+      console.log(`[NotificationService] Sending Email to ${user.email}. Subject: ${notification.subject}`);
+
+      const msg = {
+        to: user.email,
+        from: fromEmail,
+        subject: notification.subject,
+        text: notification.body,
+        html: notification.body.replace(/\n/g, "<br/>"), // Simple text to HTML fallback
+      };
+
+      const [response] = await sgMail.send(msg);
+      console.log(`[NotificationService] SendGrid response: ${response.statusCode}`);
+
+      await db
+        .update(notifications)
+        .set({ status: "SENT" })
+        .where(eq(notifications.id, notificationId));
+
+      console.log(`[NotificationService] Email sent successfully for notification ${notificationId}`);
+    } catch (error) {
+      console.error(`[NotificationService] Error sending Email for ${notificationId}:`, error);
+      
+      await db
+        .update(notifications)
+        .set({ status: "FAILED" })
+        .where(eq(notifications.id, notificationId));
+    }
+  }
+
+  /**
+   * Central helper to dispatch notifications across multiple channels.
+   * Ensures consistency and reduces boilerplate in API routes.
+   */
+  static async dispatchOrderNotifications(params: {
+    userId: string;
+    type: (typeof notificationTypeEnum)[number];
+    subject: string;
+    body: string;
+    metadata?: any;
+    channels?: (typeof notificationChannelEnum)[number][];
+  }) {
+    const { userId, type, subject, body, metadata, channels = ["FCM", "WHATSAPP"] } = params;
+
+    console.log(`[NotificationService] Dispatching ${channels.length} notifications to user ${userId} (Type: ${type})`);
+
+    const results = [];
+    for (const channel of channels) {
+      try {
+        const [notif] = await db.insert(notifications).values({
+          recipientId: userId,
+          type,
+          subject,
+          body,
+          channel,
+          status: "PENDING",
+          metadata,
+        }).returning();
+
+        if (notif) {
+          this.trigger(notif.id);
+          results.push(notif.id);
+        }
+      } catch (err) {
+        console.error(`[NotificationService] Failed to insert ${channel} notification:`, err);
+      }
+    }
+    return results;
+  }
+
+  /**
    * Helper to trigger a new notification send.
    * Can be called after inserting a notification row.
    */
@@ -220,6 +342,8 @@ export class NotificationService {
         await this.sendFCM(notificationId);
       } else if (notif.channel === "WHATSAPP") {
         await this.sendWhatsApp(notificationId);
+      } else if (notif.channel === "EMAIL") {
+        await this.sendEmail(notificationId);
       }
     };
 
