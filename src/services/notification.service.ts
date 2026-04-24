@@ -1,18 +1,35 @@
 import { messaging } from "@/lib/firebase-admin";
 import { db } from "@/lib/db";
-import { notifications, users, type notificationTypeEnum, type notificationChannelEnum } from "@/lib/db/schema";
+import {
+  notifications,
+  users,
+  orders,
+  orderItems,
+  menuItems,
+  restaurants,
+  type notificationTypeEnum,
+  type notificationChannelEnum,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
-// Require twilio; gracefully handle if not installed
-let twilioClient: any = null;
+import twilio from "twilio";
+import {
+  buildOrderConfirmedEmailTemplate,
+  buildOrderDeliveredEmailTemplate,
+  buildPaymentConfirmedEmailTemplate,
+} from "@/templates/email";
+
+type NotificationMetadata = Record<string, unknown>;
+
+// Gracefully handle if Twilio env vars are not configured
+let twilioClient: ReturnType<typeof twilio> | null = null;
 try {
-  const twilio = require("twilio");
   const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
   if (twilioAccountSid && twilioAuthToken) {
     twilioClient = twilio(twilioAccountSid, twilioAuthToken);
   }
-} catch (e) {
+} catch {
   console.warn("[NotificationService] Twilio package not found. WhatsApp notifications will not be sent.");
 }
 
@@ -20,6 +37,63 @@ const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+type OrderEmailData = {
+  orderId: string;
+  status: string;
+  restaurantName: string;
+  restaurantLocation: string | null;
+  totalAmount: string;
+  deliveryFee: string;
+  currency: string;
+  deliveryAddress: string | null;
+  createdAt: Date | null;
+  items: Array<{ name: string; quantity: number; price: string }>;
+};
+
+async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null> {
+  const [order] = await db
+    .select({
+      id: orders.id,
+      status: orders.status,
+      totalAmount: orders.totalAmount,
+      deliveryFee: orders.deliveryFee,
+      currency: orders.currency,
+      deliveryAddress: orders.deliveryAddress,
+      createdAt: orders.createdAt,
+      restaurantName: restaurants.name,
+      restaurantLocation: restaurants.location,
+    })
+    .from(orders)
+    .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order) return null;
+
+  const items = await db
+    .select({
+      name: menuItems.name,
+      quantity: orderItems.quantity,
+      price: orderItems.price,
+    })
+    .from(orderItems)
+    .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+    .where(eq(orderItems.orderId, orderId));
+
+  return {
+    orderId: order.id,
+    status: order.status,
+    restaurantName: order.restaurantName,
+    restaurantLocation: order.restaurantLocation,
+    totalAmount: order.totalAmount,
+    deliveryFee: order.deliveryFee,
+    currency: order.currency,
+    deliveryAddress: order.deliveryAddress,
+    createdAt: order.createdAt,
+    items,
+  };
 }
 
 /**
@@ -252,12 +326,28 @@ export class NotificationService {
 
       console.log(`[NotificationService] Sending Email to ${user.email}. Subject: ${notification.subject}`);
 
+      const metadata = (notification.metadata as NotificationMetadata | null) ?? null;
+      const orderId = typeof metadata?.orderId === "string" ? metadata.orderId : null;
+      const orderEmailData = notification.type === "ORDER" && orderId
+        ? await getOrderEmailData(orderId)
+        : null;
+
+      const html = orderEmailData
+        ? orderEmailData.status === "CONFIRMED"
+          ? buildOrderConfirmedEmailTemplate(notification.subject, notification.body, orderEmailData)
+          : orderEmailData.status === "PAID"
+            ? buildPaymentConfirmedEmailTemplate(notification.subject, notification.body, orderEmailData)
+            : orderEmailData.status === "DELIVERED"
+              ? buildOrderDeliveredEmailTemplate(notification.subject, notification.body, orderEmailData)
+              : notification.body.replace(/\n/g, "<br/>")
+        : notification.body.replace(/\n/g, "<br/>");
+
       const msg = {
         to: user.email,
         from: fromEmail,
         subject: notification.subject,
         text: notification.body,
-        html: notification.body.replace(/\n/g, "<br/>"), // Simple text to HTML fallback
+        html,
       };
 
       const [response] = await sgMail.send(msg);
@@ -288,43 +378,45 @@ export class NotificationService {
     type: (typeof notificationTypeEnum)[number];
     subject: string;
     body: string;
-    metadata?: any;
+    metadata?: NotificationMetadata;
     channels?: (typeof notificationChannelEnum)[number][];
   }) {
     const { userId, type, subject, body, metadata, channels = ["FCM", "WHATSAPP"] } = params;
 
     console.log(`[NotificationService] Dispatching ${channels.length} notifications to user ${userId} (Type: ${type})`);
 
-    const results = [];
-    for (const channel of channels) {
-      try {
-        const [notif] = await db.insert(notifications).values({
+    try {
+      const insertedNotifications = await db.insert(notifications).values(
+        channels.map((channel) => ({
           recipientId: userId,
           type,
           subject,
           body,
           channel,
-          status: "PENDING",
+          status: "PENDING" as const,
           metadata,
-        }).returning();
+        }))
+      ).returning({ id: notifications.id });
 
-        if (notif) {
-          this.trigger(notif.id);
-          results.push(notif.id);
-        }
-      } catch (err) {
-        console.error(`[NotificationService] Failed to insert ${channel} notification:`, err);
-      }
+      await Promise.all(
+        insertedNotifications.map(async (notif) => {
+          await this.trigger(notif.id);
+        })
+      );
+
+      return insertedNotifications.map((notif) => notif.id);
+    } catch (err) {
+      console.error("[NotificationService] Failed to insert notifications:", err);
+      return [];
     }
-    return results;
   }
 
   /**
    * Helper to trigger a new notification send.
    * Can be called after inserting a notification row.
    */
-  static trigger(notificationId: string) {
-    const run = async () => {
+  static async trigger(notificationId: string) {
+    try {
       const [notif] = await db
         .select({ channel: notifications.channel })
         .from(notifications)
@@ -345,10 +437,8 @@ export class NotificationService {
       } else if (notif.channel === "EMAIL") {
         await this.sendEmail(notificationId);
       }
-    };
-
-    run().catch(err => {
-      console.error("[NotificationService] Background trigger failed:", err);
-    });
+    } catch (err) {
+      console.error("[NotificationService] Trigger failed:", err);
+    }
   }
 }

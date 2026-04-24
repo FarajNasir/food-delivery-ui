@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useOrders } from "@/context/OrderContext";
 import { useSite } from "@/context/SiteContext";
 import {
@@ -19,6 +19,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Timer } from "lucide-react";
 import { useOrderTimer } from "@/hooks/useOrderTimer";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; description: string; step: number }> = {
   PENDING_CONFIRMATION: {
@@ -81,7 +82,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; d
 
 export default function OrderStatusPage() {
   const { id } = useParams();
-  const { orders, loading, updateOrderStatus } = useOrders();
+  const { orders, loading, refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const [isPaying, setIsPaying] = React.useState(false);
@@ -91,14 +92,18 @@ export default function OrderStatusPage() {
   const handleExpire = async () => {
     if (!order || order.status !== "PENDING_CONFIRMATION") return;
     try {
+      const session = useAuthStore.getState().session;
       const res = await fetch(`/api/orders/${order.id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
+        },
         body: JSON.stringify({ status: "CANCELLED" }),
       });
       if (res.ok) {
         toast.error("Order expired as the restaurant did not respond in time.");
-        updateOrderStatus(order.id, "CANCELLED");
+        await refreshOrders();
       }
     } catch (err) {
       console.error("[handleExpire]", err);
@@ -116,8 +121,12 @@ export default function OrderStatusPage() {
 
     try {
       setIsPaying(true);
+      const session = useAuthStore.getState().session;
       const res = await fetch(`/api/orders/${order.id}/stripe/session`, {
         method: "POST",
+        headers: {
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
+        },
       });
       const data = await res.json();
 

@@ -2,7 +2,9 @@
 
 import React from "react";
 import { useOrders } from "@/context/OrderContext";
+import { useCart } from "@/context/CartContext";
 import { useSite } from "@/context/SiteContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   ShoppingBag, Clock, CheckCircle2, CreditCard,
   Package, Truck, AlertCircle, Loader2, RefreshCw,
@@ -92,14 +94,13 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
 };
 
 export default function CustomerOrdersPage() {
-  const { 
-    orders, 
-    loading, 
-    pagination, 
-    updateOrderStatus, 
-    refreshOrders, 
-    reorder 
+  const {
+    orders,
+    loading,
+    pagination,
+    refreshOrders
   } = useOrders();
+  const { replaceCart } = useCart();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
@@ -108,13 +109,21 @@ export default function CustomerOrdersPage() {
   const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+  const expiringOrdersRef = React.useRef<Set<string>>(new Set());
 
   const handleReorder = async (orderId: string) => {
     try {
       setIsReordering(orderId);
-      const res = await reorder(orderId);
-      if (res.success && res.orderId) {
-        router.push(`/dashboard/customer/status/${res.orderId}`);
+      const order = orders.find((item) => item.id === orderId);
+      const reorderItems = order?.items?.map((item) => ({
+        menuItemId: item.menuItem?.id,
+        quantity: item.quantity,
+      })).filter((item): item is { menuItemId: string; quantity: number } => Boolean(item.menuItemId)) ?? [];
+
+      const success = await replaceCart(reorderItems);
+      if (success) {
+        toast.success("Your previous items are ready in checkout.");
+        router.push("/dashboard/customer/checkout");
       }
     } finally {
       setIsReordering(null);
@@ -124,7 +133,13 @@ export default function CustomerOrdersPage() {
   const handlePayment = async (orderId: string) => {
     try {
       setIsPaying(orderId);
-      const res = await fetch(`/api/orders/${orderId}/stripe/session`, { method: "POST" });
+      const session = useAuthStore.getState().session;
+      const res = await fetch(`/api/orders/${orderId}/stripe/session`, {
+        method: "POST",
+        headers: {
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
+        },
+      });
       const data = await res.json();
       const sessionUrl = data.url || data.data?.url;
       if (sessionUrl) {
@@ -140,9 +155,52 @@ export default function CustomerOrdersPage() {
   };
 
   const handleExpire = async (orderId: string) => {
-    await updateOrderStatus(orderId, "CANCELLED");
-    toast.error("Restaurant didn't respond in time. Order cancelled.");
+    try {
+      const session = useAuthStore.getState().session;
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
+        },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.message || data?.error || "Failed to cancel expired order.");
+        return;
+      }
+
+      await refreshOrders();
+      toast.error("Restaurant didn't respond in time. Order cancelled.");
+    } catch {
+      toast.error("A network error occurred. Please try again.");
+    } finally {
+      expiringOrdersRef.current.delete(orderId);
+    }
   };
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+
+      orders.forEach((order) => {
+        if (order.status !== "PENDING_CONFIRMATION") return;
+        if (expiringOrdersRef.current.has(order.id)) return;
+
+        const createdAt = new Date(order.createdAt).getTime();
+        const expiresAt = createdAt + (5 * 60 * 1000);
+
+        if (now >= expiresAt) {
+          expiringOrdersRef.current.add(order.id);
+          void handleExpire(order.id);
+        }
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [orders]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -362,10 +420,10 @@ export default function CustomerOrdersPage() {
               </div>
             </div>
           )}
-          
+
           {/* Pagination */}
           {!loading && (
-            <Pagination 
+            <Pagination
               total={pagination.total}
               page={pagination.page}
               limit={pagination.limit}
@@ -387,16 +445,16 @@ export default function CustomerOrdersPage() {
   );
 }
 
-function Pagination({ 
-  total, 
-  page, 
-  limit, 
-  onPageChange, 
-  accent 
-}: { 
-  total: number; 
-  page: number; 
-  limit: number; 
+function Pagination({
+  total,
+  page,
+  limit,
+  onPageChange,
+  accent
+}: {
+  total: number;
+  page: number;
+  limit: number;
   onPageChange: (p: number) => void;
   accent?: string;
 }) {
@@ -408,21 +466,21 @@ function Pagination({
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
   const adjustedStart = Math.max(1, end - 4);
-  
+
   for (let i = adjustedStart; i <= end; i++) {
     pages.push(i);
   }
 
   return (
     <div className="flex items-center justify-center gap-2 mt-12 py-6">
-      <button 
+      <button
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
         className="p-2.5 rounded-2xl bg-white border border-gray-100 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
       >
         <ChevronLeft className="w-5 h-5 text-gray-500" />
       </button>
-      
+
       <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm">
         {pages.map((p) => (
           <button
@@ -430,8 +488,8 @@ function Pagination({
             onClick={() => onPageChange(p)}
             className={cn(
               "w-11 h-11 rounded-2xl text-xs font-black transition-all duration-300 active:scale-90",
-              page === p 
-                ? "text-white shadow-md scale-105" 
+              page === p
+                ? "text-white shadow-md scale-105"
                 : "text-gray-400 hover:bg-gray-50 hover:text-gray-900"
             )}
             style={page === p ? { background: accent || "black" } : {}}
@@ -441,7 +499,7 @@ function Pagination({
         ))}
       </div>
 
-      <button 
+      <button
         disabled={page === totalPages}
         onClick={() => onPageChange(page + 1)}
         className="p-2.5 rounded-2xl bg-white border border-gray-100 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"

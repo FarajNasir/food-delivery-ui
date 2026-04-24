@@ -1,6 +1,6 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orderSessions, orders, orderItems, menuItems } from "@/lib/db/schema";
+import { orderSessions, orders, orderItems, menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
@@ -34,8 +34,13 @@ export async function POST(
 
       // 2. Fetch all CONFIRMED orders in this session
       const confirmedOrders = await db
-        .select()
+        .select({
+          id: orders.id,
+          deliveryFee: orders.deliveryFee,
+          restaurantLocation: restaurants.location,
+        })
         .from(orders)
+        .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
         .where(and(eq(orders.sessionId, id), eq(orders.status, "CONFIRMED")));
 
       if (confirmedOrders.length === 0) {
@@ -73,7 +78,10 @@ export async function POST(
       }));
 
       // 5. Add delivery fee line item (sum of all accepted restaurants)
-      const totalDeliveryFee = confirmedOrders.reduce((sum, o) => sum + parseFloat(o.deliveryFee), 0);
+      const totalDeliveryFee = confirmedOrders.reduce((sum, o) => {
+        if (o.restaurantLocation !== "Kilkeel") return sum;
+        return sum + parseFloat(o.deliveryFee);
+      }, 0);
       if (totalDeliveryFee > 0) {
         lineItems.push({
           price_data: {

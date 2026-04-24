@@ -22,6 +22,7 @@ export async function POST(
       const order = await db.query.orders.findFirst({
         where: and(eq(orders.id, id), eq(orders.userId, user.id)),
         with: {
+          restaurant: true,
           items: {
             with: {
               menuItem: true,
@@ -33,6 +34,8 @@ export async function POST(
       if (!order) {
         return fail("Order not found.", 404);
       }
+
+      const chargeDeliveryOnline = order.restaurant?.location === "Kilkeel";
 
       const host = (await headers()).get("host");
       const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
@@ -57,7 +60,7 @@ export async function POST(
       });
 
       // Add delivery fee line item
-      if (parseFloat(order.deliveryFee as string) > 0) {
+      if (chargeDeliveryOnline && parseFloat(order.deliveryFee as string) > 0) {
         lineItems.push({
           price_data: {
             currency: (order.currency || "GBP").toLowerCase(),

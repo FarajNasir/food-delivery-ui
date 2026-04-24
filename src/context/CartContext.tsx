@@ -28,6 +28,7 @@ interface CartContextType {
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
   clearCart: (silent?: boolean) => Promise<void>;
+  replaceCart: (items: { menuItemId: string; quantity: number }[]) => Promise<boolean>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -284,6 +285,70 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isGuest, cartItems]);
 
+  const replaceCart = useCallback(async (items: { menuItemId: string; quantity: number }[]) => {
+    if (items.length === 0) {
+      toast.error("This order has no items to reorder.");
+      return false;
+    }
+
+    if (isGuest) {
+      toast.error("Please sign in to reorder.");
+      return false;
+    }
+
+    let accessToken: string | undefined | null = useAuthStore.getState().session?.access_token;
+    if (!accessToken) {
+      accessToken = await getFreshToken();
+    }
+
+    if (!accessToken) {
+      toast.error("Your session expired. Please sign in again.");
+      return false;
+    }
+
+    const backup = [...cartItems];
+    setLoading(true);
+
+    try {
+      const clearRes = await fetch("/api/cart/clear", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!clearRes.ok) {
+        throw new Error("CLEAR_FAILED");
+      }
+
+      for (const item of items) {
+        const addRes = await fetch("/api/cart", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(item),
+        });
+
+        if (!addRes.ok) {
+          const data = await addRes.json().catch(() => null);
+          throw new Error(data?.error || data?.message || "ADD_FAILED");
+        }
+      }
+
+      await fetchDBCart(accessToken);
+      return true;
+    } catch (error) {
+      console.error("[CartContext] Failed to replace cart:", error);
+      setCartItems(backup);
+      toast.error("Failed to prepare your reorder. Please try again.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [cartItems, fetchDBCart, isGuest]);
+
   useEffect(() => {
     if (prevSiteRef.current !== site.key) {
       prevSiteRef.current = site.key;
@@ -304,7 +369,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     removeItem,
     updateQuantity,
     clearCart,
-  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart]);
+    replaceCart,
+  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart, replaceCart]);
 
   return (
     <CartContext.Provider value={value}>

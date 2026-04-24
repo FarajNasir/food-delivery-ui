@@ -2,12 +2,11 @@
 
 import React from "react";
 import {
-  Clock, CreditCard, ChevronRight, Star, Loader2,
-  ShoppingBag, Timer, PackageCheck, Truck, Package, AlertCircle, CheckCircle2, RotateCcw,
+  Clock, CreditCard, ChevronRight, Loader2, Star, RotateCcw,
+  ShoppingBag, Truck, Package, AlertCircle, CheckCircle2,
   Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOrderTimer } from "@/hooks/useOrderTimer";
 
 interface OrderSession {
   id: string;
@@ -23,8 +22,11 @@ interface OrderSessionCardProps {
   accent: string;
   gradientFrom: string;
   isPaying: boolean;
+  isReordering?: string | null;
   onPay: (id: string) => void;
   onTrack: (subOrderId: string) => void;
+  onReorder?: (subOrderId: string) => void;
+  onRate?: (order: any) => void;
 }
 
 const SESSION_STATUS_CONFIG: Record<string, any> = {
@@ -50,16 +52,41 @@ export default function OrderSessionCard({
   accent,
   gradientFrom,
   isPaying,
+  isReordering,
   onPay,
-  onTrack
+  onTrack,
+  onReorder,
+  onRate
 }: OrderSessionCardProps) {
   const config = SESSION_STATUS_CONFIG[session.status] || SESSION_STATUS_CONFIG.PENDING;
-  
+
   const date = new Date(session.createdAt).toLocaleDateString("en-GB", {
     day: "numeric", month: "short", year: "numeric",
   });
 
-  const totalAmount = parseFloat(session.totalItemsAmount) + parseFloat(session.totalDeliveryFee);
+  const sessionItemsAmount = Number.parseFloat(session.totalItemsAmount || "0");
+  const sessionDeliveryFee = Number.parseFloat(session.totalDeliveryFee || "0");
+  const sessionTotalAmount = sessionItemsAmount + sessionDeliveryFee;
+  const derivedTotalAmount = session.orders.reduce((sum, order) => {
+    const itemTotal = Number.parseFloat(order.totalAmount || "0");
+    const deliveryTotal = Number.parseFloat(order.deliveryFee || "0");
+    return sum + itemTotal + deliveryTotal;
+  }, 0);
+  const totalAmount = sessionTotalAmount > 0 ? sessionTotalAmount : derivedTotalAmount;
+  const restaurantCount = session.orders.length;
+  const itemCount = session.orders.reduce((sum, order) => {
+    return sum + ((order.items || []).reduce((itemSum: number, item: any) => itemSum + (item.quantity || 0), 0));
+  }, 0);
+  const subtitle = `${date} · ${restaurantCount} restaurant${restaurantCount !== 1 ? "s" : ""} · ${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+  const sessionTitle = restaurantCount > 1 ? "Group Order" : "Order Summary";
+  const sessionDescription =
+    session.status === "READY_TO_PAY"
+      ? "Everything is confirmed. Complete payment to lock it in."
+      : session.status === "PAID"
+        ? "Paid successfully. We'll keep you updated as each kitchen progresses."
+        : session.status === "CANCELLED"
+          ? "This order could not be completed."
+          : "We're checking with the restaurant and lining everything up.";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md">
@@ -67,19 +94,23 @@ export default function OrderSessionCard({
       
       <div className="p-4 space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-100">
-              <ShoppingBag className="w-4 h-4 text-gray-400" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center border shrink-0"
+              style={{ background: `${config.hex}12`, borderColor: `${config.hex}22` }}
+            >
+              <ShoppingBag className="w-5 h-5" style={{ color: config.hex }} />
             </div>
-            <div>
-              <p className="text-xs font-black text-gray-900 uppercase tracking-tight">Order Session</p>
-              <p className="text-[10px] text-gray-400">{date} · {session.orders.length} Restaurant{session.orders.length !== 1 ? "s" : ""}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-black text-gray-900 leading-tight">{sessionTitle}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">{subtitle}</p>
+              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{sessionDescription}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="font-black text-gray-900 text-sm">£{totalAmount.toFixed(2)}</p>
-            <span className={cn("inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mt-1", config.bg, config.color)}>
+          <div className="text-right shrink-0">
+            <p className="font-black text-gray-900 text-lg leading-none">£{totalAmount.toFixed(2)}</p>
+            <span className={cn("inline-flex items-center text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full mt-2", config.bg, config.color)}>
               {config.label}
             </span>
           </div>
@@ -90,31 +121,76 @@ export default function OrderSessionCard({
           {session.orders.map((order) => {
             const subConfig = SUB_ORDER_STATUS_CONFIG[order.status] || { label: order.status, color: "text-gray-400", icon: Clock };
             const StatusIcon = subConfig.icon;
+            const orderItemSummary = (order.items || [])
+              .slice(0, 2)
+              .map((i: any) => `${i.quantity}x ${i.itemName || i.menuItem?.name || "Item"}`)
+              .join(", ");
+            const remainingItemCount = Math.max((order.items || []).length - 2, 0);
+            const orderTotalAmount =
+              Number.parseFloat(order.totalAmount || "0") + Number.parseFloat(order.deliveryFee || "0");
+            const isDelivered = order.status === "DELIVERED";
             
             return (
-              <div key={order.id} className="bg-gray-50/50 rounded-xl p-3 border border-gray-100/50 space-y-2">
+              <div key={order.id} className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-3.5 border border-gray-100 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Store className="w-3 h-3 text-gray-400" />
-                    <span className="text-xs font-bold text-gray-700">{order.restaurant?.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-gray-100 flex items-center justify-center shrink-0">
+                      <Store className="w-3.5 h-3.5 text-gray-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-sm font-bold text-gray-800 truncate">
+                        {order.restaurant?.name || "Restaurant"}
+                      </span>
+                      <span className="block text-[11px] text-gray-400">
+                        £{orderTotalAmount.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white border border-gray-100">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-gray-100 shrink-0">
                     <StatusIcon className={cn("w-2.5 h-2.5", subConfig.color)} />
                     <span className={cn("text-[9px] font-bold uppercase", subConfig.color)}>{subConfig.label}</span>
                   </div>
                 </div>
                 
-                {/* Item summary for this sub-order */}
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400 font-medium">
-                    {order.items?.map((i: any) => `${i.quantity}x ${i.menuItem?.name}`).join(", ")}
+                  <p className="text-[11px] text-gray-500 font-medium pr-3">
+                    {orderItemSummary || "Items are being prepared for this restaurant."}
+                    {remainingItemCount > 0 ? ` +${remainingItemCount} more` : ""}
                   </p>
-                  <button 
-                    onClick={() => onTrack(order.id)}
-                    className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-0.5 hover:text-gray-600 transition-colors"
-                  >
-                    Track <ChevronRight className="w-2.5 h-2.5" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isDelivered && onRate && !order.review && (
+                      <button
+                        onClick={() => onRate({
+                          ...order,
+                          restaurant: order.restaurant || { name: order.restaurantName },
+                        })}
+                        className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5 transition-all hover:opacity-90"
+                        style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
+                      >
+                        <Star className="w-3 h-3 fill-white" />
+                        Review
+                      </button>
+                    )}
+
+                    {isDelivered && onReorder && (
+                      <button
+                        onClick={() => onReorder(order.id)}
+                        disabled={isReordering === order.id}
+                        className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5 transition-all hover:opacity-90 disabled:opacity-50"
+                        style={{ background: "linear-gradient(135deg, #22C55E, #16A34A)" }}
+                      >
+                        {isReordering === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                        Reorder
+                      </button>
+                    )}
+
+                    <button 
+                      onClick={() => onTrack(order.id)}
+                      className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-0.5 hover:text-gray-700 transition-colors"
+                    >
+                      Track <ChevronRight className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

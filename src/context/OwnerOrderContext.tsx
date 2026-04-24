@@ -41,32 +41,11 @@ export function OwnerOrderProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!isReady) return;
 
-    let heartbeatInterval: NodeJS.Timeout | null = null;
-
     if (session && (role === "owner" || role === "admin")) {
       console.log("[OwnerOrderContext] Syncing with owner store...");
       refreshOrders().catch(() => { });
-
-      const sendHeartbeat = () => {
-        const s = useAuthStore.getState().session;
-        if (s) {
-          fetch("/api/user/heartbeat", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${s.access_token}` }
-          }).catch(() => { });
-        }
-      };
-
-      if (!heartbeatInterval) {
-        sendHeartbeat(); // Fire immediately on mount
-        heartbeatInterval = setInterval(sendHeartbeat, 60000); // Increased to 60s
-      }
-    }
-
-    return () => {
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
-  }, [session, isReady, refreshOrders]);
+  }, [session, isReady, role, refreshOrders]);
 
   const updateOrderStatus = async (id: string, status: string) => {
     return await storeUpdateOrderStatus(id, status);

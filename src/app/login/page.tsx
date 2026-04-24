@@ -37,12 +37,13 @@ function LoginContent() {
   const redirectTo = searchParams.get("redirect") || "/dashboard";
 
   const { isReady, session } = useAuthStore();
+  const [pendingRedirect, setPendingRedirect] = useState(false);
 
   useEffect(() => {
-    if (isReady && session) {
+    if (isReady && session && pendingRedirect) {
       router.replace(redirectTo);
     }
-  }, [isReady, session, router, redirectTo]);
+  }, [isReady, session, pendingRedirect, router, redirectTo]);
 
   const [form, setForm] = useState({ email: "", password: "", remember: false });
   const [showPassword, setShowPassword] = useState(false);
@@ -64,17 +65,24 @@ function LoginContent() {
     }
 
     setLoading(true);
-    const result = await authApi.login(form.email, form.password);
-    setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
 
-    if (!result.success) {
-      toast.error(result.error ?? "Login failed.");
+    if (error) {
+      setLoading(false);
+      toast.error(error.message || "Login failed.");
       return;
     }
 
-    // IMPORTANT: Sync the global auth state IMMEDIATELY after login
-    // This ensures contexts like OrderContext see the session before redirect
-    await useAuthStore.getState().sync();
+    const result = await authApi.getMe();
+    if (!result.success) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      toast.error(result.error ?? "Login failed.");
+      return;
+    }
 
     // Sync any guest cart items into the DB
     try {
@@ -99,7 +107,8 @@ function LoginContent() {
       // Non-critical — don't block login
     }
 
-    router.push(redirectTo);
+    setPendingRedirect(true);
+    setLoading(false);
   };
 
   return (
