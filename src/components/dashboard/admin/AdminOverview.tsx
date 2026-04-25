@@ -40,7 +40,7 @@ export default function AdminOverview() {
         />
         <StatCard 
           label="Customers"      
-          value="420" // Note: This could be dynamically fetched too if needed
+          value={String(stats.totalCustomers)}
           icon={Users}           
           color="purple" 
         />

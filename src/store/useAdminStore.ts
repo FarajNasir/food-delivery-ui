@@ -32,6 +32,7 @@ interface AdminStats {
   totalRevenue: string;
   totalOrders: number;
   pendingOrders: number;
+  totalCustomers: number;
 }
 
 interface AdminState {
@@ -50,6 +51,7 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
     totalRevenue: "0",
     totalOrders: 0,
     pendingOrders: 0,
+    totalCustomers: 0,
   },
   isLoading: false,
 

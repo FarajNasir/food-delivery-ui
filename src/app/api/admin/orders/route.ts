@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
+import { orders, users } from "@/lib/db/schema";
 import { sql, desc, ne, and, eq, gte, lte } from "drizzle-orm";
 import { ok, fail, withAuth } from "@/lib/proxy";
 
@@ -34,15 +34,14 @@ export async function GET(req: Request) {
         const filterCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
         // 2. Fetch stats, count, and data in PARALLEL
-        const [statsRes, [{ count: totalCount }], allOrders] = await Promise.all([
+        const [statsRes, [{ count: totalCount }], allOrders, customersCountRes] = await Promise.all([
           // A. Aggregate stats
           db.select({
-            totalRevenue: sql<string>`COALESCE(SUM(${orders.totalAmount}), 0)`,
+            totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} != 'CANCELLED' THEN ${orders.totalAmount} ELSE 0 END), 0)`,
             totalOrders: sql<number>`CAST(COUNT(*) AS INT)`,
-            pendingOrders: sql<number>`CAST(COUNT(*) FILTER (WHERE ${orders.status} = 'PENDING_CONFIRMATION') AS INT)`,
+            pendingOrders: sql<number>`CAST(COUNT(*) FILTER (WHERE ${orders.status} NOT IN ('DELIVERED', 'CANCELLED')) AS INT)`,
           })
-          .from(orders)
-          .where(ne(orders.status, "CANCELLED")),
+          .from(orders),
 
           // B. Count for pagination
           db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
@@ -60,10 +59,16 @@ export async function GET(req: Request) {
             orderBy: [desc(orders.createdAt)],
             limit: limit,
             offset: offset,
-          })
+          }),
+
+          // D. Total Customers
+          db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+          .from(users)
+          .where(eq(users.role, "customer"))
         ]);
 
         const stats = statsRes[0] || { totalRevenue: "0", totalOrders: 0, pendingOrders: 0 };
+        const totalCustomers = customersCountRes ? customersCountRes[0]?.count || 0 : 0;
 
         return ok({
           orders: allOrders,
@@ -71,6 +76,7 @@ export async function GET(req: Request) {
             totalRevenue: stats.totalRevenue || "0.00",
             totalOrders: stats.totalOrders || 0,
             pendingOrders: stats.pendingOrders || 0,
+            totalCustomers: totalCustomers,
           },
           pagination: {
             total: totalCount,

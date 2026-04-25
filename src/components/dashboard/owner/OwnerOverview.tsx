@@ -34,11 +34,6 @@ const STATUS_DOT: Record<string, string> = {
   CANCELLED:   "bg-red-500",
 };
 
-const sites = [
-  { name: "Kilkeel Eats",      orders: 142, revenue: "£2,840", pct: 68, color: "bg-red-500" },
-  { name: "Newcastle Eats",    orders: 98,  revenue: "£1,960", pct: 46, color: "bg-green-600" },
-  { name: "Downpatrick Eats",  orders: 175, revenue: "£3,500", pct: 82, color: "bg-blue-600" },
-];
 
 export default function OwnerOverview({ user }: { user: SessionUser }) {
   const { orders, loading } = useOwnerOrders();
@@ -54,9 +49,39 @@ export default function OwnerOverview({ user }: { user: SessionUser }) {
   const pendingCount  = orders.filter(o => o.status === "PENDING_CONFIRMATION").length;
   const activeCount   = orders.filter(o => ["PAID","PREPARING","DISPATCH_REQUESTED","OUT_FOR_DELIVERY"].includes(o.status)).length;
   const deliveredToday = orders.filter(o => o.status === "DELIVERED").length;
+  
+  const revenueStatuses = ["CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY", "DELIVERED"];
+
   const totalRevenue = orders
-    .filter(o => o.status === "DELIVERED")
-    .reduce((s, o) => s + parseFloat(o.totalAmount), 0);
+    .filter(o => revenueStatuses.includes(o.status))
+    .reduce((s, o) => s + parseFloat(o.totalAmount || "0"), 0);
+
+  // Calculate real performance breakdown
+  const siteStatsMap = orders.reduce((acc, order) => {
+    if (!revenueStatuses.includes(order.status)) return acc;
+    const name = order.restaurant?.name || "Unknown";
+    if (!acc[name]) {
+      acc[name] = { orders: 0, revenue: 0 };
+    }
+    acc[name].orders += 1;
+    acc[name].revenue += parseFloat(order.totalAmount || "0");
+    return acc;
+  }, {} as Record<string, { orders: number, revenue: number }>);
+
+  // Convert to array and calculate max revenue to get percentage
+  const maxRevenue = Object.values(siteStatsMap).reduce((max, site) => Math.max(max, site.revenue), 0);
+  
+  const colors = ["bg-primary", "bg-emerald-500", "bg-blue-500", "bg-amber-500", "bg-purple-500", "bg-cyan-500"];
+  
+  const sites = Object.entries(siteStatsMap)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
+    .map(([name, stats], index) => ({
+      name,
+      orders: stats.orders,
+      revenue: `£${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      pct: maxRevenue > 0 ? (stats.revenue / maxRevenue) * 100 : 0,
+      color: colors[index % colors.length]
+    }));
 
   return (
     <div className="w-full space-y-8 pb-12 selection:bg-primary/20">
@@ -187,28 +212,34 @@ export default function OwnerOverview({ user }: { user: SessionUser }) {
               </div>
             </div>
             <div className="p-8 space-y-8">
-              {sites.map((site) => (
-                <div key={site.name} className="group">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-3 h-3 rounded-full shadow-sm", site.color)} />
-                      <span className="text-xs font-black text-gray-700 uppercase tracking-widest">{site.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-gray-900 leading-none tracking-tight">{site.revenue}</p>
-                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5">{site.orders} orders</p>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-border/20 shadow-inset">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${site.pct}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={cn("h-full rounded-full shadow-sm", site.color)}
-                    />
-                  </div>
+              {sites.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">No data available</p>
                 </div>
-              ))}
+              ) : (
+                sites.map((site) => (
+                  <div key={site.name} className="group">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-3 h-3 rounded-full shadow-sm", site.color)} />
+                        <span className="text-xs font-black text-gray-700 uppercase tracking-widest">{site.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-gray-900 leading-none tracking-tight">{site.revenue}</p>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5">{site.orders} orders</p>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-border/20 shadow-inset">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${site.pct}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className={cn("h-full rounded-full shadow-sm", site.color)}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="px-8 py-4 bg-slate-50/50 border-t border-border/40">
@@ -222,19 +253,7 @@ export default function OwnerOverview({ user }: { user: SessionUser }) {
             </div>
           </div>
           
-          {/* Quick Support Card */}
-          <div className="bg-white p-8 rounded-3xl border border-border/40 shadow-soft relative overflow-hidden group">
-             <div className="absolute -top-4 -right-4 p-6 opacity-[0.03] group-hover:scale-125 transition-transform duration-1000 group-hover:opacity-[0.06]">
-                <Activity className="w-32 h-32 text-gray-900" />
-             </div>
-             <div className="relative z-10">
-                <h4 className="text-lg font-black text-gray-900 tracking-tight uppercase">Partner Success</h4>
-                <p className="text-xs text-muted-foreground font-semibold mt-2 mb-6 leading-relaxed uppercase tracking-wide">Our success team is available 24/7 to optimize your platform performance.</p>
-                <button className="w-full px-6 py-3.5 bg-white border border-border/40 text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-elevated transition-all active:scale-95 flex items-center justify-center gap-2">
-                   Contact Specialist <ArrowRight className="w-3 h-3" />
-                </button>
-             </div>
-          </div>
+
         </div>
       </div>
     </div>

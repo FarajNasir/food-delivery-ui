@@ -10,6 +10,7 @@ interface AdminStats {
   totalRevenue: string;
   totalOrders: number;
   pendingOrders: number;
+  totalCustomers: number;
 }
 
 interface AdminOrderContextType {
