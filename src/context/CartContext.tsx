@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -59,7 +59,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { session, isReady } = useAuthStore();
   const { site } = useConfigStore();
-  const prevSiteRef = React.useRef(site.key);
+  const prevSiteRef = useRef(site.key);
+  const initCalledFor = useRef<string | null>(null);
   const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
@@ -108,8 +109,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       if (Array.isArray(fetchedItems)) {
         setCartItems(fetchedItems);
-      } else {
-        if (data.success) setCartItems(loadGuestCart());
       }
     } catch (err) {
       console.error("[CartContext] Failed to fetch cart:", err);
@@ -141,6 +140,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       if (res.ok) {
         localStorage.removeItem(GUEST_CART_KEY);
+        toast.success(`${guestItems.length} item(s) from your guest cart have been saved!`);
       }
     } catch (err) {
       console.error("[CartContext] Failed to sync guest cart:", err);
@@ -151,6 +151,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!isReady) return;
 
     const initCart = async () => {
+      const sessionKey = session?.access_token ?? "guest";
+      if (initCalledFor.current === sessionKey) return;
+      initCalledFor.current = sessionKey;
+
       setLoading(true);
       if (session) {
         await syncGuestCartToDB(session.access_token);

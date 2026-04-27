@@ -54,6 +54,15 @@ export async function POST(req: Request) {
       if ("error" in res) return res.error;
       const { menuItemId, quantity } = res.data;
 
+      /* 1. Verify item exists and is available */
+      const [item] = await db
+        .select({ id: menuItems.id, status: menuItems.status })
+        .from(menuItems)
+        .where(eq(menuItems.id, menuItemId));
+
+      if (!item) return fail("Item not found.", 404);
+      if (item.status !== "available") return fail("This item is currently unavailable.", 400);
+
       // Attempt an atomic update first
       const [updated] = await db
         .update(cartItems)

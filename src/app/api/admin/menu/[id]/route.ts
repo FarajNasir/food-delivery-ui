@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
+import { parseBody, ok, fail, withOwnerAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { menuItems, restaurants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -19,7 +19,7 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withAuth(req, async () => {
+  return withOwnerAuth(req, async () => {
     const { id } = await params;
 
     const parsed = await parseBody(req, UpdateMenuItemSchema);
@@ -55,7 +55,7 @@ export async function PUT(
       console.error("[admin/menu PUT]", err);
       return fail("Failed to update menu item.", 500);
     }
-  }, ["admin"]);
+  });
 }
 
 /* ── DELETE /api/admin/menu/[id] ── */
@@ -63,20 +63,21 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withAuth(req, async () => {
+  return withOwnerAuth(req, async () => {
     const { id } = await params;
 
     try {
-      const [deleted] = await db
-        .delete(menuItems)
+      const [updated] = await db
+        .update(menuItems)
+        .set({ status: "unavailable", updatedAt: new Date() })
         .where(eq(menuItems.id, id))
         .returning({ id: menuItems.id });
 
-      if (!deleted) return fail("Menu item not found.", 404);
-      return ok({ id: deleted.id });
+      if (!updated) return fail("Menu item not found.", 404);
+      return ok({ id: updated.id, status: "unavailable" });
     } catch (err) {
       console.error("[admin/menu DELETE]", err);
-      return fail("Failed to delete menu item.", 500);
+      return fail("Failed to mark menu item as unavailable.", 500);
     }
-  }, ["admin"]);
+  });
 }

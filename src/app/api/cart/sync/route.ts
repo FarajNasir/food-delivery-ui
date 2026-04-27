@@ -1,7 +1,7 @@
 import { ok, fail, parseBody, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { cartItems } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
+import { sql, and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 const SyncSchema = z.object({
@@ -25,21 +25,29 @@ export async function POST(req: Request) {
       const { items } = body.data;
 
       for (const item of items) {
-        // Atomic upsert avoids race conditions when sync is triggered concurrently.
-        await db
-          .insert(cartItems)
-          .values({
+        // Manual upsert: try update, then insert if not found.
+        // This is safer if the unique constraint hasn't been migrated to the DB yet.
+        const [updated] = await db
+          .update(cartItems)
+          .set({
+            quantity: sql`${cartItems.quantity} + ${item.quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(cartItems.userId, user.id),
+              eq(cartItems.menuItemId, item.menuItemId)
+            )
+          )
+          .returning();
+
+        if (!updated) {
+          await db.insert(cartItems).values({
             userId: user.id,
             menuItemId: item.menuItemId,
             quantity: item.quantity,
-          })
-          .onConflictDoUpdate({
-            target: [cartItems.userId, cartItems.menuItemId],
-            set: {
-              quantity: sql`${cartItems.quantity} + ${item.quantity}`,
-              updatedAt: new Date(),
-            },
           });
+        }
       }
 
       return ok({ message: `Synced ${items.length} guest cart items` });

@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, restaurants, settlements } from "@/lib/db/schema";
-import { eq, and, sql, sum, count } from "drizzle-orm";
+import { eq, and, sql, sum, count, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +17,10 @@ export async function GET(req: Request) {
         .select({
           restaurantId: orders.restaurantId,
           totalEarned: sum(orders.totalAmount),
-          orderCount: count(orders.id),
+          orderCount: sql<number>`CAST(count(${orders.id}) FILTER (WHERE ${orders.isSettled} = 'NO') AS INT)`,
         })
         .from(orders)
-        .where(eq(orders.status, "PAID"))
+        .where(inArray(orders.status, ["PAID", "DELIVERED"]))
         .groupBy(orders.restaurantId);
 
       // 2. Fetch total settlements per restaurant

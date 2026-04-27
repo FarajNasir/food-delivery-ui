@@ -34,7 +34,12 @@ export default async function RestaurantPage({
       DBMenuItems = await db
         .select()
         .from(menuItems)
-        .where(eq(menuItems.restaurantId, id))
+        .where(
+          and(
+            eq(menuItems.restaurantId, id),
+            eq(menuItems.status, "available")
+          )
+        )
         .orderBy(menuItems.category);
 
       // Fetch active reviews for this restaurant

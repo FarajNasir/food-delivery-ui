@@ -84,28 +84,6 @@ function LoginContent() {
       return;
     }
 
-    // Sync any guest cart items into the DB
-    try {
-      const guestCartRaw = localStorage.getItem("guest_cart");
-      if (guestCartRaw) {
-        const guestItems = JSON.parse(guestCartRaw) as { menuItemId: string; quantity: number }[];
-        if (guestItems.length > 0) {
-          const { data: { session } } = await supabase.auth.getSession();
-          await fetch("/api/cart/sync", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Authorization": session ? `Bearer ${session.access_token}` : ""
-            },
-            body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
-          });
-          localStorage.removeItem("guest_cart");
-          toast.success(`${guestItems.length} cart item(s) saved to your account!`);
-        }
-      }
-    } catch {
-      // Non-critical — don't block login
-    }
 
     setPendingRedirect(true);
     setLoading(false);

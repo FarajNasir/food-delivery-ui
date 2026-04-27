@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { orders, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -36,25 +36,20 @@ export async function POST(req: Request) {
       console.log(`[Stripe Webhook] Received completion for Order: ${orderId}`);
 
       try {
-        // 1. Fetch current order status to ensure idempotency
-        const currentOrder = await db.query.orders.findFirst({
-          where: eq(orders.id, orderId),
-        });
-
-        if (currentOrder && currentOrder.status === "PAID") {
-          console.log(`[Stripe Webhook] Order ${orderId} is already marked as PAID. Skipping.`);
-          return new NextResponse(null, { status: 200 });
-        }
-
-        // 2. Update Order Status to PAID
+        // 1. Atomic Update: Only proceed if status is NOT already PAID
         const [updatedOrder] = await db
           .update(orders)
           .set({
             status: "PAID",
             updatedAt: new Date()
           })
-          .where(eq(orders.id, orderId))
+          .where(and(eq(orders.id, orderId), ne(orders.status, "PAID")))
           .returning();
+
+        if (!updatedOrder) {
+          console.log(`[Stripe Webhook] Order ${orderId} already PAID or not found. Skipping notifications.`);
+          return new NextResponse(null, { status: 200 });
+        }
 
         if (updatedOrder) {
           // 3. Notify Restaurant Owner

@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, orderSessions, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, ne } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { NotificationService } from "@/services/notification.service";
@@ -40,79 +40,80 @@ export async function POST(
 
     if (!orderSession) return fail("Order session not found.", 404);
 
-    // 3. Perform updates if not already PAID
-    if (orderSession.status !== "PAID") {
-      await db.transaction(async (tx) => {
-        // Update Session Status
-        await tx.update(orderSessions)
-          .set({ status: "PAID", updatedAt: new Date() })
-          .where(eq(orderSessions.id, id));
+    // 3. Perform updates atomically if not already PAID
+    await db.transaction(async (tx) => {
+      const [updatedSession] = await tx
+        .update(orderSessions)
+        .set({ status: "PAID", updatedAt: new Date() })
+        .where(and(eq(orderSessions.id, id), ne(orderSessions.status, "PAID")))
+        .returning();
 
-        // Update all CONFIRMED orders in this session
-        const updatedOrders = await tx
-          .update(orders)
-          .set({ status: "PAID", updatedAt: new Date() })
-          .where(and(eq(orders.sessionId, id), eq(orders.status, "CONFIRMED")))
-          .returning();
+      if (!updatedSession) return;
 
-        // 4. Notifications for each updated order
-        for (const order of updatedOrders) {
-          try {
-            const [restaurant] = await tx
-              .select({ ownerId: restaurants.ownerId, name: restaurants.name })
-              .from(restaurants)
-              .where(eq(restaurants.id, order.restaurantId))
-              .limit(1);
+      // Update all CONFIRMED orders in this session
+      const updatedOrders = await tx
+        .update(orders)
+        .set({ status: "PAID", updatedAt: new Date() })
+        .where(and(eq(orders.sessionId, id), eq(orders.status, "CONFIRMED")))
+        .returning();
 
-            if (restaurant) {
-              const subject = "Payment Received";
-              
-              const itemsRows = await tx
-                .select({
-                  name: menuItems.name,
-                  quantity: orderItems.quantity,
-                })
-                .from(orderItems)
-                .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
-                .where(eq(orderItems.orderId, order.id));
-              
-              const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
-              const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
-
-              // Dispatch Owner Notifications
-              await NotificationService.dispatchOrderNotifications({
-                userId: restaurant.ownerId,
-                type: "ORDER",
-                subject,
-                body: ownerBody,
-                metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
-                channels: ["FCM", "WHATSAPP"]
-              });
-            }
-          } catch (notifyErr) {
-            console.error("Failed to notify restaurant:", notifyErr);
-          }
-        }
-
-        // 5. Notify Customer (once per session)
+      // 4. Notifications for each updated order
+      for (const order of updatedOrders) {
         try {
-          const subject = "Payment Confirmed";
-          const body = "Your payment was successful. The restaurants will start preparing your meal shortly.";
+          const [restaurant] = await tx
+            .select({ ownerId: restaurants.ownerId, name: restaurants.name })
+            .from(restaurants)
+            .where(eq(restaurants.id, order.restaurantId))
+            .limit(1);
 
-          // Dispatch Customer Notifications
-          await NotificationService.dispatchOrderNotifications({
-            userId: user.id,
-            type: "ORDER",
-            subject,
-            body,
-            metadata: { sessionId: id, status: "PAID", targetRole: "customer" },
-            channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
-          });
+          if (restaurant) {
+            const subject = "Payment Received";
+            
+            const itemsRows = await tx
+              .select({
+                name: menuItems.name,
+                quantity: orderItems.quantity,
+              })
+              .from(orderItems)
+              .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+              .where(eq(orderItems.orderId, order.id));
+            
+            const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+            const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
+
+            // Dispatch Owner Notifications
+            await NotificationService.dispatchOrderNotifications({
+              userId: restaurant.ownerId,
+              type: "ORDER",
+              subject,
+              body: ownerBody,
+              metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
         } catch (notifyErr) {
-          console.error("Failed to notify customer:", notifyErr);
+          console.error("Failed to notify restaurant:", notifyErr);
         }
-      });
-    }
+      }
+
+      // 5. Notify Customer (once per session)
+      try {
+        const subject = "Payment Confirmed";
+        const body = "Your payment was successful. The restaurants will start preparing your meal shortly.";
+
+        // Dispatch Customer Notifications
+        await NotificationService.dispatchOrderNotifications({
+          userId: user.id,
+          type: "ORDER",
+          subject,
+          body,
+          metadata: { sessionId: id, status: "PAID", targetRole: "customer" },
+          channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+        });
+      } catch (notifyErr) {
+        console.error("Failed to notify customer:", notifyErr);
+      }
+    });
 
     return ok({ status: "PAID" });
   } catch (err: any) {

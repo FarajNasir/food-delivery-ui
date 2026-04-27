@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { NotificationService } from "@/services/notification.service";
@@ -44,16 +44,17 @@ export async function POST(
       return fail("Order not found.", 404);
     }
 
-    // 3. Update status if not already PAID
-    if (order.status !== "PAID") {
-      await db
-        .update(orders)
-        .set({
-          status: "PAID",
-          updatedAt: new Date()
-        })
-        .where(eq(orders.id, id));
+    // 3. Atomic Update: Only proceed if status is NOT already PAID
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({
+        status: "PAID",
+        updatedAt: new Date()
+      })
+      .where(and(eq(orders.id, id), ne(orders.status, "PAID")))
+      .returning();
 
+    if (updatedOrder) {
       // 4. Notify Restaurant Owner (same logic as webhook)
       const [restaurant] = await db
         .select({
@@ -61,7 +62,7 @@ export async function POST(
           name: restaurants.name
         })
         .from(restaurants)
-        .where(eq(restaurants.id, order.restaurantId))
+        .where(eq(restaurants.id, updatedOrder.restaurantId))
         .limit(1);
 
       if (restaurant) {
@@ -74,10 +75,10 @@ export async function POST(
           })
           .from(orderItems)
           .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
-          .where(eq(orderItems.orderId, order.id));
+          .where(eq(orderItems.orderId, updatedOrder.id));
         
         const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
-        const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
+        const ownerBody = `Payment Received! 💰\nOrder: #${updatedOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${updatedOrder.totalAmount}`;
 
         // Dispatch Owner Notifications
         await NotificationService.dispatchOrderNotifications({
@@ -85,7 +86,7 @@ export async function POST(
           type: "ORDER",
           subject,
           body: ownerBody,
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
+          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
           channels: ["FCM", "WHATSAPP"]
         });
       }
@@ -97,11 +98,11 @@ export async function POST(
 
         // Dispatch Customer Notifications
         await NotificationService.dispatchOrderNotifications({
-          userId: order.userId,
+          userId: updatedOrder.userId,
           type: "ORDER",
           subject,
           body,
-          metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "customer" },
+          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "customer" },
           channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
         });
       } catch (notifyErr) {

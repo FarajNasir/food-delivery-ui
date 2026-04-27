@@ -72,7 +72,7 @@ export async function GET(req: Request) {
       .from(featuredItems)
       .innerJoin(menuItems, eq(featuredItems.entityId, menuItems.id))
       .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
-      .where(and(...filteredDishConditions))
+      .where(and(...filteredDishConditions, eq(menuItems.status, "available")))
       .orderBy(asc(featuredItems.sortOrder));
 
     const items = rows.map(r => ({
