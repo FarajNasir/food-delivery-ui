@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { orders, restaurants } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -26,19 +26,19 @@ export async function GET(
 
       if (!rest) return fail("Restaurant not found.", 404);
 
-      // 2. Fetch all orders that are PAID but NOT SETTLED
-        const unpaidOrders = await db
-          .select({
-            id: orders.id,
-            totalAmount: orders.totalAmount,
-            createdAt: orders.createdAt,
-            status: orders.status,
-            isSettled: orders.isSettled,
-          })
+      // 2. Fetch all orders that are PAID or DELIVERED but NOT SETTLED
+      const unpaidOrders = await db
+        .select({
+          id: orders.id,
+          totalAmount: orders.totalAmount,
+          createdAt: orders.createdAt,
+          status: orders.status,
+          isSettled: orders.isSettled,
+        })
         .from(orders)
         .where(and(
           eq(orders.restaurantId, id),
-          eq(orders.status, "PAID"),
+          inArray(orders.status, ["PAID", "DELIVERED"]),
           eq(orders.isSettled, "NO")
         ));
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,7 +27,8 @@ interface CartContextType {
   addItem: (item: Omit<CartItem, "id" | "quantity">) => Promise<void>;
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
-  clearCart: () => Promise<void>;
+  clearCart: (silent?: boolean) => Promise<void>;
+  replaceCart: (items: { menuItemId: string; quantity: number }[]) => Promise<boolean>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -51,11 +52,15 @@ function saveGuestCart(items: CartItem[]) {
 }
 
 import { useAuthStore } from "@/store/useAuthStore";
+import { useConfigStore } from "@/store/useConfigStore";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { session, isReady } = useAuthStore();
+  const { site } = useConfigStore();
+  const prevSiteRef = useRef(site.key);
+  const initCalledFor = useRef<string | null>(null);
   const isGuest = !session;
 
   // ── Fetch DB cart (logged-in users) ─────────────────────────
@@ -104,8 +109,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       if (Array.isArray(fetchedItems)) {
         setCartItems(fetchedItems);
-      } else {
-        if (data.success) setCartItems(loadGuestCart());
       }
     } catch (err) {
       console.error("[CartContext] Failed to fetch cart:", err);
@@ -137,6 +140,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       if (res.ok) {
         localStorage.removeItem(GUEST_CART_KEY);
+        toast.success(`${guestItems.length} item(s) from your guest cart have been saved!`);
       }
     } catch (err) {
       console.error("[CartContext] Failed to sync guest cart:", err);
@@ -147,6 +151,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!isReady) return;
 
     const initCart = async () => {
+      const sessionKey = session?.access_token ?? "guest";
+      if (initCalledFor.current === sessionKey) return;
+      initCalledFor.current = sessionKey;
+
       setLoading(true);
       if (session) {
         await syncGuestCartToDB(session.access_token);
@@ -255,11 +263,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Clear cart ───────────────────────────────────────────────
-  const clearCart = async () => {
+  const clearCart = useCallback(async (silent?: boolean) => {
     if (isGuest) {
       localStorage.removeItem(GUEST_CART_KEY);
       setCartItems([]);
-      toast.success("Cart cleared");
+      if (!silent) toast.success("Cart cleared");
       return;
     }
 
@@ -274,12 +282,83 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
       });
       if (!res.ok) throw new Error();
-      toast.success("Order cleared");
+      if (!silent) toast.success("Order cleared");
     } catch {
-      toast.error("Failed to clear cart");
+      if (!silent) toast.error("Failed to clear cart");
       setCartItems(backup);
     }
-  };
+  }, [isGuest, cartItems]);
+
+  const replaceCart = useCallback(async (items: { menuItemId: string; quantity: number }[]) => {
+    if (items.length === 0) {
+      toast.error("This order has no items to reorder.");
+      return false;
+    }
+
+    if (isGuest) {
+      toast.error("Please sign in to reorder.");
+      return false;
+    }
+
+    let accessToken: string | undefined | null = useAuthStore.getState().session?.access_token;
+    if (!accessToken) {
+      accessToken = await getFreshToken();
+    }
+
+    if (!accessToken) {
+      toast.error("Your session expired. Please sign in again.");
+      return false;
+    }
+
+    const backup = [...cartItems];
+    setLoading(true);
+
+    try {
+      const clearRes = await fetch("/api/cart/clear", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!clearRes.ok) {
+        throw new Error("CLEAR_FAILED");
+      }
+
+      for (const item of items) {
+        const addRes = await fetch("/api/cart", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(item),
+        });
+
+        if (!addRes.ok) {
+          const data = await addRes.json().catch(() => null);
+          throw new Error(data?.error || data?.message || "ADD_FAILED");
+        }
+      }
+
+      await fetchDBCart(accessToken);
+      return true;
+    } catch (error) {
+      console.error("[CartContext] Failed to replace cart:", error);
+      setCartItems(backup);
+      toast.error("Failed to prepare your reorder. Please try again.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [cartItems, fetchDBCart, isGuest]);
+
+  useEffect(() => {
+    if (prevSiteRef.current !== site.key) {
+      prevSiteRef.current = site.key;
+      clearCart(true);
+    }
+  }, [site.key, clearCart]);
 
   const totalItems = useMemo(() => cartItems.reduce((acc, item) => acc + item.quantity, 0), [cartItems]);
   const totalPrice = useMemo(() => cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0), [cartItems]);
@@ -294,7 +373,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     removeItem,
     updateQuantity,
     clearCart,
-  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart]);
+    replaceCart,
+  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart, replaceCart]);
 
   return (
     <CartContext.Provider value={value}>

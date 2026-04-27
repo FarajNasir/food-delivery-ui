@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { deliveryJobs, orders } from "@/lib/db/schema";
+import { deliveryJobs, orders, restaurants, notifications, orderItems, menuItems, notificationChannelEnum } from "@/lib/db/schema";
+import { NotificationService } from "@/services/notification.service";
 
 type ShipdayWebhookPayload = Record<string, unknown>;
 
@@ -220,6 +221,8 @@ export async function POST(req: Request) {
       .where(eq(deliveryJobs.id, deliveryJob.id));
 
     if (mappedStatus) {
+      const orderId = deliveryJob.orderId;
+
       await db
         .update(orders)
         .set({
@@ -227,7 +230,7 @@ export async function POST(req: Request) {
           updatedAt: new Date(),
         })
         .where(and(
-          eq(orders.id, deliveryJob.orderId),
+          eq(orders.id, orderId),
           mappedStatus === "DELIVERED"
             ? or(
                 eq(orders.status, "CONFIRMED"),
@@ -251,6 +254,76 @@ export async function POST(req: Request) {
                   eq(orders.status, "DISPATCH_REQUESTED")
                 )
         ));
+
+      // --- Notify Owner ---
+      try {
+        const [orderData] = await db
+          .select({
+            orderId: orders.id,
+            userId: orders.userId,
+            restaurantId: orders.restaurantId,
+            restaurantName: restaurants.name,
+            ownerId: restaurants.ownerId,
+            totalAmount: orders.totalAmount,
+          })
+          .from(orders)
+          .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+          .where(eq(orders.id, orderId))
+          .limit(1);
+
+          if (orderData) {
+            const statusText = mappedStatus.replace(/_/g, " ").toLowerCase();
+            const subject = mappedStatus === "DELIVERED" ? "Order Delivered! 🎉" : `Order Update: #${orderData.orderId.slice(0, 8)}`;
+            
+            // Build Detailed Body for Owner
+            const itemsRows = await db
+              .select({
+                name: menuItems.name,
+                quantity: orderItems.quantity,
+              })
+              .from(orderItems)
+              .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+              .where(eq(orderItems.orderId, orderData.orderId));
+            
+            const itemsSummary = itemsRows.length > 0 
+              ? itemsRows.map(i => `${i.quantity}x ${i.name || "Unknown Item"}`).join("\n")
+              : "No specific items found.";
+            
+            const ownerBody = `*Order Update: #${orderData.orderId.slice(0, 8)}*\nRestaurant: ${orderData.restaurantName}\nStatus: ${statusText.toUpperCase()}\n\n*Items:*\n${itemsSummary}\n\n*Total:* £${orderData.totalAmount}\n(Ref: SHIPDAY)`;
+
+            // Build Customer Body
+            let customerBody = `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is now ${statusText.toUpperCase()}.`;
+            if (mappedStatus === "DELIVERED") {
+              customerBody = `Congratulations! Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is successfully delivered. Enjoy your meal! 🍴`;
+            } else if (mappedStatus === "DISPATCH_REQUESTED" || mappedStatus === "OUT_FOR_DELIVERY") {
+              customerBody = `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is now dispatched!`;
+            }
+
+            // 1. Notify Owner (WhatsApp + FCM)
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.ownerId,
+              type: "ORDER",
+              subject,
+              body: ownerBody,
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
+              channels: ["FCM", "WHATSAPP"]
+            });
+
+            const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.userId,
+              type: "ORDER",
+              subject,
+              body: customerBody,
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
+              channels: customerChannels
+            });
+          }
+
+      } catch (notifyErr) {
+        console.error("[Shipday Webhook] Failed to notify owner:", notifyErr);
+      }
     }
 
     return NextResponse.json({ ok: true });

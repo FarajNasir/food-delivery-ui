@@ -1,15 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useSite } from "@/context/SiteContext";
 import AuthCard from "@/components/auth/AuthCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
 
+import { createClient } from "@/lib/supabase/client";
+
 export default function ForgotPasswordPage() {
   const { site } = useSite();
+  const router = useRouter();
+  const { isReady, session } = useAuthStore();
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (isReady && session) {
+      router.replace("/dashboard");
+    }
+  }, [isReady, session, router]);
 
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,10 +43,17 @@ export default function ForgotPasswordPage() {
     }
 
     setLoading(true);
-    // UI-only: simulate sending reset email
-    await new Promise((r) => setTimeout(r, 1400));
-    setLoading(false);
-    setSent(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to send reset link. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ── Success state ── */

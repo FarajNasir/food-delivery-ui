@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSite } from "@/context/SiteContext";
 import AuthCard from "@/components/auth/AuthCard";
@@ -36,6 +36,15 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
 
+  const { isReady, session } = useAuthStore();
+  const [pendingRedirect, setPendingRedirect] = useState(false);
+
+  useEffect(() => {
+    if (isReady && session && pendingRedirect) {
+      router.replace(redirectTo);
+    }
+  }, [isReady, session, pendingRedirect, router, redirectTo]);
+
   const [form, setForm] = useState({ email: "", password: "", remember: false });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,42 +65,28 @@ function LoginContent() {
     }
 
     setLoading(true);
-    const result = await authApi.login(form.email, form.password);
-    setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
 
+    if (error) {
+      setLoading(false);
+      toast.error(error.message || "Login failed.");
+      return;
+    }
+
+    const result = await authApi.getMe();
     if (!result.success) {
+      await supabase.auth.signOut();
+      setLoading(false);
       toast.error(result.error ?? "Login failed.");
       return;
     }
 
-    // IMPORTANT: Sync the global auth state IMMEDIATELY after login
-    // This ensures contexts like OrderContext see the session before redirect
-    await useAuthStore.getState().sync();
 
-    // Sync any guest cart items into the DB
-    try {
-      const guestCartRaw = localStorage.getItem("guest_cart");
-      if (guestCartRaw) {
-        const guestItems = JSON.parse(guestCartRaw) as { menuItemId: string; quantity: number }[];
-        if (guestItems.length > 0) {
-          const { data: { session } } = await supabase.auth.getSession();
-          await fetch("/api/cart/sync", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Authorization": session ? `Bearer ${session.access_token}` : ""
-            },
-            body: JSON.stringify({ items: guestItems.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) }),
-          });
-          localStorage.removeItem("guest_cart");
-          toast.success(`${guestItems.length} cart item(s) saved to your account!`);
-        }
-      }
-    } catch {
-      // Non-critical — don't block login
-    }
-
-    router.push(redirectTo);
+    setPendingRedirect(true);
+    setLoading(false);
   };
 
   return (

@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import {
   Star, Plus, Trash2, X, ChevronDown, 
   Store, Utensils, Search, 
-  ChevronRight, ArrowLeft, Check
+  ChevronRight, ArrowLeft, Check,
+  MoreVertical, Pencil
 } from "lucide-react";
 import { 
   adminFeaturedApi, 
@@ -40,6 +41,8 @@ export default function AdminFeatured() {
   });
 
   const [addOpen, setAddOpen] = useState(false);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<AdminFeaturedItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminFeaturedItem | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -53,7 +56,7 @@ export default function AdminFeatured() {
   // Form state for adding
   const [formType, setFormType] = useState<FeaturedType>("restaurant");
   const [formLocation, setFormLocation] = useState(site.location || "");
-  const [formSortOrder, setFormSortOrder] = useState<number | string>(0);
+  const [formSortOrder, setFormSortOrder] = useState<number | string>("");
   
   // Guided Selection State
   const [selectedRestaurant, setSelectedRestaurant] = useState<{ id: string; name: string } | null>(null);
@@ -95,17 +98,23 @@ export default function AdminFeatured() {
            limit: 50 
         });
         if (res.success && res.data) {
-          setEntities(res.data.restaurants.map(r => ({ id: r.id, name: r.name })));
+          const fetched = res.data.restaurants.map(r => ({ id: r.id, name: r.name }));
+          // Filter out items already featured in this location
+          const filtered = fetched.filter(f => !items.some(i => i.entityId === f.id && i.location === formLocation && i.type === "restaurant"));
+          setEntities(filtered);
         }
       } 
       else if (formType === "dish" && selectedRestaurant) {
         const res = await menuApi.list({ 
-          search, 
-          restaurantId: selectedRestaurant.id, 
-          limit: 50 
+           search, 
+           restaurantId: selectedRestaurant.id, 
+           limit: 50 
         });
         if (res.success && res.data) {
-          setEntities(res.data.items.map(i => ({ id: i.id, name: i.name })));
+          const fetched = res.data.items.map(i => ({ id: i.id, name: i.name }));
+          // Filter out items already featured in this location
+          const filtered = fetched.filter(f => !items.some(i => i.entityId === f.id && i.location === formLocation && i.type === "dish"));
+          setEntities(filtered);
         }
       }
       
@@ -126,12 +135,13 @@ export default function AdminFeatured() {
   };
 
   // Helper to check if rank is already used in the current UI list
-  const isRankTaken = (rank: string) => {
+  const isRankTaken = (rank: string, excludeId?: string) => {
     const r = parseInt(rank);
     if (isNaN(r)) return false;
     return items.some(i => 
-      i.location === formLocation && 
-      i.type === formType && 
+      i.id !== excludeId &&
+      i.location === (editTarget?.location || formLocation) && 
+      i.type === (editTarget?.type || formType) && 
       i.sortOrder === r &&
       i.status === "active"
     );
@@ -140,7 +150,11 @@ export default function AdminFeatured() {
   const handleAdd = async () => {
     if (!formEntityId || !formLocation) return toast.error("Please select an item and location.");
     
-    const rankNum = parseInt(formSortOrder as string) || 0;
+    const rankNum = parseInt(formSortOrder as string);
+    if (isNaN(rankNum) || rankNum < 1) {
+      return toast.error("Please enter a valid rank (1 or higher).");
+    }
+
     if (isRankTaken(formSortOrder as string)) {
       return toast.error(`Rank #${rankNum} is already assigned in ${formLocation}.`);
     }
@@ -161,6 +175,26 @@ export default function AdminFeatured() {
       resetForm();
     } else {
       toast.error(res.error ?? "Failed to add.");
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editTarget) return;
+    const rankNum = parseInt(editTarget.sortOrder as any);
+    if (isNaN(rankNum) || rankNum < 1) return toast.error("Rank must be 1 or higher.");
+
+    setSaving(true);
+    const res = await adminFeaturedApi.update(editTarget.id, {
+      sortOrder: rankNum,
+      status: editTarget.status
+    });
+    setSaving(false);
+    if (res.success) {
+      toast.success("Updated featured item.");
+      setEditTarget(null);
+      fetchFeatured();
+    } else {
+      toast.error(res.error ?? "Update failed.");
     }
   };
 
@@ -254,9 +288,12 @@ export default function AdminFeatured() {
                   <div className="font-semibold truncate pr-4 sm:pr-0 text-base sm:text-sm" style={{ color: "var(--dash-text-primary)" }}>{item.entityName}</div>
                   <div className="flex items-center gap-3 sm:hidden">
                     <div className="font-bold text-base" style={{ color: "var(--dash-text-primary)" }}>#{item.sortOrder}</div>
-                    <button onClick={() => setDeleteTarget(item)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors -mr-2">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <ActionMenu 
+                      menuOpen={menuId === item.id} 
+                      onToggle={() => setMenuId(menuId === item.id ? null : item.id)}
+                      onEdit={() => { setEditTarget({ ...item }); setMenuId(null); }}
+                      onDelete={() => { setDeleteTarget(item); setMenuId(null); }}
+                    />
                   </div>
                 </div>
 
@@ -270,7 +307,7 @@ export default function AdminFeatured() {
                   <div>
                     <span
                       onClick={() => toggleStatus(item)}
-                      className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all ${item.status === "active" ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                      className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all ${item.status === "active" ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                     >
                       {item.status === "active" ? "Active" : "Inactive"}
                     </span>
@@ -282,9 +319,12 @@ export default function AdminFeatured() {
                 
                 {/* Desktop Action */}
                 <div className="hidden sm:block">
-                  <button onClick={() => setDeleteTarget(item)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors ml-auto">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <ActionMenu 
+                    menuOpen={menuId === item.id} 
+                    onToggle={() => setMenuId(menuId === item.id ? null : item.id)}
+                    onEdit={() => { setEditTarget({ ...item }); setMenuId(null); }}
+                    onDelete={() => { setDeleteTarget(item); setMenuId(null); }}
+                  />
                 </div>
               </div>
             ))}
@@ -318,7 +358,7 @@ export default function AdminFeatured() {
             {/* Config Grid */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest opacity-50 px-1">Location</label>
+                <label className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1">Location</label>
                 <select 
                   value={formLocation} 
                   onChange={e => { setFormLocation(e.target.value); resetForm(); }} 
@@ -331,19 +371,22 @@ export default function AdminFeatured() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex justify-between px-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest opacity-50">Rank Priority</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider opacity-60">Rank Priority</label>
                   {isRankTaken(String(formSortOrder)) && (
-                    <span className="text-[9px] font-bold text-red-500 uppercase">Rank Taken</span>
+                    <span className="text-[10px] font-bold text-red-500 uppercase">Rank Taken</span>
                   )}
                 </div>
                 <input 
                   type="number" 
+                  min="1"
                   value={formSortOrder} 
-                  onFocus={(e) => { if (e.target.value === "0") setFormSortOrder(""); }}
-                  onChange={e => setFormSortOrder(e.target.value)} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/^0+/, "");
+                    setFormSortOrder(val);
+                  }} 
                   className={`w-full h-11 px-3 rounded-xl border outline-none text-sm font-medium transition-all ${isRankTaken(String(formSortOrder)) ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   style={{ background: "var(--dash-bg)", borderColor: isRankTaken(String(formSortOrder)) ? "transparent" : "var(--dash-card-border)", color: "var(--dash-text-primary)" }}
-                  placeholder="Enter rank..."
+                  placeholder="e.g. 1, 2, 3..."
                 />
               </div>
             </div>
@@ -431,13 +474,75 @@ export default function AdminFeatured() {
               </button>
               <button 
                 onClick={handleAdd}
-                disabled={saving || !formEntityId || isRankTaken(String(formSortOrder))}
+                disabled={saving || !formEntityId || !formSortOrder || Number(formSortOrder) < 1 || isRankTaken(String(formSortOrder))}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-30"
                 style={{ background: "var(--dash-accent)" }}
               >
                 {saving ? "Wait..." : `Feature ${formType === 'restaurant' ? 'Restaurant' : 'Dish'}`}
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {editTarget && (
+        <Modal title="Edit Featured" onClose={() => setEditTarget(null)}>
+          <div className="space-y-4">
+             <div>
+               <p className="text-xs font-bold uppercase tracking-wider opacity-40 mb-3">{editTarget.entityName}</p>
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="space-y-1.5">
+                   <div className="flex justify-between px-1">
+                     <label className="text-xs font-semibold uppercase tracking-wider opacity-60">Rank Priority</label>
+                     {isRankTaken(String(editTarget.sortOrder), editTarget.id) && (
+                       <span className="text-[10px] font-bold text-red-500 uppercase">Taken</span>
+                     )}
+                   </div>
+                   <input 
+                     type="number" 
+                     min="1"
+                     value={editTarget.sortOrder || ""} 
+                     onChange={e => {
+                        const val = e.target.value.replace(/^0+/, "");
+                        setEditTarget({ ...editTarget, sortOrder: val ? parseInt(val) : 0 });
+                     }} 
+                     className={`w-full h-11 px-3 rounded-xl border outline-none text-sm font-medium transition-all ${isRankTaken(String(editTarget.sortOrder), editTarget.id) ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                     style={{ background: "var(--dash-bg)", borderColor: isRankTaken(String(editTarget.sortOrder), editTarget.id) ? "transparent" : "var(--dash-card-border)", color: "var(--dash-text-primary)" }}
+                   />
+                 </div>
+                 <div className="space-y-1.5">
+                   <label className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1">Status</label>
+                   <select 
+                     value={editTarget.status} 
+                     onChange={e => setEditTarget({ ...editTarget, status: e.target.value as any })} 
+                     className="w-full h-11 px-3 rounded-xl border outline-none text-sm font-medium transition-all"
+                     style={{ background: "var(--dash-bg)", borderColor: "var(--dash-card-border)", color: "var(--dash-text-primary)" }}
+                   >
+                     <option value="active">Active</option>
+                     <option value="inactive">Inactive</option>
+                   </select>
+                 </div>
+               </div>
+             </div>
+             
+             <div className="flex gap-2 mt-4">
+               <button 
+                 onClick={() => setEditTarget(null)}
+                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold border"
+                 style={{ borderColor: "var(--dash-card-border)", color: "var(--dash-text-secondary)", background: "var(--dash-bg)" }}
+               >
+                 Cancel
+               </button>
+               <button 
+                 onClick={handleEdit}
+                 disabled={saving || !editTarget.sortOrder || editTarget.sortOrder < 1 || isRankTaken(String(editTarget.sortOrder), editTarget.id)}
+                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                 style={{ background: "var(--dash-accent)" }}
+               >
+                 {saving ? "..." : "Save Changes"}
+               </button>
+             </div>
           </div>
         </Modal>
       )}
@@ -468,6 +573,9 @@ export default function AdminFeatured() {
           </div>
         </Modal>
       )}
+
+      {/* Backdrop to close action menus */}
+      {menuId && <div className="fixed inset-0 z-40" onClick={() => setMenuId(null)} />}
     </div>
   );
 }
@@ -516,6 +624,35 @@ function Modal({ title, onClose, children }: {
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+function ActionMenu({ menuOpen, onToggle, onEdit, onDelete }: {
+  menuOpen: boolean; onToggle: () => void; onEdit: () => void; onDelete: () => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-black/5 ml-auto"
+      >
+        <MoreVertical className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />
+      </button>
+      {menuOpen && (
+        <div
+          className="absolute right-0 top-8 z-50 w-32 rounded-xl shadow-lg border py-1 overflow-hidden animate-in fade-in zoom-in duration-100"
+          style={{ background: "var(--dash-card)", borderColor: "var(--dash-card-border)" }}
+        >
+          <button onClick={onEdit} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-black/5 transition-colors" style={{ color: "var(--dash-text-primary)" }}>
+            <Pencil className="w-3 h-3 shrink-0" /> Edit
+          </button>
+          <div className="border-t" style={{ borderColor: "var(--dash-card-border)" }} />
+          <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors">
+            <Trash2 className="w-3 h-3 shrink-0" /> Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

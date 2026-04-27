@@ -184,7 +184,8 @@ export default function CheckoutView() {
   const isStandard = site.deliveryPricing?.type === "standard";
   const isFixedAreas = site.deliveryPricing?.type === "fixed_areas";
   const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
-  const grandTotal = totalPrice + deliveryFee;
+  const paysDeliveryAtDoor = site.key === "newcastleeats" || site.key === "downpatrickeats";
+  const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee);
 
   const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
@@ -366,7 +367,11 @@ export default function CheckoutView() {
                 <div className="flex justify-between items-center text-xs font-medium text-gray-400">
                   <span>Delivery Fee</span>
                   <span>
-                    {deliveryFee > 0 ? `£${deliveryFee.toFixed(2)}` : "FREE"}
+                    {deliveryFee > 0
+                      ? paysDeliveryAtDoor
+                        ? `£${deliveryFee.toFixed(2)} at doorstep`
+                        : `£${deliveryFee.toFixed(2)}`
+                      : "FREE"}
                   </span>
                 </div>
               </div>
@@ -379,7 +384,7 @@ export default function CheckoutView() {
                 </span>
               </div>
 
-{(isFixedAreas || isDistSlabs) && (
+              {(isFixedAreas || isDistSlabs) && (
                 <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
                   <span className="text-amber-500 text-xs">ⓘ</span>
                   <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">

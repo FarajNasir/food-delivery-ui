@@ -1,45 +1,35 @@
 import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { featuredItems, restaurants, menuItems } from "@/lib/db/schema";
-import { eq, and, sql, desc, asc, count, SQL, inArray } from "drizzle-orm";
-
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user)                 return { user: null, res: fail("Unauthorized.", 401) };
-  if (user.role !== "admin") return { user: null, res: fail("Forbidden.", 403) };
-  return { user, res: null };
-}
+import { eq, and, sql, desc, count, SQL, inArray } from "drizzle-orm";
 
 const CreateFeaturedSchema = z.object({
   type:      z.enum(["restaurant", "dish"]),
   entityId:  z.string().uuid(),
   location:  z.string().min(1).max(100),
   status:    z.enum(["active", "inactive"]).default("active"),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.number().int().min(1, "Rank must be 1 or greater."),
 });
 
 /* ── GET /api/admin/featured ── */
 export async function GET(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
-
-    const { searchParams } = new URL(req.url);
-    const location = searchParams.get("location") ?? "all";
-    const type     = searchParams.get("type")     ?? "all";
-    const status   = searchParams.get("status")   ?? "all";
-    const page     = Math.max(1, Number(searchParams.get("page")  ?? "1"));
-    const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("limit") ?? "20")));
-    const offset   = (page - 1) * pageSize;
+  return withAuth(req, async () => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const location = searchParams.get("location") ?? "all";
+      const type     = searchParams.get("type")     ?? "all";
+      const status   = searchParams.get("status")   ?? "all";
+      const page     = Math.max(1, Number(searchParams.get("page")  ?? "1"));
+      const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("limit") ?? "20")));
+      const offset   = (page - 1) * pageSize;
 
     const conditions: SQL[] = [];
     if (location !== "all") conditions.push(eq(featuredItems.location, location));
     if (type     !== "all") conditions.push(eq(featuredItems.type,     type as "restaurant" | "dish"));
     if (status   !== "all") conditions.push(eq(featuredItems.status,   status as "active" | "inactive"));
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [countRows, rows] = await Promise.all([
       db.select({ total: count() }).from(featuredItems).where(where),
@@ -85,21 +75,20 @@ export async function GET(req: Request) {
       entityName: nameMap.get(row.entityId) || "Unknown",
     }));
 
-    return ok({ items: enhancedRows, total: countRows[0].total, page, pageSize });
-  } catch (err) {
-    console.error("[admin/featured GET]", err);
-    return fail("Failed to load featured items.", 500);
-  }
+      return ok({ items: enhancedRows, total: countRows[0].total, page, pageSize });
+    } catch (err) {
+      console.error("[admin/featured GET]", err);
+      return fail("Failed to load featured items.", 500);
+    }
+  }, ["admin"]);
 }
 
 /* ── POST /api/admin/featured ── */
 export async function POST(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
-
-    const parsed = await parseBody(req, CreateFeaturedSchema);
-    if ("error" in parsed) return parsed.error;
+  return withAuth(req, async () => {
+    try {
+      const parsed = await parseBody(req, CreateFeaturedSchema);
+      if ("error" in parsed) return parsed.error;
 
     const { type, entityId, location, status, sortOrder } = parsed.data;
 
@@ -115,7 +104,7 @@ export async function POST(req: Request) {
       entityName = m.name;
     }
 
-    // Check for duplicate
+      // Check for duplicate
     const [existing] = await db
       .select({ id: featuredItems.id })
       .from(featuredItems)
@@ -132,9 +121,10 @@ export async function POST(req: Request) {
       .values({ type, entityId, location, status, sortOrder })
       .returning();
 
-    return ok({ ...created, entityName });
-  } catch (err) {
-    console.error("[admin/featured POST]", err);
-    return fail("Failed to create featured item.", 500);
-  }
+      return ok({ ...created, entityName });
+    } catch (err) {
+      console.error("[admin/featured POST]", err);
+      return fail("Failed to create featured item.", 500);
+    }
+  }, ["admin"]);
 }

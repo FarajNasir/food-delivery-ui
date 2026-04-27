@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants, users, notifications } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { orders, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { NotificationService } from "@/services/notification.service";
@@ -44,16 +44,17 @@ export async function POST(
       return fail("Order not found.", 404);
     }
 
-    // 3. Update status if not already PAID
-    if (order.status !== "PAID") {
-      await db
-        .update(orders)
-        .set({
-          status: "PAID",
-          updatedAt: new Date()
-        })
-        .where(eq(orders.id, id));
+    // 3. Atomic Update: Only proceed if status is NOT already PAID
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({
+        status: "PAID",
+        updatedAt: new Date()
+      })
+      .where(and(eq(orders.id, id), ne(orders.status, "PAID")))
+      .returning();
 
+    if (updatedOrder) {
       // 4. Notify Restaurant Owner (same logic as webhook)
       const [restaurant] = await db
         .select({
@@ -61,56 +62,49 @@ export async function POST(
           name: restaurants.name
         })
         .from(restaurants)
-        .where(eq(restaurants.id, order.restaurantId))
+        .where(eq(restaurants.id, updatedOrder.restaurantId))
         .limit(1);
 
       if (restaurant) {
-        const [owner] = await db
-          .select({ lastActive: users.lastActive })
-          .from(users)
-          .where(eq(users.id, restaurant.ownerId))
-          .limit(1);
+        const subject = "Payment Received";
+        
+        const itemsRows = await db
+          .select({
+            name: menuItems.name,
+            quantity: orderItems.quantity,
+          })
+          .from(orderItems)
+          .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+          .where(eq(orderItems.orderId, updatedOrder.id));
+        
+        const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+        const ownerBody = `Payment Received! 💰\nOrder: #${updatedOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${updatedOrder.totalAmount}`;
 
-        const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-        const [newNotification] = await db.insert(notifications).values({
-          recipientId: restaurant.ownerId,
+        // Dispatch Owner Notifications
+        await NotificationService.dispatchOrderNotifications({
+          userId: restaurant.ownerId,
           type: "ORDER",
-          subject: "Payment Received",
-          body: `Payment for Order #${order.id.slice(0, 8)} at ${restaurant.name} has been confirmed. You can now begin preparation.`,
-          channel: isActive ? "FCM" : "WHATSAPP",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID" }
-        }).returning();
-
-        if (newNotification && newNotification.channel === "FCM") {
-          NotificationService.trigger(newNotification.id);
-        }
+          subject,
+          body: ownerBody,
+          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
+          channels: ["FCM", "WHATSAPP"]
+        });
       }
 
       // 5. Notify Customer
       try {
-        const [customer] = await db
-          .select({ lastActive: users.lastActive })
-          .from(users)
-          .where(eq(users.id, order.userId))
-          .limit(1);
+        const subject = "Payment Confirmed";
+        const body = `Your payment was successful. The restaurant will start preparing your meal shortly.`;
 
-        const isActive = customer?.lastActive && (Date.now() - new Date(customer.lastActive).getTime() < 300000);
-
-        const [customerNotification] = await db.insert(notifications).values({
-          recipientId: order.userId,
+        // Dispatch Customer Notifications
+        await NotificationService.dispatchOrderNotifications({
+          userId: updatedOrder.userId,
           type: "ORDER",
-          subject: "Payment Confirmed",
-          body: `Your payment was successful. The restaurant will start preparing your meal shortly.`,
-          channel: isActive ? "FCM" : "WHATSAPP",
-          status: "PENDING",
-          metadata: { orderId: order.id, orderStatus: "PAID" }
-        }).returning();
-
-        if (customerNotification && customerNotification.channel === "FCM") {
-          NotificationService.trigger(customerNotification.id);
-        }
+          subject,
+          body,
+          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "customer" },
+          channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+        });
       } catch (notifyErr) {
         console.error("[Stripe Verify] Failed to notify customer:", notifyErr);
       }

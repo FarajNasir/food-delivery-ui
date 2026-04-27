@@ -105,16 +105,21 @@ export async function getCurrentUser(
   reqOrToken?: Request | string
 ): Promise<SessionUser | null> {
   let userId: string | null = null;
+  let bearerToken: string | undefined;
 
   // ── Fast path 1: middleware-injected header (no Supabase network call) ───
   if (reqOrToken instanceof Request) {
     userId = reqOrToken.headers.get("x-user-id");
+    const authHeader = reqOrToken.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      bearerToken = authHeader.slice("Bearer ".length).trim();
+    }
   }
 
   // ── Slow path: verify via Supabase when no header is available ───────────
   if (!userId) {
     const supabase = await createClient();
-    const token = typeof reqOrToken === "string" ? reqOrToken : undefined;
+    const token = typeof reqOrToken === "string" ? reqOrToken : bearerToken;
     const { data: { user: authUser } } = token
       ? await supabase.auth.getUser(token)
       : await supabase.auth.getUser();

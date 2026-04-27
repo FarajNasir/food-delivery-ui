@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from "zustand/middleware";
 import { createClient } from '@/lib/supabase/client';
 import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import { authApi, AuthUser, UserRole } from '@/lib/api';
@@ -16,52 +17,53 @@ interface AuthState {
   setRole:    (role: UserRole | null)   => void;
   setIsReady: (ready: boolean)          => void;
   logout:     () => Promise<void>;
-  sync:       () => Promise<void>;
 }
 
 const supabase = createClient();
 
-export const useAuthStore = create<AuthState>((set) => ({
-  session:  null,
-  user:     null,
-  profile:  null,
-  role:     null,
-  isReady:  false,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      session:  null,
+      user:     null,
+      profile:  null,
+      role:     null,
+      isReady:  false,
 
-  setSession: (session) => set({ session }),
-  setUser:    (user)    => set({ user }),
-  setProfile: (profile) => set({ profile }),
-  setRole:    (role)    => set({ role }),
-  setIsReady: (isReady) => set({ isReady }),
+      setSession: (session) => set({ session }),
+      setUser:    (user)    => set({ user }),
+      setProfile: (profile) => set({ profile }),
+      setRole:    (role)    => set({ role }),
+      setIsReady: (isReady) => set({ isReady }),
 
-  logout: async () => {
-    await supabase.auth.signOut();
-    set({ session: null, user: null, profile: null, role: null, isReady: true });
-  },
-
-  // Called manually after login to ensure profile + role are loaded
-  // before the app redirects. Does NOT use getSession() (stale cache).
-  sync: async () => {
-    // Fetch fresh session to ensure `user` and `session` getters in contexts work immediately after login.
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await authApi.getMe();
-    if (res.success && res.data) {
-      set({ 
-        session,
-        user: session?.user ?? null,
-        profile: res.data, 
-        role: res.data.role, 
-        isReady: true 
-      });
+      logout: async () => {
+        await supabase.auth.signOut();
+        set({ session: null, user: null, profile: null, role: null, isReady: true });
+      },
+    }),
+    {
+      name: "auth-store",
+      partialize: (state) => ({
+        profile: state.profile,
+        role: state.role,
+      }),
     }
-  },
-}));
+  )
+);
 
 // ── Load profile for a given session ──────────────────────────────────────────
 // Fetches the DB profile and sets role + profile atomically,
 // then marks the store as ready. Used on INITIAL_SESSION and SIGNED_IN.
 async function loadProfile(session: Session) {
   const store = useAuthStore.getState();
+
+  if (store.profile && store.profile.id === session.user.id) {
+    store.setSession(session);
+    store.setUser(session.user);
+    store.setIsReady(true);
+    return;
+  }
+
   store.setSession(session);
   store.setUser(session.user);
 

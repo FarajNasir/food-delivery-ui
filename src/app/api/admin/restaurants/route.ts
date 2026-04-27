@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { parseBody, ok, fail } from "@/lib/proxy";
-import { getCurrentUser } from "@/lib/auth";
+import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { restaurants, users } from "@/lib/db/schema";
 import { eq, and, asc, desc, count, sql, SQL } from "drizzle-orm";
@@ -41,115 +40,106 @@ const restaurantSelect = {
   createdAt:     restaurants.createdAt,
 } as const;
 
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user)                 return { user: null, res: fail("Unauthorized.", 401) };
-  if (user.role !== "admin") return { user: null, res: fail("Forbidden.", 403) };
-  return { user, res: null };
-}
-
 /* ── GET /api/admin/restaurants ── */
 export async function GET(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
+  return withAuth(req, async () => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const search   = searchParams.get("search")   ?? "";
+      const status   = searchParams.get("status")   ?? "all";
+      const location = searchParams.get("location") ?? "all";
+      const sort     = searchParams.get("sort")     ?? "name";
+      const order    = searchParams.get("order")    ?? "asc";
+      const page     = Math.max(1, Number(searchParams.get("page")  ?? "1"));
+      const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("limit") ?? "10")));
+      const offset   = (page - 1) * pageSize;
 
-    const { searchParams } = new URL(req.url);
-    const search   = searchParams.get("search")   ?? "";
-    const status   = searchParams.get("status")   ?? "all";
-    const location = searchParams.get("location") ?? "all";
-    const sort     = searchParams.get("sort")     ?? "name";
-    const order    = searchParams.get("order")    ?? "asc";
-    const page     = Math.max(1, Number(searchParams.get("page")  ?? "1"));
-    const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("limit") ?? "10")));
-    const offset   = (page - 1) * pageSize;
+      const conditions: SQL[] = [];
 
-    const conditions: SQL[] = [];
+      if (search) {
+        const tsQuery = search
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((w) => `${w.replace(/[^a-zA-Z0-9]/g, "")}:*`)
+          .filter(Boolean)
+          .join(" & ");
 
-    if (search) {
-      const tsQuery = search
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => `${w.replace(/[^a-zA-Z0-9]/g, "")}:*`)
-        .filter(Boolean)
-        .join(" & ");
-
-      if (tsQuery) {
-        conditions.push(
-          sql`to_tsvector('simple', coalesce(${restaurants.name}, '') || ' ' || coalesce(${restaurants.contactEmail}, ''))
-              @@ to_tsquery('simple', ${tsQuery})`
-        );
+        if (tsQuery) {
+          conditions.push(
+            sql`to_tsvector('simple', coalesce(${restaurants.name}, '') || ' ' || coalesce(${restaurants.contactEmail}, ''))
+                @@ to_tsquery('simple', ${tsQuery})`
+          );
+        }
       }
+
+      if (status !== "all") {
+        conditions.push(eq(restaurants.status, status as "active" | "inactive" | "suspended"));
+      }
+
+      if (location !== "all") {
+        conditions.push(eq(restaurants.location, location));
+      }
+
+      const where    = conditions.length > 0 ? and(...conditions) : undefined;
+      const orderCol = sort === "createdAt" ? restaurants.createdAt : restaurants.name;
+      const orderDir = order === "desc" ? desc(orderCol) : asc(orderCol);
+
+      /* Run count + data fetch in parallel — saves one round-trip */
+      const [countRows, rows] = await Promise.all([
+        db.select({ total: count() }).from(restaurants).where(where),
+        db
+          .select(restaurantSelect)
+          .from(restaurants)
+          .leftJoin(users, eq(restaurants.ownerId, users.id))
+          .where(where)
+          .orderBy(orderDir)
+          .limit(pageSize)
+          .offset(offset),
+      ]);
+
+      return ok({ restaurants: rows, total: countRows[0].total, page, pageSize });
+    } catch (err) {
+      console.error("[admin/restaurants GET]", err);
+      return fail("Failed to load restaurants.", 500);
     }
-
-    if (status !== "all") {
-      conditions.push(eq(restaurants.status, status as "active" | "inactive" | "suspended"));
-    }
-
-    if (location !== "all") {
-      conditions.push(eq(restaurants.location, location));
-    }
-
-    const where    = conditions.length > 0 ? and(...conditions) : undefined;
-    const orderCol = sort === "createdAt" ? restaurants.createdAt : restaurants.name;
-    const orderDir = order === "desc" ? desc(orderCol) : asc(orderCol);
-
-    /* Run count + data fetch in parallel — saves one round-trip */
-    const [countRows, rows] = await Promise.all([
-      db.select({ total: count() }).from(restaurants).where(where),
-      db
-        .select(restaurantSelect)
-        .from(restaurants)
-        .leftJoin(users, eq(restaurants.ownerId, users.id))
-        .where(where)
-        .orderBy(orderDir)
-        .limit(pageSize)
-        .offset(offset),
-    ]);
-
-    return ok({ restaurants: rows, total: countRows[0].total, page, pageSize });
-  } catch (err) {
-    console.error("[admin/restaurants GET]", err);
-    return fail("Failed to load restaurants.", 500);
-  }
+  }, ["admin"]);
 }
 
 /* ── POST /api/admin/restaurants ── */
 export async function POST(req: Request) {
-  try {
-    const { res } = await requireAdmin();
-    if (res) return res;
+  return withAuth(req, async () => {
+    try {
+      const parsed = await parseBody(req, CreateRestaurantSchema);
+      if ("error" in parsed) return parsed.error;
 
-    const parsed = await parseBody(req, CreateRestaurantSchema);
-    if ("error" in parsed) return parsed.error;
+      const { name, location, logoUrl, ownerId, managerPhone, contactEmail,
+              contactPhone, businessRegNo, openingHours, status } = parsed.data;
 
-    const { name, location, logoUrl, ownerId, managerPhone, contactEmail,
-            contactPhone, businessRegNo, openingHours, status } = parsed.data;
+      /* Verify owner exists and grab their info in one query */
+      const [owner] = await db
+        .select({ id: users.id, name: users.name, email: users.email, phone: users.phone })
+        .from(users)
+        .where(eq(users.id, ownerId));
 
-    /* Verify owner exists and grab their info in one query */
-    const [owner] = await db
-      .select({ id: users.id, name: users.name, email: users.email, phone: users.phone })
-      .from(users)
-      .where(eq(users.id, ownerId));
+      if (!owner) return fail("Owner user not found.", 404);
 
-    if (!owner) return fail("Owner user not found.", 404);
+      const [created] = await db
+        .insert(restaurants)
+        .values({ name, location, logoUrl, ownerId, managerPhone, contactEmail,
+                  contactPhone, businessRegNo, openingHours, status })
+        .returning();
 
-    const [created] = await db
-      .insert(restaurants)
-      .values({ name, location, logoUrl, ownerId, managerPhone, contactEmail,
-                contactPhone, businessRegNo, openingHours, status })
-      .returning();
-
-    /* Return the full shape the UI expects (same as GET list rows) */
-    return ok({
-      ...created,
-      ownerName:  owner.name,
-      ownerEmail: owner.email,
-      ownerPhone: owner.phone,
-    });
-  } catch (err) {
-    console.error("[admin/restaurants POST]", err);
-    return fail("Failed to create restaurant.", 500);
-  }
+      /* Return the full shape the UI expects (same as GET list rows) */
+      return ok({
+        ...created,
+        ownerName:  owner.name,
+        ownerEmail: owner.email,
+        ownerPhone: owner.phone,
+      });
+    } catch (err) {
+      console.error("[admin/restaurants POST]", err);
+      return fail("Failed to create restaurant.", 500);
+    }
+  }, ["admin"]);
 }

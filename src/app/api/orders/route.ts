@@ -1,7 +1,7 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, cartItems, menuItems, restaurants, users, notifications, orderSessions } from "@/lib/db/schema";
-import { eq, inArray, desc, asc, sql } from "drizzle-orm";
+import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions } from "@/lib/db/schema";
+import { eq, inArray, desc, sql } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
 export const dynamic = "force-dynamic";
@@ -144,47 +144,64 @@ export async function POST(req: Request) {
       });
 
       // --- Notification Logic (Outside Transaction) ---
-      for (const newOrder of createdOrders.orders) {
-        try {
-          const [restaurant] = await db
-            .select({ ownerId: restaurants.ownerId, name: restaurants.name })
-            .from(restaurants)
-            .where(eq(restaurants.id, newOrder.restaurantId))
-            .limit(1);
+      await Promise.all(
+        createdOrders.orders.map(async (newOrder) => {
+          try {
+            const [[restaurant], itemsRows] = await Promise.all([
+              db
+                .select({ ownerId: restaurants.ownerId, name: restaurants.name })
+                .from(restaurants)
+                .where(eq(restaurants.id, newOrder.restaurantId))
+                .limit(1),
+              db
+                .select({
+                  name: menuItems.name,
+                  quantity: orderItems.quantity,
+                  price: orderItems.price,
+                })
+                .from(orderItems)
+                .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+                .where(eq(orderItems.orderId, newOrder.id)),
+            ]);
 
-          if (restaurant) {
-            const [owner] = await db
-              .select({ lastActive: users.lastActive })
-              .from(users)
-              .where(eq(users.id, restaurant.ownerId))
-              .limit(1);
+            if (restaurant) {
+              const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+              const totalAmount = newOrder.totalAmount;
 
-            const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
+              const ownerBody = `New Order Received!\n\nOrder #${newOrder.id.slice(0, 8)}\nItems:\n${itemsSummary}\n\nTotal: £${totalAmount}\n\nAddress: ${newOrder.deliveryAddress}`;
+              const customerBody = `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`;
 
-            const [newNotification] = await db.insert(notifications).values({
-              recipientId: restaurant.ownerId,
-              type: "ORDER",
-              subject: "New Order Received!",
-              body: `Order #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
-              channel: isActive ? "FCM" : "WHATSAPP",
-              status: "PENDING",
-              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
-            }).returning();
-
-            if (newNotification && newNotification.channel === "FCM") {
-              NotificationService.trigger(newNotification.id);
+              await Promise.all([
+                NotificationService.dispatchOrderNotifications({
+                  userId: restaurant.ownerId,
+                  type: "ORDER",
+                  subject: "New Order Received!",
+                  body: ownerBody,
+                  metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
+                  channels: ["FCM", "WHATSAPP"]
+                }),
+                NotificationService.dispatchOrderNotifications({
+                  userId: newOrder.userId,
+                  type: "ORDER",
+                  subject: "Order Received! 🛍️",
+                  body: customerBody,
+                  metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
+                  channels: ["FCM", "WHATSAPP"]
+                  // Note: No EMAIL here as per requirements (key stages only: PAID, CONFIRMED, DELIVERED)
+                }),
+              ]);
             }
+          } catch (notifyErr) {
+            console.error("Failed to queue notification:", notifyErr);
           }
-        } catch (notifyErr) {
-          console.error("Failed to queue notification:", notifyErr);
-        }
-      }
+        })
+      );
       // --------------------------
 
       return ok({ orders: createdOrders.orders, sessionId: createdOrders.sessionId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[api/orders POST]", err);
-      if (err.message === "CART_EMPTY") {
+      if (err instanceof Error && err.message === "CART_EMPTY") {
         return fail("Cart is empty", 400);
       }
       return fail("Failed to create orders.", 500);
@@ -205,40 +222,39 @@ export async function GET(req: Request) {
       const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
       const offset = (page - 1) * limit;
 
-      // Step 0: fetch total count
-      const [{ count }] = await db
-        .select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
-        .from(orders)
-        .where(eq(orders.userId, user.id));
-
-      // Step 1: fetch orders + restaurant name
-      const orderRows = await db
-        .select({
-          id: orders.id,
-          userId: orders.userId,
-          restaurantId: orders.restaurantId,
-          restaurantName: restaurants.name,
-          status: orders.status,
-          totalAmount: orders.totalAmount,
-          deliveryFee: orders.deliveryFee,
-          deliveryAddress: orders.deliveryAddress,
-          deliveryArea: orders.deliveryArea,
-          customerPhone: orders.customerPhone,
-          currency: orders.currency,
-          paymentIntentId: orders.paymentIntentId,
-          sessionId: orders.sessionId,
-          createdAt: orders.createdAt,
-          updatedAt: orders.updatedAt,
-        })
-        .from(orders)
-        .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
-        .where(eq(orders.userId, user.id))
-        .orderBy(
-          sql`CASE WHEN ${orders.status} IN ('DELIVERED', 'CANCELLED') THEN 1 ELSE 0 END ASC`,
-          desc(orders.createdAt)
-        )
-        .limit(limit)
-        .offset(offset);
+      const [[{ count }], orderRows] = await Promise.all([
+        db
+          .select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+          .from(orders)
+          .where(eq(orders.userId, user.id)),
+        db
+          .select({
+            id: orders.id,
+            userId: orders.userId,
+            restaurantId: orders.restaurantId,
+            restaurantName: restaurants.name,
+            status: orders.status,
+            totalAmount: orders.totalAmount,
+            deliveryFee: orders.deliveryFee,
+            deliveryAddress: orders.deliveryAddress,
+            deliveryArea: orders.deliveryArea,
+            customerPhone: orders.customerPhone,
+            currency: orders.currency,
+            paymentIntentId: orders.paymentIntentId,
+            sessionId: orders.sessionId,
+            createdAt: orders.createdAt,
+            updatedAt: orders.updatedAt,
+          })
+          .from(orders)
+          .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+          .where(eq(orders.userId, user.id))
+          .orderBy(
+            sql`CASE WHEN ${orders.status} IN ('DELIVERED', 'CANCELLED') THEN 1 ELSE 0 END ASC`,
+            desc(orders.createdAt)
+          )
+          .limit(limit)
+          .offset(offset),
+      ]);
 
       if (orderRows.length === 0) return ok({ orders: [] });
 
@@ -284,7 +300,7 @@ export async function GET(req: Request) {
           })),
       }));
 
-      return ok({ 
+      return ok({
         orders: result,
         pagination: {
           total: count,

@@ -106,7 +106,7 @@ export default function CustomerCart() {
         </div>
         {!isEmpty && (
           <button
-            onClick={clearCart}
+            onClick={() => clearCart()}
             className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-all flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-50 rounded-full"
           >
             <Trash2 className="w-3.5 h-3.5" />

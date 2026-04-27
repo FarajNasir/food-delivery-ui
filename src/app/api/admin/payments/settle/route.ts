@@ -38,7 +38,7 @@ export async function POST(req: Request) {
           eq(orders.restaurantId, restaurantId),
           inArray(orders.id, orderIds),
           eq(orders.isSettled, "NO"),
-          eq(orders.status, "PAID")
+          inArray(orders.status, ["PAID", "DELIVERED"])
         ));
 
       if (targetedOrders.length === 0) {

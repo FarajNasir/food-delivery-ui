@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { customerService } from "@/services/customer.service";
 import type { RestaurantItem, FeaturedItem } from "@/types/api.types";
-import { getRestaurants, type Restaurant } from "@/data/restaurants";
 
 /**
  * useRestaurants.ts - Unified hook for fetching and managing restaurant data.
@@ -12,24 +11,28 @@ import { getRestaurants, type Restaurant } from "@/data/restaurants";
 export function useRestaurants(searchQuery: string = "") {
   const { site } = useConfigStore();
   const [featured, setFeatured] = useState<FeaturedItem[]>([]);
+  const [normal, setNormal] = useState<RestaurantItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoized local restaurants (mock data for now, or unified DB later)
-  const localRestaurants = useMemo(() => getRestaurants(site.key), [site.key]);
-
-  const fetchFeatured = useCallback(async () => {
+  const fetchRestaurants = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await customerService.getFeatured({ 
-        location: site.location, 
-        type: "restaurant" 
-      });
-      if (res.success && res.data) {
-        setFeatured(res.data.items);
-      } else {
-        setError(res.error || "Failed to load featured restaurants");
+      const [featRes, normRes] = await Promise.all([
+        customerService.getFeatured({ 
+          location: site.location, 
+          type: "restaurant" 
+        }),
+        customerService.getRestaurants({ location: site.location })
+      ]);
+      
+      if (featRes.success && featRes.data) {
+        setFeatured(featRes.data.items);
+      }
+      
+      if (normRes.success && normRes.data) {
+        setNormal(normRes.data.items);
       }
     } catch (err) {
       setError("An unexpected error occurred");
@@ -39,8 +42,8 @@ export function useRestaurants(searchQuery: string = "") {
   }, [site.location]);
 
   useEffect(() => {
-    fetchFeatured();
-  }, [fetchFeatured]);
+    fetchRestaurants();
+  }, [fetchRestaurants]);
 
   // Filtering Logic
   const filteredFeatured = useMemo(() => {
@@ -51,19 +54,18 @@ export function useRestaurants(searchQuery: string = "") {
   }, [featured, searchQuery]);
 
   const filteredNormal = useMemo(() => {
-    if (!searchQuery) return localRestaurants;
+    if (!searchQuery) return normal;
     const query = searchQuery.toLowerCase();
-    return localRestaurants.filter(r => 
-      r.name.toLowerCase().includes(query) || 
-      r.cuisine.toLowerCase().includes(query)
+    return normal.filter(r => 
+      r.name.toLowerCase().includes(query)
     );
-  }, [localRestaurants, searchQuery]);
+  }, [normal, searchQuery]);
 
   return {
     featured: filteredFeatured,
     normal: filteredNormal,
     isLoading,
     error,
-    refresh: fetchFeatured
+    refresh: fetchRestaurants
   };
 }

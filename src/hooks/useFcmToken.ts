@@ -78,40 +78,46 @@ export const useFcmToken = (userId: string | undefined) => {
       const role = useAuthStore.getState().role;
       const incomingTitle = payload.notification?.title || "";
       const incomingBody = payload.notification?.body || "";
+      const targetRole = payload.data?.targetRole; // 'owner' or 'customer'
 
-      const ownerAdminToast = (() => {
-        if (!isOrder) {
+      // Determine if this is a merchant-specific alert based on metadata or current role fallback
+      const isMerchantAlert = targetRole 
+        ? (targetRole === "owner" || targetRole === "admin")
+        : (role === "owner" || role === "admin");
+
+      const toastContent = (() => {
+        // High priority: If we have an explicit targetRole and it's merchant, we might want to standardize
+        // generic statuses like PENDING_CONFIRMATION for a cleaner UI, BUT we should still prefer server text.
+        if (isMerchantAlert) {
+          // Fallback logic for merchant alerts
+          if (isNewOrder) {
+            return {
+              title: incomingTitle || "New order received",
+              description: incomingBody || "A customer placed a new order.",
+            };
+          }
+          const orderStatus = payload.data?.status;
+          if (orderStatus === "PAID") {
+            return {
+              title: incomingTitle || "Payment received",
+              description: incomingBody || "An order payment was confirmed.",
+            };
+          }
           return {
-            title: incomingTitle || "Notification",
-            description: incomingBody || "A new update is available.",
+            title: incomingTitle || "Order update",
+            description: incomingBody || "An order status was updated.",
           };
         }
 
-        if (isNewOrder) {
-          return {
-            title: "New order received",
-            description: "A customer placed a new order.",
-          };
-        }
-
-        const orderStatus = payload.data?.status;
-        if (orderStatus === "PAID") {
-          return {
-            title: "Payment received",
-            description: "An order payment was confirmed.",
-          };
-        }
-
+        // Customer or un-flagged alert: always trust the server's copy entirely
         return {
-          title: "Order update",
-          description: "An order status was updated.",
+          title: incomingTitle || "Live Update",
+          description: incomingBody || "A live order update was received.",
         };
       })();
 
-      toast.success(role === "owner" || role === "admin" ? ownerAdminToast.title : (incomingTitle || "New Kitchen Alert"), {
-        description: role === "owner" || role === "admin"
-          ? ownerAdminToast.description
-          : (incomingBody || "A live order update was received."),
+      toast.success(toastContent.title, {
+        description: toastContent.description,
         duration: 3000,
       });
 

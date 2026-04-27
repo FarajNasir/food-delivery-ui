@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { getRestaurants } from "@/data/restaurants";
 import RestaurantMenuView from "@/components/dashboard/customer/RestaurantMenuView";
 import { ALL_SITES } from "@/config/sites";
 import { db } from "@/lib/db";
@@ -35,7 +34,12 @@ export default async function RestaurantPage({
       DBMenuItems = await db
         .select()
         .from(menuItems)
-        .where(eq(menuItems.restaurantId, id))
+        .where(
+          and(
+            eq(menuItems.restaurantId, id),
+            eq(menuItems.status, "available")
+          )
+        )
         .orderBy(menuItems.category);
 
       // Fetch active reviews for this restaurant
@@ -59,13 +63,6 @@ export default async function RestaurantPage({
     }
   } catch (err) {
     console.error("Failed to fetch restaurant or reviews from DB:", err);
-  }
-
-  // 2. Fallback to mock data if not in DB
-  if (!restaurantData) {
-    restaurantData = ALL_SITES.flatMap((s) => getRestaurants(s.key)).find(
-      (r) => r.id === id
-    );
   }
 
   if (!restaurantData) notFound();

@@ -1,6 +1,6 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, restaurants, users, notifications } from "@/lib/db/schema";
+import { orders, orderItems, restaurants, users, notifications, menuItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 
@@ -86,27 +86,39 @@ export async function POST(
           .limit(1);
 
         if (restaurant) {
-          const [owner] = await db
-            .select({ lastActive: users.lastActive })
-            .from(users)
-            .where(eq(users.id, restaurant.ownerId))
-            .limit(1);
+          const subject = "New Order Received!";
+          
+          const itemsRows = await db
+            .select({
+              name: menuItems.name,
+              quantity: orderItems.quantity,
+            })
+            .from(orderItems)
+            .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .where(eq(orderItems.orderId, newOrder.id));
+          
+          const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+          const ownerBody = `New Order! 🛍️\nOrder: #${newOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: NEW\n\nItems:\n${itemsSummary}\n\nTotal: £${newOrder.totalAmount}`;
 
-          const isActive = owner?.lastActive && (Date.now() - new Date(owner.lastActive).getTime() < 300000);
-
-          const [newNotification] = await db.insert(notifications).values({
-            recipientId: restaurant.ownerId,
+          // Dispatch Owner Notifications
+          await NotificationService.dispatchOrderNotifications({
+            userId: restaurant.ownerId,
             type: "ORDER",
-            subject: "New Reorder Received!",
-            body: `Reorder #${newOrder.id.slice(0, 8)} for ${restaurant.name} has been placed.`,
-            channel: isActive ? "FCM" : "WHATSAPP",
-            status: "PENDING",
-            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION" }
-          }).returning();
+            subject,
+            body: ownerBody,
+            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
+            channels: ["FCM", "WHATSAPP"]
+          });
 
-          if (newNotification && newNotification.channel === "FCM") {
-            NotificationService.trigger(newNotification.id);
-          }
+          // Dispatch Customer Notifications
+          await NotificationService.dispatchOrderNotifications({
+            userId: newOrder.userId,
+            type: "ORDER",
+            subject: "Order Received! 🛍️",
+            body: `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received.`,
+            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
+            channels: ["FCM", "WHATSAPP"]
+          });
         }
       } catch (notifyErr) {
         console.error("Failed to queue notification for reorder:", notifyErr);

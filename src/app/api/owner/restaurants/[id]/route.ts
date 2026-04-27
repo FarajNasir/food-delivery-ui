@@ -1,16 +1,15 @@
-import { ok, fail } from "@/lib/proxy";
+import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { restaurants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  try {
-    const user = await getCurrentUser();
-    if (!user || (user.role !== "owner" && user.role !== "admin")) {
-      return fail("Unauthorized.", 401);
-    }
+  return withAuth(req, async (user) => {
+    const { id } = await params;
+    try {
+      if (user.role !== "owner" && user.role !== "admin") {
+        return fail("Unauthorized.", 401);
+      }
 
     const conditions = [eq(restaurants.id, id)];
     if (user.role === "owner") {
@@ -25,20 +24,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (!row) return fail("Restaurant not found.", 404);
 
-    return ok(row);
-  } catch (err) {
-    console.error(`[api/owner/restaurants/${id} GET]`, err);
-    return fail("Failed to load restaurant details.", 500);
-  }
+      return ok(row);
+    } catch (err) {
+      console.error(`[api/owner/restaurants/${id} GET]`, err);
+      return fail("Failed to load restaurant details.", 500);
+    }
+  }, ["owner", "admin"]);
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  try {
-    const user = await getCurrentUser();
-    if (!user || (user.role !== "owner" && user.role !== "admin")) {
-      return fail("Unauthorized.", 401);
-    }
+  return withAuth(req, async (user) => {
+    const { id } = await params;
+    try {
+      if (user.role !== "owner" && user.role !== "admin") {
+        return fail("Unauthorized.", 401);
+      }
 
     const body = await req.json();
 
@@ -69,9 +69,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(restaurants.id, id))
       .returning();
 
-    return ok(updated);
-  } catch (err) {
-    console.error(`[api/owner/restaurants/${id} PUT]`, err);
-    return fail("Failed to update restaurant.", 500);
-  }
+      return ok(updated);
+    } catch (err) {
+      console.error(`[api/owner/restaurants/${id} PUT]`, err);
+      return fail("Failed to update restaurant.", 500);
+    }
+  }, ["owner", "admin"]);
 }

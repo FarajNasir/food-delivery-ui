@@ -1,9 +1,10 @@
 import { ok, fail, parseBody, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, restaurants, orderSessions } from "@/lib/db/schema";
+import { orders, restaurants, orderSessions, notifications, orderItems, menuItems, notificationChannelEnum } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { syncSessionStatus } from "@/lib/order-session";
+import { NotificationService } from "@/services/notification.service";
 
 const StatusSchema = z.object({
   status: z.enum([
@@ -126,6 +127,64 @@ export async function PATCH(
       // 4. Session Status Aggregation (Post-update)
       if (updated.sessionId && (status === "CONFIRMED" || status === "CANCELLED")) {
         await syncSessionStatus(updated.sessionId);
+      }
+
+      // --- Notify Owner ---
+      try {
+        const [resto] = await db
+          .select({
+            name: restaurants.name,
+            ownerId: restaurants.ownerId,
+          })
+          .from(restaurants)
+          .where(eq(restaurants.id, order.restaurantId))
+          .limit(1);
+
+        if (resto) {
+          const statusText = status.replace(/_/g, " ").toLowerCase();
+          const subject = status === "PAID" ? "Payment Confirmed" : `Order Update: #${id.slice(0, 8)}`;
+          
+          const itemsRows = await db
+            .select({
+              name: menuItems.name,
+              quantity: orderItems.quantity,
+            })
+            .from(orderItems)
+            .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .where(eq(orderItems.orderId, id));
+          
+          const itemsSummary = itemsRows.map(i => `${i.quantity}x ${i.name}`).join("\n");
+          const ownerBody = `Order Update: #${id.slice(0, 8)}\nRestaurant: ${resto.name}\nStatus: ${statusText.toUpperCase()}\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
+
+          // Dispatch Owner Notifications
+          await NotificationService.dispatchOrderNotifications({
+            userId: resto.ownerId,
+            type: "ORDER",
+            subject,
+            body: ownerBody,
+            metadata: { orderId: id, orderStatus: status },
+            channels: ["FCM", "WHATSAPP"]
+          });
+
+          const customerBody = `Your order #${id.slice(0, 8)} from ${resto.name} is now ${statusText.toUpperCase()}.`;
+
+          // Dispatch Customer Notifications
+          const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+          if (status === "PAID") {
+            customerChannels.push("EMAIL");
+          }
+
+          await NotificationService.dispatchOrderNotifications({
+            userId: order.userId,
+            type: "ORDER",
+            subject,
+            body: customerBody,
+            metadata: { orderId: id, orderStatus: status },
+            channels: customerChannels
+          });
+        }
+      } catch (notifyErr) {
+        console.error("[api/orders/status] Failed to notify owner:", notifyErr);
       }
 
       return ok({ order: updated });
