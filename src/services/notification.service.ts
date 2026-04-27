@@ -14,10 +14,9 @@ import { eq } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import twilio from "twilio";
 import {
-  buildOrderConfirmedEmailTemplate,
-  buildOrderDeliveredEmailTemplate,
   buildPaymentConfirmedEmailTemplate,
-} from "@/templates/email";
+} from "../templates/email";
+import { formatCurrency, resolveEmailBrand } from "../templates/email/utils";
 
 type NotificationMetadata = Record<string, unknown>;
 
@@ -332,23 +331,47 @@ export class NotificationService {
         ? await getOrderEmailData(orderId)
         : null;
 
-      const html = orderEmailData
-        ? orderEmailData.status === "CONFIRMED"
-          ? buildOrderConfirmedEmailTemplate(notification.subject, notification.body, orderEmailData)
-          : orderEmailData.status === "PAID"
-            ? buildPaymentConfirmedEmailTemplate(notification.subject, notification.body, orderEmailData)
-            : orderEmailData.status === "DELIVERED"
-              ? buildOrderDeliveredEmailTemplate(notification.subject, notification.body, orderEmailData)
-              : notification.body.replace(/\n/g, "<br/>")
-        : notification.body.replace(/\n/g, "<br/>");
+      const templateId = process.env.SENDGRID_PAYMENT_TEMPLATE_ID;
+      let msg: any;
 
-      const msg = {
-        to: user.email,
-        from: fromEmail,
-        subject: notification.subject,
-        text: notification.body,
-        html,
-      };
+      if (templateId && orderEmailData && orderEmailData.status === "PAID") {
+        const brand = resolveEmailBrand(orderEmailData.restaurantLocation);
+        msg = {
+          to: user.email,
+          from: fromEmail,
+          templateId: templateId,
+          dynamicTemplateData: {
+            brandName: brand.siteName,
+            brandPrimary: brand.primary,
+            brandAccent: brand.accent,
+            brandNotice: brand.notice,
+            supportEmail: brand.supportEmail,
+            orderId: orderEmailData.orderId.slice(0, 8).toUpperCase(),
+            restaurantName: orderEmailData.restaurantName,
+            items: orderEmailData.items.map((i) => ({
+              name: i.name,
+              quantity: i.quantity,
+              price: formatCurrency(i.price, orderEmailData.currency),
+            })),
+            totalAmount: formatCurrency(orderEmailData.totalAmount, orderEmailData.currency),
+            deliveryFee: formatCurrency(orderEmailData.deliveryFee, orderEmailData.currency),
+          },
+        };
+      } else {
+        const html = orderEmailData
+          ? orderEmailData.status === "PAID"
+            ? buildPaymentConfirmedEmailTemplate(notification.subject, notification.body, orderEmailData)
+            : notification.body.replace(/\n/g, "<br/>")
+          : notification.body.replace(/\n/g, "<br/>");
+
+        msg = {
+          to: user.email,
+          from: fromEmail,
+          subject: notification.subject,
+          text: notification.body,
+          html,
+        };
+      }
 
       const [response] = await sgMail.send(msg);
       console.log(`[NotificationService] SendGrid response: ${response.statusCode}`);

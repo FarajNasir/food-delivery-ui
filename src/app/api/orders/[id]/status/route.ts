@@ -170,7 +170,7 @@ export async function PATCH(
 
           // Dispatch Customer Notifications
           const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
-          if (["CONFIRMED", "PAID", "DELIVERED"].includes(status)) {
+          if (status === "PAID") {
             customerChannels.push("EMAIL");
           }
 

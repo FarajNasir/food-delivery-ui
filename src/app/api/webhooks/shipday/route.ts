@@ -309,11 +309,7 @@ export async function POST(req: Request) {
               channels: ["FCM", "WHATSAPP"]
             });
 
-            // 2. Notify Customer (FCM + WhatsApp + Optional Email)
             const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
-            if (mappedStatus === "DELIVERED") {
-              customerChannels.push("EMAIL");
-            }
 
             await NotificationService.dispatchOrderNotifications({
               userId: orderData.userId,

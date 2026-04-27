@@ -69,7 +69,7 @@ export const SITES: Record<SiteKey, SiteConfig> = {
     },
     contact: {
       managerPhone: "",
-      email: "Newcastleeatsinfo@gmail.com",
+      email: "hello@yourlocaleats.app",
       facebook: { label: "Newcastle Eats Delivery", handle: "Newcastle Eats" },
       instagram: { label: "newcastleeats__", handle: "newcastleeats__" },
       notice:
@@ -117,7 +117,7 @@ export const SITES: Record<SiteKey, SiteConfig> = {
     },
     contact: {
       managerPhone: "",
-      email: "Kilkeeleatsinfo@gmail.com",
+      email: "hello@yourlocaleats.app",
       facebook: { label: "Kilkeel Eats Delivery", handle: "Kilkeel Eats Delivery" },
       instagram: { label: "kilkeel_eats", handle: "kilkeel_eats" },
       notice:
@@ -156,7 +156,7 @@ export const SITES: Record<SiteKey, SiteConfig> = {
     },
     contact: {
       managerPhone: "",
-      email: "Downpatrickeatsinfo@gmail.com",
+      email: "hello@yourlocaleats.app",
       facebook: { label: "Downpatrick Eats Delivery", handle: "Downpatrick Eats Delivery" },
       instagram: { label: "downpatrickeats", handle: "downpatrickeats" },
       notice:
