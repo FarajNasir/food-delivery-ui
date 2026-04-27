@@ -17,6 +17,7 @@ interface ReviewSheetProps {
 
 export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }: ReviewSheetProps) {
   const [sortBy, setSortBy] = useState<"latest" | "highest">("latest");
+  const [selectedStars, setSelectedStars] = useState<number | null>(null);
 
   const breakdown = useMemo(() => {
     const counts = [0, 0, 0, 0, 0];
@@ -28,14 +29,25 @@ export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }
     return counts;
   }, [reviews]);
 
-  const sortedReviews = useMemo(() => {
-    return [...reviews].sort((a, b) => {
+  const filteredAndSortedReviews = useMemo(() => {
+    let result = [...reviews];
+    
+    // 1. Filter by stars if selected
+    if (selectedStars !== null) {
+      result = result.filter(r => Math.floor(r.rating) === selectedStars);
+    }
+
+    // 2. Sort
+    result.sort((a, b) => {
       if (sortBy === "latest") {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
       return b.rating - a.rating;
     });
-  }, [reviews, sortBy]);
+
+    // 3. Limit to 10
+    return result.slice(0, 10);
+  }, [reviews, sortBy, selectedStars]);
 
   const avgRating = reviews.length > 0 
     ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
@@ -63,13 +75,13 @@ export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }
             className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full overflow-hidden border-l border-gray-100"
           >
             {/* Header */}
-            <div className="p-8 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white sticky top-0 z-20">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white sticky top-0 z-20">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                   <div className="p-2 rounded-xl bg-amber-50 border border-amber-100">
-                     <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
+                   <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-100">
+                     <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
                    </div>
-                   <h2 className="text-xl font-black text-gray-900 tracking-tight">Reviews</h2>
+                   <h2 className="text-lg font-black text-gray-900 tracking-tight">Reviews</h2>
                 </div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-heading">
                   Verified feedback for {restaurantName}
@@ -77,66 +89,92 @@ export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }
               </div>
               <button 
                 onClick={onClose}
-                className="p-3 rounded-full bg-gray-50 border border-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all active:scale-90"
+                className="p-2.5 rounded-full bg-gray-50 border border-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all active:scale-90"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Scrollable Area */}
-            <div className="flex-1 overflow-y-auto p-6 pt-8 custom-scrollbar space-y-8">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-6">
               {/* Summary Stats Card */}
-              <div className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100/50 space-y-6">
-                <div className="flex items-center gap-6">
-                   <p className="text-5xl font-black text-gray-900 tracking-tighter">{avgRating}</p>
-                   <div>
-                     <div className="flex gap-0.5 mb-1">
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star 
-                            key={s} 
-                            className={cn(
-                              "w-3.5 h-3.5", 
-                              parseFloat(avgRating) >= s ? "fill-amber-400 text-amber-400" : "text-gray-200"
-                            )} 
-                          />
-                        ))}
-                     </div>
-                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest font-sans">
-                        From {formatReviewCount(reviews.length)} customers
-                     </p>
-                   </div>
+              <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100/50 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-5">
+                    <p className="text-4xl font-black text-gray-900 tracking-tighter">{avgRating}</p>
+                    <div>
+                      <div className="flex gap-0.5 mb-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star 
+                              key={s} 
+                              className={cn(
+                                "w-3 h-3", 
+                                parseFloat(avgRating) >= s ? "fill-amber-400 text-amber-400" : "text-gray-200"
+                              )} 
+                            />
+                          ))}
+                      </div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest font-sans">
+                          From {formatReviewCount(reviews.length)} customers
+                      </p>
+                    </div>
+                  </div>
+                  {selectedStars !== null && (
+                    <button 
+                      onClick={() => setSelectedStars(null)}
+                      className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {breakdown.map((count, i) => {
                     const stars = 5 - i;
                     const percentage = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                    const isSelected = selectedStars === stars;
+                    
                     return (
-                      <div key={stars} className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-gray-400 w-3">{stars}</span>
-                        <div className="flex-1 h-2 bg-white rounded-full overflow-hidden border border-gray-100 shadow-inner">
+                      <button 
+                        key={stars} 
+                        onClick={() => setSelectedStars(isSelected ? null : stars)}
+                        className={cn(
+                          "w-full flex items-center gap-3 transition-all hover:translate-x-1 group",
+                          isSelected ? "opacity-100" : selectedStars === null ? "opacity-100" : "opacity-40"
+                        )}
+                      >
+                        <span className={cn("text-[9px] font-black w-3", isSelected ? "text-amber-600" : "text-gray-400")}>
+                          {stars}
+                        </span>
+                        <div className={cn(
+                          "flex-1 h-1.5 rounded-full overflow-hidden border shadow-inner transition-colors",
+                          isSelected ? "bg-amber-50 border-amber-200" : "bg-white border-gray-100"
+                        )}>
                           <motion.div 
                             initial={{ width: 0 }}
                             animate={{ width: `${percentage}%` }}
-                            className="h-full bg-amber-400 rounded-full"
+                            className={cn("h-full rounded-full transition-colors", isSelected ? "bg-amber-500" : "bg-amber-400")}
                           />
                         </div>
-                        <span className="text-[10px] font-black text-gray-400 w-8 text-right">
+                        <span className={cn("text-[9px] font-black w-8 text-right", isSelected ? "text-amber-600" : "text-gray-400")}>
                           {Math.round(percentage)}%
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
 
               {/* Sorting Bar */}
-              <div className="flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md py-4 z-10 border-b border-gray-50 -mx-6 px-6">
+              <div className="flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md py-3 z-10 border-b border-gray-50 -mx-5 px-5">
                 <div className="flex items-center gap-2">
-                  <Filter className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Sort</span>
+                  <Filter className="w-3 h-3 text-gray-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                    {selectedStars ? `${selectedStars} Star Reviews` : "Sort Reviews"}
+                  </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {[
                     { id: "latest", label: "Newest" },
                     { id: "highest", label: "Top" }
@@ -145,9 +183,9 @@ export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }
                       key={btn.id}
                       onClick={() => setSortBy(btn.id as any)}
                       className={cn(
-                        "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border",
+                        "px-3.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border",
                         sortBy === btn.id 
-                          ? "bg-gray-900 text-white border-gray-900 shadow-lg shadow-gray-400/20" 
+                          ? "bg-gray-900 text-white border-gray-900 shadow-md shadow-gray-400/20" 
                           : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
                       )}
                     >
@@ -158,22 +196,31 @@ export default function ReviewSheet({ isOpen, onClose, reviews, restaurantName }
               </div>
 
               {/* Reviews List */}
-              <div className="space-y-6 pb-24">
-                {sortedReviews.length === 0 ? (
-                  <div className="py-20 text-center">
-                    <MessageSquare className="w-12 h-12 text-gray-100 mx-auto mb-4" />
-                    <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No reviews found</p>
+              <div className="space-y-3.5 pb-20">
+                {filteredAndSortedReviews.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <MessageSquare className="w-10 h-10 text-gray-100 mx-auto mb-3" />
+                    <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+                      {selectedStars ? `No ${selectedStars} star reviews found` : "No reviews found"}
+                    </p>
                   </div>
                 ) : (
-                  sortedReviews.map((r) => (
-                    <ReviewCard key={r.id} review={r} />
-                  ))
+                  <>
+                    {filteredAndSortedReviews.map((r) => (
+                      <ReviewCard key={r.id} review={r} />
+                    ))}
+                    {reviews.length > 10 && !selectedStars && filteredAndSortedReviews.length === 10 && (
+                      <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-widest py-4">
+                        Showing 10 most recent reviews
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
             {/* Fixed Footer CTA */}
-            <div className="absolute bottom-0 left-0 right-0 p-8 pt-4 bg-gradient-to-t from-white via-white to-white/0 border-t border-gray-50 flex items-center justify-center pointer-events-none">
+            <div className="absolute bottom-0 left-0 right-0 p-6 pt-3 bg-gradient-to-t from-white via-white to-white/0 border-t border-gray-50 flex items-center justify-center pointer-events-none">
                <Link
                 href="/dashboard/customer/orders"
                 className="w-full h-14 rounded-2xl bg-gray-900 flex items-center justify-center gap-3 text-white font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-gray-900/20 pointer-events-auto"

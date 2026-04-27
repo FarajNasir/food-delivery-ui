@@ -109,6 +109,7 @@ export default function CustomerOrdersPage() {
   const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"all" | "active" | "past">("all");
   const expiringOrdersRef = React.useRef<Set<string>>(new Set());
 
   const handleReorder = async (orderId: string) => {
@@ -264,8 +265,8 @@ export default function CustomerOrdersPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: gradientFrom }} />
-        <p className="text-xs font-semibold text-gray-400">Loading your orders...</p>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: gradientFrom }} />
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Retrieving your feast...</p>
       </div>
     );
   }
@@ -299,130 +300,109 @@ export default function CustomerOrdersPage() {
     }
   });
 
+  const displayedItems = activeTab === "all" ? allItems : activeTab === "active" ? activeItems : pastItems;
+
 
   return (
-    <div className="w-full max-w-xl mx-auto pt-6 sm:pt-8 pb-20 px-4 space-y-8">
+    <div className="w-full max-w-5xl mx-auto pt-8 sm:pt-12 pb-24 px-4 sm:px-6 space-y-10">
 
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-100 pb-8">
         <div>
-          <h1 className="text-xl font-black text-gray-900 tracking-tight">My Orders</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Track and manage your orders</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight sm:text-4xl">Order History</h1>
+          <p className="text-sm text-gray-500 mt-2 font-medium">Manage your past cravings and track active deliveries</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className={cn(
-            "p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-gray-700 transition-all active:scale-95",
-            refreshing && "animate-spin"
-          )}
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefresh}
+            className={cn(
+              "p-3 bg-white rounded-2xl border border-gray-200 shadow-sm text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-all active:scale-95",
+              refreshing && "animate-spin"
+            )}
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner">
+            {(["all", "active", "past"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all",
+                  activeTab === tab 
+                    ? "bg-white text-gray-900 shadow-md scale-[1.02]" 
+                    : "text-gray-400 hover:text-gray-600"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Empty State */}
       {orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-5 bg-white rounded-3xl border border-dashed border-gray-200">
+        <div className="flex flex-col items-center justify-center py-32 gap-6 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-sm">
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: `${gradientFrom}14` }}
+            className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-inner"
+            style={{ background: `${gradientFrom}10` }}
           >
-            <ShoppingBag className="w-7 h-7" style={{ color: gradientFrom }} />
+            <ShoppingBag className="w-10 h-10" style={{ color: gradientFrom }} />
           </div>
           <div className="text-center">
-            <p className="font-bold text-gray-800 text-sm">No orders yet</p>
-            <p className="text-xs text-gray-400 mt-1">Explore restaurants and place your first order!</p>
+            <h2 className="text-xl font-black text-gray-900">Your stomach is waiting!</h2>
+            <p className="text-sm text-gray-400 mt-2 max-w-[280px] mx-auto">You haven't placed any orders yet. Let's find something delicious for you.</p>
           </div>
           <button
             onClick={() => router.push("/dashboard/customer")}
-            className="px-6 py-2.5 rounded-2xl text-xs font-bold text-white transition-all hover:opacity-90"
+            className="px-8 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest text-white transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 shadow-lg"
             style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
           >
-            Find Food
+            Explore Restaurants
           </button>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-12">
 
-          {/* Active Orders */}
-          {activeItems.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Active</p>
-                <span className="text-[10px] font-bold text-gray-300">· {activeItems.length}</span>
+          {/* Conditional List Rendering */}
+          <div className="space-y-6">
+            {displayedItems.length === 0 ? (
+              <div className="py-20 text-center bg-gray-50/50 rounded-3xl border border-gray-100">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No {activeTab} orders found</p>
               </div>
-              <div className="space-y-3">
-                {activeItems.map((item: any) => item.type === "session" ? (
-                  <OrderSessionCard
-                    key={`session-${item.data.id}`}
-                    session={item.data}
-                    accent={accent}
-                    gradientFrom={gradientFrom}
-                    isPaying={isPaying === item.data.id}
-                    onPay={handleSessionPayment}
-                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
-                  />
-                ) : (
-                  <OrderCard
-                    key={`order-${item.data.id}`}
-                    order={item.data}
-                    config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
-                    accent={accent}
-                    gradientFrom={gradientFrom}
-                    isPaying={isPaying === item.data.id}
-                    isReordering={isReordering === item.data.id}
-                    onPay={handlePayment}
-                    onReorder={handleReorder}
-                    onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
-                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
-                    onExpire={handleExpire}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Past Orders */}
-          {pastItems.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Past Orders</p>
-                <span className="text-[10px] font-bold text-gray-300">· {pastItems.length}</span>
-              </div>
-              <div className="space-y-3">
-                {pastItems.map((item: any) => item.type === "session" ? (
-                  <OrderSessionCard
-                    key={`session-${item.data.id}`}
-                    session={item.data}
-                    accent={accent}
-                    gradientFrom={gradientFrom}
-                    isPaying={isPaying === item.data.id}
-                    onPay={handleSessionPayment}
-                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
-                  />
-                ) : (
-                  <OrderCard
-                    key={`order-${item.data.id}`}
-                    order={item.data}
-                    config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
-                    accent={accent}
-                    gradientFrom={gradientFrom}
-                    isPaying={isPaying === item.data.id}
-                    isReordering={isReordering === item.data.id}
-                    onPay={handlePayment}
-                    onReorder={handleReorder}
-                    onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
-                    onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
-                    onExpire={handleExpire}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+            ) : (
+              displayedItems.map((item: any) => item.type === "session" ? (
+                <OrderSessionCard
+                  key={`session-${item.data.id}`}
+                  session={item.data}
+                  accent={accent}
+                  gradientFrom={gradientFrom}
+                  isPaying={isPaying === item.data.id}
+                  onPay={handleSessionPayment}
+                  onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                />
+              ) : (
+                <OrderCard
+                  key={`order-${item.data.id}`}
+                  order={item.data}
+                  config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                  accent={accent}
+                  gradientFrom={gradientFrom}
+                  isPaying={isPaying === item.data.id}
+                  isReordering={isReordering === item.data.id}
+                  onPay={handlePayment}
+                  onReorder={handleReorder}
+                  onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
+                  onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
+                  onExpire={handleExpire}
+                />
+              ))
+            )}
+          </div>
 
           {/* Pagination */}
-          {!loading && (
+          {!loading && displayedItems.length > 0 && (
             <Pagination
               total={pagination.total}
               page={pagination.page}
