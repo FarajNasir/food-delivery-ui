@@ -169,19 +169,21 @@ export async function PATCH(
           const customerBody = `Your order #${id.slice(0, 8)} from ${resto.name} is now ${statusText.toUpperCase()}.`;
 
           // Dispatch Customer Notifications
-          const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
-          if (status === "PAID") {
-            customerChannels.push("EMAIL");
-          }
+          if (order.userId) {
+            const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+            if (status === "PAID") {
+              customerChannels.push("EMAIL");
+            }
 
-          await NotificationService.dispatchOrderNotifications({
-            userId: order.userId,
-            type: "ORDER",
-            subject,
-            body: customerBody,
-            metadata: { orderId: id, orderStatus: status },
-            channels: customerChannels
-          });
+            await NotificationService.dispatchOrderNotifications({
+              userId: order.userId,
+              type: "ORDER",
+              subject,
+              body: customerBody,
+              metadata: { orderId: id, orderStatus: status },
+              channels: customerChannels
+            });
+          }
         }
       } catch (notifyErr) {
         console.error("[api/orders/status] Failed to notify owner:", notifyErr);

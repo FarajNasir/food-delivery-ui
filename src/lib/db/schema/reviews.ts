@@ -5,7 +5,7 @@ import { orders } from "./orders";
 
 export const reviews = pgTable("reviews", {
   id:           uuid("id").primaryKey().defaultRandom(),
-  userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId:       uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   restaurantId: uuid("restaurant_id").notNull().references(() => restaurants.id, { onDelete: "cascade" }),
   orderId:      uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   rating:       integer("rating").notNull(),

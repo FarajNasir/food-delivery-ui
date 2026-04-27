@@ -115,6 +115,9 @@ export const authApi = {
   getMe() {
     return get<AuthUser>("/api/auth/me");
   },
+  deleteAccount() {
+    return del<{ message: string }>("/api/customer/account");
+  },
 };
 
 /* ── Admin: Restaurant Management API ── */

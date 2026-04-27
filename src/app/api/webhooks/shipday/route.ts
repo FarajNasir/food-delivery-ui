@@ -309,16 +309,18 @@ export async function POST(req: Request) {
               channels: ["FCM", "WHATSAPP"]
             });
 
-            const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+            if (orderData.userId) {
+              const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
 
-            await NotificationService.dispatchOrderNotifications({
-              userId: orderData.userId,
-              type: "ORDER",
-              subject,
-              body: customerBody,
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
-              channels: customerChannels
-            });
+              await NotificationService.dispatchOrderNotifications({
+                userId: orderData.userId,
+                type: "ORDER",
+                subject,
+                body: customerBody,
+                metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
+                channels: customerChannels
+              });
+            }
           }
 
       } catch (notifyErr) {

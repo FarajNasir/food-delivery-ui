@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { orders, users } from "@/lib/db/schema";
-import { sql, desc, ne, and, eq, gte, lte } from "drizzle-orm";
+import { orders, users, orderItems, restaurants } from "@/lib/db/schema";
+import { sql, desc, ne, and, eq, gte, lte, inArray } from "drizzle-orm";
 import { ok, fail, withAuth } from "@/lib/proxy";
 
 /**
@@ -33,8 +33,8 @@ export async function GET(req: Request) {
 
         const filterCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-        // 2. Fetch stats, count, and data in PARALLEL
-        const [statsRes, [{ count: totalCount }], allOrders, customersCountRes] = await Promise.all([
+        // 2. Fetch stats and total count
+        const [statsRes, [{ count: totalCount }], customersCountRes] = await Promise.all([
           // A. Aggregate stats
           db.select({
             totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} != 'CANCELLED' THEN ${orders.totalAmount} ELSE 0 END), 0)`,
@@ -48,24 +48,54 @@ export async function GET(req: Request) {
           .from(orders)
           .where(filterCondition),
 
-          // C. Detailed order list
-          db.query.orders.findMany({
-            where: filterCondition,
-            with: {
-              user: { columns: { id: true, name: true, email: true, phone: true } },
-              restaurant: { columns: { id: true, name: true } },
-              items: { with: { menuItem: { columns: { name: true } } } },
-            },
-            orderBy: [desc(orders.createdAt)],
-            limit: limit,
-            offset: offset,
-          }),
-
-          // D. Total Customers
+          // C. Total Customers
           db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
           .from(users)
           .where(eq(users.role, "customer"))
         ]);
+
+        // 3. Fetch detailed order list with manual joins (to avoid db.query possible innerJoin issues)
+        const allOrdersRaw = await db
+          .select({
+            id: orders.id,
+            status: orders.status,
+            totalAmount: orders.totalAmount,
+            deliveryAddress: orders.deliveryAddress,
+            customerPhone: orders.customerPhone,
+            createdAt: orders.createdAt,
+            updatedAt: orders.updatedAt,
+            user: {
+              id: users.id,
+              name: users.name,
+              email: users.email,
+              phone: users.phone,
+            },
+            restaurant: {
+              id: restaurants.id,
+              name: restaurants.name,
+            },
+          })
+          .from(orders)
+          .leftJoin(users, eq(orders.userId, users.id))
+          .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+          .where(filterCondition)
+          .orderBy(desc(orders.createdAt))
+          .limit(limit)
+          .offset(offset);
+
+        // Fetch items separately for each order (to avoid complex reassembly in select)
+        const orderIds = allOrdersRaw.map(o => o.id);
+        const allItems = orderIds.length > 0 
+          ? await db.query.orderItems.findMany({
+              where: inArray(orderItems.orderId, orderIds),
+              with: { menuItem: { columns: { name: true } } }
+            })
+          : [];
+
+        const allOrders = allOrdersRaw.map(o => ({
+          ...o,
+          items: allItems.filter(item => item.orderId === o.id)
+        }));
 
         const stats = statsRes[0] || { totalRevenue: "0", totalOrders: 0, pendingOrders: 0 };
         const totalCustomers = customersCountRes ? customersCountRes[0]?.count || 0 : 0;

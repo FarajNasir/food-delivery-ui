@@ -27,10 +27,10 @@ export default function ReviewCard({ review, compact = false }: ReviewCardProps)
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center font-black text-gray-400 text-[8px] uppercase border border-gray-100/50 shrink-0">
-            {review.userName?.charAt(0)}
+            {review.userName?.charAt(0) || "?"}
           </div>
           <p className="text-[10px] font-bold font-heading text-gray-900 uppercase tracking-tight truncate max-w-[120px]">
-            {review.userName}
+            {review.userName || "Anonymous User"}
           </p>
         </div>
         <div className="flex gap-0.5">

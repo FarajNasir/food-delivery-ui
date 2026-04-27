@@ -57,7 +57,7 @@ export default function AdminOrders() {
       .filter((o) => {
         const q = search.toLowerCase();
         const matchSearch = !q || o.id.toLowerCase().includes(q)
-          || o.user.name.toLowerCase().includes(q)
+          || (o.user?.name || "anonymous user").toLowerCase().includes(q)
           || o.restaurant.name.toLowerCase().includes(q);
         const isTimeout = o.status === 'CANCELLED' && 
           (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime() >= 290000);
@@ -227,7 +227,7 @@ export default function AdminOrders() {
                       <td className="px-6 py-6 font-mono font-bold text-gray-900 text-[11px]">
                         #{o.id.slice(0, 8).toUpperCase()}
                       </td>
-                      <td className="px-6 py-6 text-gray-900 font-bold">{o.user.name}</td>
+                      <td className="px-6 py-6 text-gray-900 font-bold">{o.user?.name || "Anonymous User"}</td>
                       <td className="px-6 py-6 text-gray-500 font-bold hidden md:table-cell">{o.restaurant.name}</td>
                       <td className="px-6 py-6 text-gray-400 font-bold hidden lg:table-cell text-[11px]">
                         {format(new Date(o.createdAt), "MMM d, HH:mm")}
@@ -271,7 +271,7 @@ export default function AdminOrders() {
                           </div>
                           <div className="flex justify-between items-end">
                             <div className="space-y-1">
-                              <p className="text-sm font-black text-gray-900 leading-tight">{o.user.name}</p>
+                              <p className="text-sm font-black text-gray-900 leading-tight">{o.user?.name || "Anonymous User"}</p>
                               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{o.restaurant.name}</p>
                             </div>
                             <div className="text-right">
@@ -344,9 +344,9 @@ function OrderDetailsDrawer({ order, onClose }: { order: AdminOrder | null, onCl
             <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-8">
-                <Detail label="Customer Name" value={order.user.name} />
-                <Detail label="Phone Number" value={order.user.phone} />
-                <Detail colSpan={2} label="Email Address" value={order.user.email} />
+                <Detail label="Customer Name" value={order.user?.name || "Anonymous User"} />
+                <Detail label="Phone Number" value={order.user?.phone || "-"} />
+                <Detail colSpan={2} label="Email Address" value={order.user?.email || "Deleted Account"} />
                 <Detail colSpan={2} label="Delivery Address" value={order.deliveryAddress || "N/A"} />
               </div>
 

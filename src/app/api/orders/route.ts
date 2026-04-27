@@ -180,8 +180,8 @@ export async function POST(req: Request) {
                   metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
                   channels: ["FCM", "WHATSAPP"]
                 }),
-                NotificationService.dispatchOrderNotifications({
-                  userId: newOrder.userId,
+                 NotificationService.dispatchOrderNotifications({
+                  userId: newOrder.userId!,
                   type: "ORDER",
                   subject: "Order Received! 🛍️",
                   body: customerBody,

@@ -110,9 +110,9 @@ export async function POST(
             channels: ["FCM", "WHATSAPP"]
           });
 
-          // Dispatch Customer Notifications
+           // Dispatch Customer Notifications
           await NotificationService.dispatchOrderNotifications({
-            userId: newOrder.userId,
+            userId: newOrder.userId!,
             type: "ORDER",
             subject: "Order Received! 🛍️",
             body: `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received.`,

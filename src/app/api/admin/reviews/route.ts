@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { reviews } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { reviews, users, restaurants } from "@/lib/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { ok, fail, withAuth } from "@/lib/proxy";
 
 export const dynamic = "force-dynamic";
@@ -14,31 +14,27 @@ export async function GET(req: Request) {
     req,
     async () => {
       try {
-        const allReviews = await db.query.reviews.findMany({
-          with: {
+        const allReviews = await db
+          .select({
+            id: reviews.id,
+            rating: reviews.rating,
+            comment: reviews.comment,
+            status: reviews.status,
+            createdAt: reviews.createdAt,
             user: {
-              columns: {
-                id: true,
-                name: true,
-                email: true,
-              },
+              id: users.id,
+              name: users.name,
+              email: users.email,
             },
             restaurant: {
-              columns: {
-                id: true,
-                name: true,
-              },
+              id: restaurants.id,
+              name: restaurants.name,
             },
-            order: {
-              columns: {
-                id: true,
-                status: true,
-                totalAmount: true,
-              }
-            }
-          },
-          orderBy: [desc(reviews.createdAt)],
-        });
+          })
+          .from(reviews)
+          .leftJoin(users, eq(reviews.userId, users.id))
+          .innerJoin(restaurants, eq(reviews.restaurantId, restaurants.id))
+          .orderBy(desc(reviews.createdAt));
 
         return ok({ reviews: allReviews });
       } catch (error: any) {

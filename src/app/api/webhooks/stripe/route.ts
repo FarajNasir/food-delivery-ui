@@ -96,14 +96,16 @@ export async function POST(req: Request) {
             const body = `Your payment was successful. The restaurant will start preparing your meal shortly.`;
 
             // Dispatch Customer Notifications
-            await NotificationService.dispatchOrderNotifications({
-              userId: updatedOrder.userId,
-              type: "ORDER",
-              subject,
-              body,
-              metadata: { orderId: updatedOrder.id, orderStatus: "PAID" },
-              channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
-            });
+            if (updatedOrder.userId) {
+              await NotificationService.dispatchOrderNotifications({
+                userId: updatedOrder.userId,
+                type: "ORDER",
+                subject,
+                body,
+                metadata: { orderId: updatedOrder.id, orderStatus: "PAID" },
+                channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+              });
+            }
             console.log(`[Stripe Webhook] Customer notification dispatched for order ${orderId}`);
           } catch (notifyErr) {
             console.error("[Stripe Webhook] Failed to notify customer:", notifyErr);
