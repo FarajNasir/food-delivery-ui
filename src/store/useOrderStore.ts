@@ -17,7 +17,7 @@ interface OrderState {
   };
 
   // Actions
-  refreshOrders: (page?: number) => Promise<void>;
+  refreshOrders: (page?: number, scope?: "all" | "active" | "past", limit?: number) => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   updateSingleOrder: (order: Partial<Order> & { id: string }) => void;
   reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
@@ -32,11 +32,11 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     limit: 20,
   },
 
-  refreshOrders: async (page) => {
+  refreshOrders: async (page, scope = "all", limit = 20) => {
     set({ isLoading: true });
     try {
       const currentPage = page ?? get().pagination.page;
-      const { success, data } = await customerService.getOrders({ page: currentPage });
+      const { success, data } = await customerService.getOrders({ page: currentPage, scope, limit });
       if (success && data) {
         set({ 
           orders: data.orders,
@@ -65,7 +65,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     }
   },
 
-  updateSingleOrder: (updatedOrder) => {
+  updateSingleOrder: async (updatedOrder) => {
     const state = get();
     const exists = state.orders.find((o) => o.id === updatedOrder.id);
 
@@ -75,23 +75,23 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
           o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
         ),
       });
-
-      // Handle toasts for status changes
-      if (updatedOrder.status) {
-        const isCustomerPage = typeof window !== "undefined" && window.location.pathname.includes("/dashboard/customer");
-        if (isCustomerPage) {
-          if (updatedOrder.status === "CONFIRMED") {
-            toast.success("Restaurant confirmed your order!");
-          } else if (updatedOrder.status === "DISPATCH_REQUESTED") {
-            toast.info("Your delivery has been requested.");
-          } else if (updatedOrder.status === "OUT_FOR_DELIVERY") {
-            toast.info("Your food is on the way!");
-          }
-        }
-      }
+      console.log(`[useOrderStore] Updated local order ${updatedOrder.id} status to ${updatedOrder.status}`);
     } else {
-      // Order is brand-new — always refresh the full list to maintain order and relations
-      get().refreshOrders();
+      // Order is missing from current view (e.g. on another page or brand new)
+      console.log(`[useOrderStore] Order ${updatedOrder.id} missing from local state. Fetching from server...`);
+      const { success, data } = await customerService.getOrderById(updatedOrder.id);
+      
+      if (success && data) {
+        set({
+          orders: [data, ...get().orders].filter((o, idx, self) => 
+            self.findIndex(other => other.id === o.id) === idx
+          )
+        });
+        console.log(`[useOrderStore] Successfully fetched and prepended missing order ${updatedOrder.id}`);
+      } else {
+        // Fallback: full refresh if single fetch fails
+        await get().refreshOrders();
+      }
     }
   },
   reorder: async (orderId: string) => {
@@ -108,7 +108,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
         toast.error("Failed to reorder. Please try again.");
         return { success: false };
       }
-    } catch (err) {
+    } catch {
       toast.error("A network error occurred.");
       return { success: false };
     } finally {

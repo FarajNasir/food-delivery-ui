@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Utensils, Package, Truck, CheckCircle2,
+  Utensils, Truck, CheckCircle2,
   Clock, ChevronRight, AlertCircle, Loader2,
-  Store, X, Bell, Zap, ExternalLink
+  X, Bell, Zap, ExternalLink
 } from "lucide-react";
 import { useOwnerStore, type OwnerOrder } from "@/store/useOwnerStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,7 +38,7 @@ const NEXT_STATUS: Record<string, { label: string; status: string; color: string
   PENDING_CONFIRMATION: { label: "Accept Order", status: "CONFIRMED", color: "bg-emerald-600 shadow-emerald-200" },
   CONFIRMED: { label: "Waiting for payment", status: "CONFIRMED", color: "bg-slate-100 text-slate-400 shadow-none", disabled: true },
   PAID: { label: "Send to Kitchen", status: "PREPARING", color: "bg-blue-600 shadow-blue-200" },
-  PREPARING: { label: "Dispatch Food", status: "OUT_FOR_DELIVERY", color: "bg-purple-600 shadow-purple-200" },
+  PREPARING: { label: "Dispatch Food", status: "DISPATCH_REQUESTED", color: "bg-purple-600 shadow-purple-200" },
   DISPATCH_REQUESTED: { label: "Awaiting Driver", status: "OUT_FOR_DELIVERY", color: "bg-slate-100 text-slate-400 shadow-none", disabled: true },
 };
 
@@ -247,7 +247,8 @@ export default function LiveOrdersView() {
   useEffect(() => {
     const currentPending = orders.filter(o => o.status === 'PENDING_CONFIRMATION');
     if (currentPending.length > prevPendingCount.current) {
-      setNewOrderAlert(true);
+      const timer = setTimeout(() => setNewOrderAlert(true), 0);
+      return () => clearTimeout(timer);
     }
     prevPendingCount.current = currentPending.length;
   }, [orders]);
@@ -362,7 +363,7 @@ export default function LiveOrdersView() {
 }
 
 // Simple internal helper for refresh
-function RotateCcw(props: any) {
+function RotateCcw(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -73,6 +73,7 @@ export const useFcmToken = (userId: string | undefined) => {
     retrieveToken();
 
     const unsubscribe = onMessage(messaging!, (payload: MessagePayload) => {
+      console.log("[useFcmToken] Received message:", payload);
       const isOrder = payload.data?.type === "ORDER";
       const isNewOrder = isOrder && (payload.data?.status === "PENDING_CONFIRMATION" || !payload.data?.status);
       const role = useAuthStore.getState().role;
@@ -116,27 +117,36 @@ export const useFcmToken = (userId: string | undefined) => {
         };
       })();
 
-      toast.success(toastContent.title, {
-        description: toastContent.description,
-        duration: 3000,
-      });
+      if (!isMerchantAlert) {
+        toast.success(toastContent.title, {
+          description: toastContent.description,
+          duration: 3000,
+        });
+      }
 
       if (isOrder) {
         const orderId = payload.data?.orderId;
-        const status = payload.data?.status;
-        // Role already resolved above — only dispatch to relevant stores to avoid 403 errors
+        const status = payload.data?.status || payload.data?.orderStatus;
+        
+        console.log(`[useFcmToken] Order update detected. ID: ${orderId}, Status: ${status}, TargetRole: ${targetRole}`);
 
-        if (orderId) {
-          // Customer order store — always update (customer tracks their own orders)
-          useOrderStore.getState().updateSingleOrder({ id: orderId, status });
+        if (orderId && status) {
+          // Customer order store
+          if (targetRole !== "owner" && targetRole !== "admin") {
+            console.log(`[useFcmToken] Updating Customer Order Store for ${orderId}`);
+            useOrderStore.getState().updateSingleOrder({ id: orderId, status });
+          }
 
-          // Owner store — only if the user is an owner or admin
-          if (role === "owner" || role === "admin") {
+          // Owner store — only update if the notification was targeted at the customer,
+          // NOT the owner. When the owner changes a status, their own store is already
+          // updated via the optimistic update + API response. Applying the FCM echo
+          // (which carries the OLD or INTERMEDIATE status) would cause the card to bounce.
+          if ((role === "owner" || role === "admin") && targetRole !== "owner" && targetRole !== "admin") {
             useOwnerStore.getState().updateSingleOrder({ id: orderId, status });
           }
 
           // Admin store — only if the user is an admin (avoids 403 for owners)
-          if (role === "admin") {
+          if (role === "admin" && targetRole !== "admin") {
             useAdminStore.getState().updateSingleOrder({ id: orderId, status });
           }
         } else {
@@ -149,6 +159,7 @@ export const useFcmToken = (userId: string | undefined) => {
           }
         }
       }
+
     });
 
     return () => unsubscribe();

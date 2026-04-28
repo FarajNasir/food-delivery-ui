@@ -14,6 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export default async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete("x-user-id");
 
   let supabaseResponse = NextResponse.next({
     request: { headers: requestHeaders },
@@ -28,15 +29,13 @@ export default async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach((cookie) => request.cookies.set(cookie));
 
           supabaseResponse = NextResponse.next({
             request: { headers: requestHeaders },
           });
 
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach((cookie) => supabaseResponse.cookies.set(cookie));
         },
       },
     }
@@ -64,7 +63,7 @@ export default async function proxy(request: NextRequest) {
   // Inject the verified user ID into a trusted server-side header so API
   // route handlers can skip their own supabase.auth.getUser() call.
   if (userId) {
-    supabaseResponse.headers.set("x-user-id", userId);
+    requestHeaders.set("x-user-id", userId);
   }
 
   // Boolean: is there an authenticated session?
@@ -108,17 +107,31 @@ export default async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    // Copy Supabase cookies to the redirect response
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
   }
 
   // Case 2: Already logged in → redirect away from /login to /dashboard
   if (isAuthPage && isLoggedIn) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    // Copy Supabase cookies to the redirect response
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
   }
 
-  return supabaseResponse;
+  // Case 3: Continue to the route with updated request headers
+  const finalResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+
+  // Copy Supabase cookies to the final response
+  supabaseResponse.cookies.getAll().forEach((cookie) => finalResponse.cookies.set(cookie));
+
+  return finalResponse;
 }
 
 export const config = {
