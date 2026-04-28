@@ -81,14 +81,16 @@ export async function POST(
         const ownerBody = `Payment Received! 💰\nOrder: #${updatedOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${updatedOrder.totalAmount}`;
 
         // Dispatch Owner Notifications
-        await NotificationService.dispatchOrderNotifications({
-          userId: restaurant.ownerId,
-          type: "ORDER",
-          subject,
-          body: ownerBody,
-          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
-          channels: ["FCM", "WHATSAPP"]
-        });
+        if (restaurant.ownerId) {
+          await NotificationService.dispatchOrderNotifications({
+            userId: restaurant.ownerId,
+            type: "ORDER",
+            subject,
+            body: ownerBody,
+            metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
+            channels: ["FCM", "WHATSAPP"]
+          });
+        }
       }
 
       // 5. Notify Customer

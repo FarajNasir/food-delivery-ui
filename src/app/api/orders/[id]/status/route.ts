@@ -157,14 +157,16 @@ export async function PATCH(
           const ownerBody = `Order Update: #${id.slice(0, 8)}\nRestaurant: ${resto.name}\nStatus: ${statusText.toUpperCase()}\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
           // Dispatch Owner Notifications
-          await NotificationService.dispatchOrderNotifications({
-            userId: resto.ownerId,
-            type: "ORDER",
-            subject,
-            body: ownerBody,
-            metadata: { orderId: id, orderStatus: status },
-            channels: ["FCM", "WHATSAPP"]
-          });
+          if (resto.ownerId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: resto.ownerId,
+              type: "ORDER",
+              subject,
+              body: ownerBody,
+              metadata: { orderId: id, orderStatus: status },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
 
           const customerBody = `Your order #${id.slice(0, 8)} from ${resto.name} is now ${statusText.toUpperCase()}.`;
 

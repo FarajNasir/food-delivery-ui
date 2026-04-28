@@ -79,14 +79,16 @@ export async function POST(req: Request) {
             const ownerBody = `Payment Confirmed! 💰\nOrder: #${updatedOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${updatedOrder.totalAmount}`;
 
             // Dispatch Owner Notifications
-            await NotificationService.dispatchOrderNotifications({
-              userId: restaurant.ownerId,
-              type: "ORDER",
-              subject,
-              body: ownerBody,
-              metadata: { orderId: updatedOrder.id, orderStatus: "PAID" },
-              channels: ["FCM", "WHATSAPP"]
-            });
+            if (restaurant.ownerId) {
+              await NotificationService.dispatchOrderNotifications({
+                userId: restaurant.ownerId,
+                type: "ORDER",
+                subject,
+                body: ownerBody,
+                metadata: { orderId: updatedOrder.id, orderStatus: "PAID" },
+                channels: ["FCM", "WHATSAPP"]
+              });
+            }
             console.log(`[Stripe Webhook] Owner notification dispatched for order ${orderId}`);
           }
 

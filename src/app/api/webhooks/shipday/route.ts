@@ -300,14 +300,16 @@ export async function POST(req: Request) {
             }
 
             // 1. Notify Owner (WhatsApp + FCM)
-            await NotificationService.dispatchOrderNotifications({
-              userId: orderData.ownerId,
-              type: "ORDER",
-              subject,
-              body: ownerBody,
-              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
-              channels: ["FCM", "WHATSAPP"]
-            });
+            if (orderData.ownerId) {
+              await NotificationService.dispatchOrderNotifications({
+                userId: orderData.ownerId,
+                type: "ORDER",
+                subject,
+                body: ownerBody,
+                metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
+                channels: ["FCM", "WHATSAPP"]
+              });
+            }
 
             if (orderData.userId) {
               const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];

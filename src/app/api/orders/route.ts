@@ -121,6 +121,7 @@ export async function POST(req: Request) {
             customerPhone,
             status: "PENDING_CONFIRMATION",
             isSettled: "NO",
+            restaurantNameSnapshot: restaurant.name,
           }).returning();
 
           await tx.insert(orderItems).values(
@@ -172,23 +173,22 @@ export async function POST(req: Request) {
               const customerBody = `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`;
 
               await Promise.all([
-                NotificationService.dispatchOrderNotifications({
+                restaurant.ownerId ? NotificationService.dispatchOrderNotifications({
                   userId: restaurant.ownerId,
                   type: "ORDER",
                   subject: "New Order Received!",
                   body: ownerBody,
                   metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
                   channels: ["FCM", "WHATSAPP"]
-                }),
-                 NotificationService.dispatchOrderNotifications({
-                  userId: newOrder.userId!,
+                }) : Promise.resolve(),
+                 newOrder.userId ? NotificationService.dispatchOrderNotifications({
+                  userId: newOrder.userId,
                   type: "ORDER",
                   subject: "Order Received! 🛍️",
                   body: customerBody,
                   metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
                   channels: ["FCM", "WHATSAPP"]
-                  // Note: No EMAIL here as per requirements (key stages only: PAID, CONFIRMED, DELIVERED)
-                }),
+                }) : Promise.resolve(),
               ]);
             }
           } catch (notifyErr) {
@@ -242,6 +242,7 @@ export async function GET(req: Request) {
             currency: orders.currency,
             paymentIntentId: orders.paymentIntentId,
             sessionId: orders.sessionId,
+            restaurantNameSnapshot: orders.restaurantNameSnapshot,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
@@ -289,7 +290,7 @@ export async function GET(req: Request) {
         paymentIntentId: order.paymentIntentId,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
-        restaurant: { name: order.restaurantName },
+        restaurant: { name: order.restaurantNameSnapshot || order.restaurantName },
         items: itemRows
           .filter((i) => i.orderId === order.id)
           .map((i) => ({

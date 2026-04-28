@@ -132,7 +132,7 @@ export interface AdminRestaurantItem {
   name:          string;
   location:      string | null;
   logoUrl:       string | null;
-  ownerId:       string;
+  ownerId:       string | null;
   ownerName:     string | null;
   ownerEmail:    string | null;
   ownerPhone:    string | null;
@@ -142,6 +142,10 @@ export interface AdminRestaurantItem {
   businessRegNo: string | null;
   openingHours:  OpeningHours | null;
   status:        RestaurantStatus;
+  deletionStatus: "PENDING_DELETION" | "DELETED" | null;
+  deletionRequestedAt: string | null;
+  deletionScheduledAt: string | null;
+  isActive:      boolean;
   createdAt:     string;
 }
 
@@ -198,6 +202,10 @@ export const restaurantApi = {
 
   delete(id: string) {
     return del<{ id: string }>(`/api/admin/restaurants/${id}`);
+  },
+
+  forceDelete(id: string) {
+    return del<{ message: string }>(`/api/admin/restaurants/${id}/delete`);
   },
 
   getPublic(id: string) {
@@ -435,6 +443,12 @@ export const ownerRestaurantApi = {
   },
   update(id: string, payload: Partial<RestaurantPayload>) {
     return put<AdminRestaurantItem>(`/api/owner/restaurants/${id}`, payload);
+  },
+  requestDeletion(id: string) {
+    return post<{ message: string }>(`/api/owner/restaurants/${id}/delete`, {});
+  },
+  restore(id: string) {
+    return post<{ message: string }>(`/api/owner/restaurants/${id}/restore`, {});
   },
 };
 

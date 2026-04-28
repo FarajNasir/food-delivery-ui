@@ -5,6 +5,7 @@ import {
   Search, Plus, MoreVertical, Pencil, Trash2, X,
   ChevronDown, ChevronLeft, ChevronRight,
   ChevronsUpDown, ChevronUp, Mail, Phone,
+  AlertCircle, Clock, AlertTriangle, Loader2
 } from "lucide-react";
 import {
   restaurantApi,
@@ -103,7 +104,7 @@ function restaurantToForm(r: AdminRestaurantItem): RestaurantForm {
     name:          r.name,
     location:      r.location      ?? "",
     logoUrl:       r.logoUrl       ?? "",
-    ownerId:       r.ownerId,
+    ownerId:       r.ownerId ?? "",
     managerPhone:  r.managerPhone  ?? "",
     contactEmail:  r.contactEmail,
     contactPhone:  r.contactPhone,
@@ -167,8 +168,8 @@ function SortIcon({ field, filters }: { field: SortField; filters: Filters }) {
 }
 
 /* ── Action menu ── */
-function ActionMenu({ menuOpen, onToggle, onEdit, onDelete }: {
-  menuOpen: boolean; onToggle: () => void; onEdit: () => void; onDelete: () => void;
+function ActionMenu({ menuOpen, onToggle, onEdit, onDelete, onForceDelete }: {
+  menuOpen: boolean; onToggle: () => void; onEdit: () => void; onDelete: () => void; onForceDelete?: () => void;
 }) {
   return (
     <div className="relative">
@@ -190,6 +191,17 @@ function ActionMenu({ menuOpen, onToggle, onEdit, onDelete }: {
           <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors">
             <Trash2 className="w-3 h-3 shrink-0" /> Delete
           </button>
+          {onForceDelete && (
+            <>
+              <div className="border-t" style={{ borderColor: "var(--dash-card-border)" }} />
+              <button 
+                onClick={(e) => { e.stopPropagation(); onForceDelete(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <AlertCircle className="w-3 h-3 shrink-0" /> Force Delete
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -713,6 +725,8 @@ export default function AdminRestaurants() {
     }
   };
 
+
+
   const totalPages = Math.max(1, Math.ceil(data.total / filters.pageSize));
 
   return (
@@ -720,11 +734,13 @@ export default function AdminRestaurants() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--dash-text-primary)" }}>Restaurants</h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
-            {initialLoad ? "Loading…" : `${data.total} restaurant${data.total !== 1 ? "s" : ""} on the platform`}
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: "var(--dash-text-primary)" }}>Restaurants</h1>
+            <p className="text-sm mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
+              {initialLoad ? "Loading…" : `${data.total} restaurant${data.total !== 1 ? "s" : ""} on the platform`}
+            </p>
+          </div>
         </div>
         <button
           onClick={() => { setAddOpen(true); setForm(EMPTY_FORM); }}
@@ -878,12 +894,21 @@ export default function AdminRestaurants() {
                         <span style={{ color: "var(--dash-text-secondary)" }}>{r.contactPhone}</span>
                       </p>
                     </div>
-                    <span
-                      className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full w-fit"
-                      style={{ color: sm.color, background: sm.bg }}
-                    >
-                      {sm.label}
-                    </span>
+                    {/* Status */}
+                    <div className="flex flex-col gap-1.5 min-w-0">
+                      <span
+                        className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full w-fit shrink-0"
+                        style={{ color: sm.color, background: sm.bg }}
+                      >
+                        {sm.label}
+                      </span>
+                      {r.deletionStatus === "DELETED" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight bg-red-100 text-red-700 border border-red-200 w-fit shrink-0">
+                          <AlertTriangle className="w-3 h-3" /> Deleted
+                        </span>
+                      )}
+                    </div>
+
                     <ActionMenu
                       menuOpen={menuId === r.id}
                       onToggle={() => setMenuId(menuId === r.id ? null : r.id)}
@@ -908,17 +933,15 @@ export default function AdminRestaurants() {
                           onDelete={() => { setDeleteTarget(r); setMenuId(null); }}
                         />
                       </div>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: sm.color, background: sm.bg }}>
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit" style={{ color: sm.color, background: sm.bg }}>
                           {sm.label}
                         </span>
-                        {r.location && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: locationTheme(r.location).color, background: locationTheme(r.location).bg }}>
-                            {r.location}
+                        {r.deletionStatus === "DELETED" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight bg-red-100 text-red-700 border border-red-200 w-fit">
+                            Deleted
                           </span>
                         )}
-                        <span className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>· {r.ownerName ?? "No owner"}</span>
-                        <span className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>· {added}</span>
                       </div>
                     </div>
                   </div>

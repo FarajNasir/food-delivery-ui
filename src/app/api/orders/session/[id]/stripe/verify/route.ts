@@ -82,14 +82,16 @@ export async function POST(
             const ownerBody = `Payment Received! 💰\nOrder: #${order.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
             // Dispatch Owner Notifications
-            await NotificationService.dispatchOrderNotifications({
-              userId: restaurant.ownerId,
-              type: "ORDER",
-              subject,
-              body: ownerBody,
-              metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
-              channels: ["FCM", "WHATSAPP"]
-            });
+            if (restaurant.ownerId) {
+              await NotificationService.dispatchOrderNotifications({
+                userId: restaurant.ownerId,
+                type: "ORDER",
+                subject,
+                body: ownerBody,
+                metadata: { orderId: order.id, orderStatus: "PAID", targetRole: "owner" },
+                channels: ["FCM", "WHATSAPP"]
+              });
+            }
           }
         } catch (notifyErr) {
           console.error("Failed to notify restaurant:", notifyErr);
