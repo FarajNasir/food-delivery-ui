@@ -165,6 +165,7 @@ export interface ListRestaurantsParams {
   order?:    "asc" | "desc";
   page?:     number;
   limit?:    number;
+  includeDeletions?: boolean;
 }
 
 export interface RestaurantPayload {
@@ -191,6 +192,7 @@ export const restaurantApi = {
     if (params.order)     qs.set("order",    params.order);
     if (params.page)      qs.set("page",     String(params.page));
     if (params.limit)     qs.set("limit",    String(params.limit));
+    if (params.includeDeletions) qs.set("includeDeletions", "true");
     return get<AdminRestaurantListResponse>(`/api/admin/restaurants?${qs.toString()}`);
   },
 

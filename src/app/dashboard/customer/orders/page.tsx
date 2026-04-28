@@ -19,12 +19,31 @@ import OrderSessionCard from "@/components/dashboard/customer/OrderSessionCard";
 
 export interface StatusConfig {
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   hex: string;
   bg: string;
   description: string;
 }
+
+type OrderSessionSummary = {
+  type: "session";
+  data: {
+    id: string;
+    orders: import("@/types/api.types").Order[];
+    createdAt: string;
+    status: string;
+    totalItemsAmount: string;
+    totalDeliveryFee: string;
+  };
+  date: Date;
+};
+
+type OrderItemSummary = {
+  type: "order";
+  data: import("@/types/api.types").Order;
+  date: Date;
+};
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
   PENDING_CONFIRMATION: {
@@ -106,11 +125,18 @@ export default function CustomerOrdersPage() {
   const router = useRouter();
   const [isPaying, setIsPaying] = React.useState<string | null>(null);
   const [isReordering, setIsReordering] = React.useState<string | null>(null);
-  const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<any>(null);
+  const [selectedOrderForFeedback, setSelectedOrderForFeedback] = React.useState<import("@/types/api.types").Order | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"all" | "active" | "past">("all");
   const expiringOrdersRef = React.useRef<Set<string>>(new Set());
+
+  const tabScope = activeTab === "all" ? "all" : activeTab;
+
+  React.useEffect(() => {
+    const limit = tabScope === "all" ? 20 : 100;
+    void refreshOrders(1, tabScope, limit);
+  }, [activeTab, refreshOrders, tabScope]);
 
   const handleReorder = async (orderId: string) => {
     try {
@@ -155,7 +181,7 @@ export default function CustomerOrdersPage() {
     }
   };
 
-  const handleExpire = async (orderId: string) => {
+  const handleExpire = React.useCallback(async (orderId: string) => {
     try {
       const session = useAuthStore.getState().session;
       const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -173,45 +199,39 @@ export default function CustomerOrdersPage() {
         return;
       }
 
-      await refreshOrders();
       toast.error("Restaurant didn't respond in time. Order cancelled.");
+      await refreshOrders();
     } catch {
       toast.error("A network error occurred. Please try again.");
     } finally {
       expiringOrdersRef.current.delete(orderId);
     }
-  };
+  }, [refreshOrders]);
 
   React.useEffect(() => {
-    const timer = window.setInterval(() => {
-      const now = Date.now();
+    for (const order of orders) {
+      if (order.status !== "PENDING_CONFIRMATION") continue;
+      if (expiringOrdersRef.current.has(order.id)) continue;
 
-      orders.forEach((order) => {
-        if (order.status !== "PENDING_CONFIRMATION") return;
-        if (expiringOrdersRef.current.has(order.id)) return;
+      const createdAt = new Date(order.createdAt).getTime();
+      const expiresAt = createdAt + (5 * 60 * 1000);
 
-        const createdAt = new Date(order.createdAt).getTime();
-        const expiresAt = createdAt + (5 * 60 * 1000);
-
-        if (now >= expiresAt) {
-          expiringOrdersRef.current.add(order.id);
-          void handleExpire(order.id);
-        }
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [orders]);
+      if (Date.now() >= expiresAt) {
+        expiringOrdersRef.current.add(order.id);
+        void handleExpire(order.id);
+      }
+    }
+  }, [orders, handleExpire]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshOrders();
+    await refreshOrders(1, tabScope, tabScope === "all" ? 20 : 100);
     setRefreshing(false);
   };
 
   const handlePageChange = async (p: number) => {
     setRefreshing(true);
-    await refreshOrders(p);
+    await refreshOrders(p, tabScope, tabScope === "all" ? 20 : 100);
     setRefreshing(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -235,31 +255,48 @@ export default function CustomerOrdersPage() {
   };
 
   // --- Grouping Logic ---
-  const [sessionDetails, setSessionDetails] = React.useState<Record<string, any>>({});
   const groupedItems = React.useMemo(() => {
-    const sessionsMap: Record<string, any> = {};
-    const standalones: any[] = [];
-    orders.forEach(order => {
-      if (order.sessionId) {
-        if (!sessionsMap[order.sessionId]) {
-          sessionsMap[order.sessionId] = { id: order.sessionId, orders: [], createdAt: order.createdAt, status: "PENDING", totalItemsAmount: "0", totalDeliveryFee: "0" };
-        }
-        sessionsMap[order.sessionId].orders.push(order);
-      } else { standalones.push(order); }
-    });
-    return { sessions: Object.values(sessionsMap), standalones };
-  }, [orders]);
+    const sessionsMap: Record<string, {
+      id: string;
+      orders: typeof orders;
+      createdAt: string;
+      status: string;
+      totalItemsAmount: string;
+      totalDeliveryFee: string;
+    }> = {};
+    const standalones: typeof orders = [];
 
-  React.useEffect(() => {
-    const sessionIds = Object.keys(orders.reduce((acc, o) => { if (o.sessionId) acc[o.sessionId] = true; return acc; }, {} as any));
-    sessionIds.forEach(async (sid) => {
-      if (sessionDetails[sid]) return;
-      try {
-        const res = await fetch(`/api/orders/session/${sid}`);
-        const data = await res.json();
-        if (data.success) setSessionDetails(prev => ({ ...prev, [sid]: data.data.session }));
-      } catch (e) { console.error("Failed to fetch session", sid, e); }
+    orders.forEach((order) => {
+      if (!order.sessionId) {
+        standalones.push(order);
+        return;
+      }
+
+      if (!sessionsMap[order.sessionId]) {
+        sessionsMap[order.sessionId] = {
+          id: order.sessionId,
+          orders: [],
+          createdAt: order.createdAt,
+          status: "PENDING",
+          totalItemsAmount: "0",
+          totalDeliveryFee: "0",
+        };
+      }
+
+      const session = sessionsMap[order.sessionId];
+      session.orders.push(order);
+
+      const amount = Number.parseFloat(order.totalAmount || "0");
+      const delivery = Number.parseFloat(order.deliveryFee || "0");
+      session.totalItemsAmount = (Number.parseFloat(session.totalItemsAmount) + amount).toFixed(2);
+      session.totalDeliveryFee = (Number.parseFloat(session.totalDeliveryFee) + delivery).toFixed(2);
+      session.createdAt = new Date(Math.min(new Date(session.createdAt).getTime(), new Date(order.createdAt).getTime())).toISOString();
+      if (order.status === "PAID") session.status = "PAID";
+      else if (order.status === "CONFIRMED" && session.status !== "PAID") session.status = "READY_TO_PAY";
+      else if (order.status === "CANCELLED" && session.status !== "PAID") session.status = "CANCELLED";
     });
+
+    return { sessions: Object.values(sessionsMap), standalones };
   }, [orders]);
 
   if (loading) {
@@ -271,9 +308,9 @@ export default function CustomerOrdersPage() {
     );
   }
 
-  const allItems = [
-    ...groupedItems.standalones.map(o => ({ type: "order", data: o, date: new Date(o.createdAt) })),
-    ...groupedItems.sessions.map(s => ({ type: "session", data: sessionDetails[s.id] || s, date: new Date(s.createdAt) }))
+  const allItems: (OrderItemSummary | OrderSessionSummary)[] = [
+    ...groupedItems.standalones.map(o => ({ type: "order" as const, data: o, date: new Date(o.createdAt) })),
+    ...groupedItems.sessions.map(s => ({ type: "session" as const, data: s, date: new Date(s.createdAt) }))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const activeItems = allItems.filter(item => {
@@ -282,7 +319,7 @@ export default function CustomerOrdersPage() {
     } else {
       const s = item.data;
       if (s.orders && s.orders.length > 0) {
-        return s.orders.some((o: any) => ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status));
+        return s.orders.some((o: { status: string }) => ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status));
       }
       return ["PENDING", "READY_TO_PAY", "PAID"].includes(s.status);
     }
@@ -294,7 +331,7 @@ export default function CustomerOrdersPage() {
     } else {
       const s = item.data;
       if (s.orders && s.orders.length > 0) {
-        return s.orders.every((o: any) => ["DELIVERED", "CANCELLED"].includes(o.status));
+        return s.orders.every((o: { status: string }) => ["DELIVERED", "CANCELLED"].includes(o.status));
       }
       return ["CANCELLED"].includes(s.status);
     }
@@ -352,7 +389,7 @@ export default function CustomerOrdersPage() {
           </div>
           <div className="text-center">
             <h2 className="text-xl font-black text-gray-900">Your stomach is waiting!</h2>
-            <p className="text-sm text-gray-400 mt-2 max-w-[280px] mx-auto">You haven't placed any orders yet. Let's find something delicious for you.</p>
+        <p className="text-sm text-gray-400 mt-2 max-w-[280px] mx-auto">You haven&apos;t placed any orders yet. Let&apos;s find something delicious for you.</p>
           </div>
           <button
             onClick={() => router.push("/dashboard/customer")}
@@ -372,7 +409,7 @@ export default function CustomerOrdersPage() {
                 <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No {activeTab} orders found</p>
               </div>
             ) : (
-              displayedItems.map((item: any) => item.type === "session" ? (
+              displayedItems.map((item) => item.type === "session" ? (
                 <OrderSessionCard
                   key={`session-${item.data.id}`}
                   session={item.data}

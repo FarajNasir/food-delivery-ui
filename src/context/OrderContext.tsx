@@ -1,9 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import { toast } from "sonner";
+import React, { createContext, useContext, useEffect } from "react";
 import { useFcmToken } from "@/hooks/useFcmToken";
 
 import { type Order } from "@/types/api.types";
@@ -17,16 +14,15 @@ interface OrderContextType {
     page: number;
     limit: number;
   };
-  refreshOrders: (page?: number) => Promise<void>;
+  refreshOrders: (page?: number, scope?: "all" | "active" | "past", limit?: number) => Promise<void>;
   updateOrderStatus: (id: string, status: string, paymentIntentId?: string) => Promise<void>;
   reorder: (orderId: string) => Promise<{ success: boolean; orderId?: string }>;
 }
 
-const OrderContext = createContext<OrderContextType | undefined>(undefined);
-const supabase = createClient();
-
 import { useAuthStore } from "@/store/useAuthStore";
 import { useOrderStore } from "@/store/useOrderStore";
+
+const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const { 
@@ -45,12 +41,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   useFcmToken(userId);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !session) return;
 
-    if (session) {
-      console.log("[OrderContext] Syncing with store...");
-      refreshOrders();
-    }
+    refreshOrders(1, "all").catch(() => {});
   }, [session, isReady, refreshOrders]);
 
   const updateOrderStatus = async (id: string, status: string, paymentIntentId?: string) => {

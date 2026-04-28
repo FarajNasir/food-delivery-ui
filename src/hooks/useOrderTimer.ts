@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * useOrderTimer - A hook to manage a 5-minute countdown for orders.
@@ -12,9 +12,17 @@ export function useOrderTimer(
   createdAt: string,
   timeoutMinutes: number = 5,
   onExpire?: () => void
-) {
-  const [timeLeft, setTimeLeft] = useState<number>(0);
-  const [isExpired, setIsExpired] = useState(false);
+  ) {
+  const getInitialTimeLeft = () => {
+    const start = new Date(createdAt).getTime();
+    const now = new Date().getTime();
+    const duration = timeoutMinutes * 60 * 1000;
+    return Math.floor(Math.max(0, duration - (now - start)) / 1000);
+  };
+
+  const [timeLeft, setTimeLeft] = useState<number>(getInitialTimeLeft);
+  const [isExpired, setIsExpired] = useState(() => getInitialTimeLeft() <= 0);
+  const expireCalledRef = useRef(false);
 
   const calculateTimeLeft = useCallback(() => {
     const start = new Date(createdAt).getTime();
@@ -27,12 +35,14 @@ export function useOrderTimer(
   }, [createdAt, timeoutMinutes]);
 
   useEffect(() => {
+    expireCalledRef.current = false;
     const initial = calculateTimeLeft();
-    setTimeLeft(initial);
-    
+
     if (initial <= 0 && !isExpired) {
-      setIsExpired(true);
-      onExpire?.();
+      if (!expireCalledRef.current) {
+        expireCalledRef.current = true;
+        onExpire?.();
+      }
       return;
     }
 
@@ -42,7 +52,8 @@ export function useOrderTimer(
       
       if (remaining <= 0) {
         clearInterval(timer);
-        if (!isExpired) {
+        if (!isExpired && !expireCalledRef.current) {
+          expireCalledRef.current = true;
           setIsExpired(true);
           onExpire?.();
         }

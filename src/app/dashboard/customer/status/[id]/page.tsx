@@ -82,7 +82,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; d
 
 export default function OrderStatusPage() {
   const { id } = useParams();
-  const { orders, loading, refreshOrders } = useOrders();
+  const { orders, loading, refreshOrders, updateOrderStatus } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const [isPaying, setIsPaying] = React.useState(false);
@@ -92,19 +92,10 @@ export default function OrderStatusPage() {
   const handleExpire = async () => {
     if (!order || order.status !== "PENDING_CONFIRMATION") return;
     try {
-      const session = useAuthStore.getState().session;
-      const res = await fetch(`/api/orders/${order.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
-        },
-        body: JSON.stringify({ status: "CANCELLED" }),
+      await updateOrderStatus(order.id, "CANCELLED");
+      toast.error("Your order was cancelled because the restaurant didn't respond in time. No charges were made.", {
+        duration: 5000,
       });
-      if (res.ok) {
-        toast.error("Order expired as the restaurant did not respond in time.");
-        await refreshOrders();
-      }
     } catch (err) {
       console.error("[handleExpire]", err);
     }

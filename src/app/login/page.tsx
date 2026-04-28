@@ -37,13 +37,12 @@ function LoginContent() {
   const redirectTo = searchParams.get("redirect") || "/dashboard";
 
   const { isReady, session } = useAuthStore();
-  const [pendingRedirect, setPendingRedirect] = useState(false);
 
   useEffect(() => {
-    if (isReady && session && pendingRedirect) {
+    if (isReady && session) {
       router.replace(redirectTo);
     }
-  }, [isReady, session, pendingRedirect, router, redirectTo]);
+  }, [isReady, session, router, redirectTo]);
 
   const [form, setForm] = useState({ email: "", password: "", remember: false });
   const [showPassword, setShowPassword] = useState(false);
@@ -85,7 +84,7 @@ function LoginContent() {
     }
 
 
-    setPendingRedirect(true);
+    router.replace(redirectTo);
     setLoading(false);
   };
 

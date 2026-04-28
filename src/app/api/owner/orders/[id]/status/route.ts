@@ -38,8 +38,15 @@ export async function PATCH(
       const json = await req.json();
       const { status } = json;
 
+      console.log(`[api/owner/orders/status] Received status: "${status}" for order: ${id}`);
+
       if (!status) {
         return fail("Status is required.", 400);
+      }
+
+      const ALLOWED = ["CONFIRMED", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
+      if (!ALLOWED.includes(status)) {
+        return fail(`Invalid status: ${status}. Allowed values: ${ALLOWED.join(", ")}`, 400);
       }
 
       // 1. Ownership Validation: 
@@ -48,7 +55,8 @@ export async function PATCH(
           id: orders.id, 
           userId: orders.userId, 
           restaurantId: orders.restaurantId,
-          totalAmount: orders.totalAmount 
+          totalAmount: orders.totalAmount,
+          status: orders.status
         })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
@@ -62,13 +70,7 @@ export async function PATCH(
         return fail("Order not found or you don't have permission to manage it.", 403);
       }
 
-      let nextStatus = status;
-
-      // 2. Perform the DB Update IMMEDIATELY
-      // We handle the Shipday logic in the background if status is OUT_FOR_DELIVERY
-      if (status === "OUT_FOR_DELIVERY") {
-        nextStatus = "DISPATCH_REQUESTED";
-      }
+      const nextStatus = status;
 
       const [updated] = await db
         .update(orders)
@@ -76,8 +78,15 @@ export async function PATCH(
           status: nextStatus,
           updatedAt: new Date()
         })
-        .where(eq(orders.id, id))
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.status, ownedOrder.status)
+        ))
         .returning();
+
+      if (!updated) {
+        return fail("Order status has changed or order not found. Please refresh and try again.", 409);
+      }
 
       // 3. Fire-and-forget BACKGROUND tasks
       (async () => {
@@ -88,7 +97,7 @@ export async function PATCH(
           }
 
           // B. Handle Shipday for Dispatch
-          if (status === "OUT_FOR_DELIVERY") {
+          if (status === "DISPATCH_REQUESTED" || status === "OUT_FOR_DELIVERY") {
             const [existingDeliveryJob] = await db
               .select({ id: deliveryJobs.id, status: deliveryJobs.status })
               .from(deliveryJobs)

@@ -5,8 +5,14 @@ import type {
   FeaturedItem, 
   AuthUser,
   Order,
-  OrderItem 
+  OrderItem,
 } from "@/types/api.types";
+
+type Pagination = {
+  total: number;
+  page: number;
+  limit: number;
+};
 
 /**
  * customer.service.ts - Handles all public and customer-facing API operations.
@@ -60,11 +66,12 @@ export const customerService = {
   clearCart: () => http.post("/api/cart/clear", {}),
 
   /* ── Orders ── */
-  getOrders: (params?: { page?: number; limit?: number }) => {
+  getOrders: (params?: { page?: number; limit?: number; scope?: "all" | "active" | "past" }) => {
     const qs = new URLSearchParams();
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
-    return http.get<{ orders: Order[]; pagination: any }>(`/api/orders?${qs.toString()}`);
+    if (params?.scope) qs.set("scope", params.scope);
+    return http.get<{ orders: Order[]; pagination: Pagination }>(`/api/orders?${qs.toString()}`);
   },
   
   getOrderById: (id: string) => http.get<Order>(`/api/orders/${id}`),

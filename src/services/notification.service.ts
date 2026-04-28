@@ -336,10 +336,12 @@ export class NotificationService {
 
       if (templateId && orderEmailData && orderEmailData.status === "PAID") {
         const brand = resolveEmailBrand(orderEmailData.restaurantLocation);
+        // 1. Sanitize the template ID (prevent env-var concatenation bugs)
+        const cleanTemplateId = templateId.split(/[\s\n\r=]/)[0].trim();
         msg = {
           to: user.email,
           from: fromEmail,
-          templateId: templateId,
+          templateId: cleanTemplateId,
           dynamicTemplateData: {
             brandName: brand.siteName,
             brandPrimary: brand.primary,
@@ -382,8 +384,11 @@ export class NotificationService {
         .where(eq(notifications.id, notificationId));
 
       console.log(`[NotificationService] Email sent successfully for notification ${notificationId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[NotificationService] Error sending Email for ${notificationId}:`, error);
+      if (error.response?.body) {
+        console.error("[NotificationService] SendGrid Error Details:", JSON.stringify(error.response.body, null, 2));
+      }
       
       await db
         .update(notifications)
