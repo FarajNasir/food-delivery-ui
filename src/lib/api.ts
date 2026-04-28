@@ -115,6 +115,9 @@ export const authApi = {
   getMe() {
     return get<AuthUser>("/api/auth/me");
   },
+  deleteAccount() {
+    return del<{ message: string }>("/api/customer/account");
+  },
 };
 
 /* ── Admin: Restaurant Management API ── */
@@ -129,7 +132,7 @@ export interface AdminRestaurantItem {
   name:          string;
   location:      string | null;
   logoUrl:       string | null;
-  ownerId:       string;
+  ownerId:       string | null;
   ownerName:     string | null;
   ownerEmail:    string | null;
   ownerPhone:    string | null;
@@ -139,6 +142,11 @@ export interface AdminRestaurantItem {
   businessRegNo: string | null;
   openingHours:  OpeningHours | null;
   status:        RestaurantStatus;
+  deletionStatus: "PENDING_DELETION" | "DELETED" | null;
+  deletionRequestedAt: string | null;
+  deletionScheduledAt: string | null;
+  isActive:      boolean;
+  isMobileChef:  boolean;
   createdAt:     string;
 }
 
@@ -170,6 +178,7 @@ export interface RestaurantPayload {
   businessRegNo?: string;
   openingHours?:  OpeningHours;
   status?:        RestaurantStatus;
+  isMobileChef?:  boolean;
 }
 
 export const restaurantApi = {
@@ -195,6 +204,10 @@ export const restaurantApi = {
 
   delete(id: string) {
     return del<{ id: string }>(`/api/admin/restaurants/${id}`);
+  },
+
+  forceDelete(id: string) {
+    return del<{ message: string }>(`/api/admin/restaurants/${id}/delete`);
   },
 
   getPublic(id: string) {
@@ -432,6 +445,12 @@ export const ownerRestaurantApi = {
   },
   update(id: string, payload: Partial<RestaurantPayload>) {
     return put<AdminRestaurantItem>(`/api/owner/restaurants/${id}`, payload);
+  },
+  requestDeletion(id: string) {
+    return post<{ message: string }>(`/api/owner/restaurants/${id}/delete`, {});
+  },
+  restore(id: string) {
+    return post<{ message: string }>(`/api/owner/restaurants/${id}/restore`, {});
   },
 };
 

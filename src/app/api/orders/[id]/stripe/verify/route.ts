@@ -81,14 +81,16 @@ export async function POST(
         const ownerBody = `Payment Received! 💰\nOrder: #${updatedOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: PAID\n\nItems:\n${itemsSummary}\n\nTotal: £${updatedOrder.totalAmount}`;
 
         // Dispatch Owner Notifications
-        await NotificationService.dispatchOrderNotifications({
-          userId: restaurant.ownerId,
-          type: "ORDER",
-          subject,
-          body: ownerBody,
-          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
-          channels: ["FCM", "WHATSAPP"]
-        });
+        if (restaurant.ownerId) {
+          await NotificationService.dispatchOrderNotifications({
+            userId: restaurant.ownerId,
+            type: "ORDER",
+            subject,
+            body: ownerBody,
+            metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "owner" },
+            channels: ["FCM", "WHATSAPP"]
+          });
+        }
       }
 
       // 5. Notify Customer
@@ -97,14 +99,16 @@ export async function POST(
         const body = `Your payment was successful. The restaurant will start preparing your meal shortly.`;
 
         // Dispatch Customer Notifications
-        await NotificationService.dispatchOrderNotifications({
-          userId: updatedOrder.userId,
-          type: "ORDER",
-          subject,
-          body,
-          metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "customer" },
-          channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
-        });
+        if (updatedOrder.userId) {
+          await NotificationService.dispatchOrderNotifications({
+            userId: updatedOrder.userId,
+            type: "ORDER",
+            subject,
+            body,
+            metadata: { orderId: updatedOrder.id, orderStatus: "PAID", targetRole: "customer" },
+            channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
+          });
+        }
       } catch (notifyErr) {
         console.error("[Stripe Verify] Failed to notify customer:", notifyErr);
       }

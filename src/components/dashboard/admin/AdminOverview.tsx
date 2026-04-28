@@ -76,8 +76,8 @@ export default function AdminOverview() {
                     <td className="px-5 py-3.5 font-mono text-gray-700 text-[10px]">
                       #{order.id.slice(0, 8)}
                     </td>
-                    <td className="px-5 py-3.5 text-gray-900">{order.user.name}</td>
-                    <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{order.restaurant.name}</td>
+                    <td className="px-5 py-3.5 text-gray-900">{order.user?.name ?? "Deleted User"}</td>
+                    <td className="px-5 py-3.5 text-gray-600 hidden md:table-cell">{order.restaurant?.name ?? "Deleted Restaurant"}</td>
                     <td className="px-5 py-3.5">
                       <span 
                         className="px-2 py-0.5 rounded-full text-[10px] font-medium"

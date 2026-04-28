@@ -34,9 +34,11 @@ export interface SiteConfig {
   };
   contact: ContactInfo;
   coordinates?: { lat: number; lng: number };
+  serviceCharge?: number;
   deliveryPricing?: {
     type: "fixed_areas" | "distance_slabs" | "standard";
     rules: any;
+    mobileChefRules?: any;
   };
 }
 
@@ -76,15 +78,16 @@ export const SITES: Record<SiteKey, SiteConfig> = {
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Newcastle Eats' for assistance. Our support team is available via Messenger.",
     },
     coordinates: { lat: 54.2104, lng: -5.8916 },
+    serviceCharge: 0.99,
     deliveryPricing: {
       type: "fixed_areas",
       rules: [
         { name: "Newcastle", fee: 5.0 },
         { name: "Bryansford / Maghera", fee: 6.0 },
-        { name: "Dundrum / Castlewellan", fee: 7.0 },
-        { name: "Annsborough", fee: 8.0 },
-        { name: "Clough", fee: 9.0 },
-        { name: "Annalong / Kilcoo", fee: 10.0 },
+        { name: "Dundrum / Castlewellan", fee: 8.0 },
+        { name: "Annsborough", fee: 9.0 },
+        { name: "Clough / Seaforde", fee: 10.0 },
+        { name: "Annalong / Kilcoo / Leitrim", fee: 10.0 },
         { name: "Ballykilner", fee: 11.0 },
       ],
     },
@@ -123,9 +126,27 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       notice:
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Kilkeel Eats' for assistance. Our support team is available via Messenger.",
     },
+    serviceCharge: 1.99,
+    coordinates: { lat: 54.0628, lng: -5.9986 },
     deliveryPricing: {
-      type: "standard",
-      rules: { standardFee: 3.5 },
+      type: "distance_slabs",
+      rules: [
+        { maxMiles: 2, fee: 3.75 },
+        { maxMiles: 4, fee: 4.25 },
+        { maxMiles: 5, fee: 5.25 },
+        { maxMiles: 6, fee: 6.25 },
+        { maxMiles: 7, fee: 7.50 },
+        { maxMiles: 999, fee: 8.50 },
+      ],
+      mobileChefRules: [
+        { maxMiles: 3, fee: 6.25 },
+        { maxMiles: 4, fee: 6.75 },
+        { maxMiles: 5, fee: 7.00 },
+        { maxMiles: 6, fee: 7.25 },
+        { maxMiles: 6.5, fee: 8.00 },
+        { maxMiles: 7, fee: 8.50 },
+        { maxMiles: 999, fee: 9.50 },
+      ],
     },
   },
   downpatrickeats: {
@@ -162,22 +183,23 @@ export const SITES: Record<SiteKey, SiteConfig> = {
       notice:
         "If you have any problems with your order, please contact the food outlet you ordered from and they will arrange for a driver to re-deliver any missing items. Alternatively, if you can't get through, please message our Facebook page 'Downpatrick Eats' for assistance. Our support team is available via Messenger.",
     },
+    serviceCharge: 1.99,
     coordinates: { lat: 54.3235, lng: -5.7107 },
     deliveryPricing: {
       type: "distance_slabs",
       rules: [
         { maxMiles: 2, fee: 4.0 },
         { maxMiles: 3, fee: 4.5 },
-        { maxMiles: 4, fee: 5.0 },
-        { maxMiles: 5, fee: 6.0 },
+        { maxMiles: 5, fee: 5.0 },
         { maxMiles: 6, fee: 7.0 },
         { maxMiles: 7, fee: 7.5 },
         { maxMiles: 8, fee: 8.0 },
-        { maxMiles: 999, fee: 8.5 },
+        { maxMiles: 999, fee: 9.0 },
       ],
     },
   },
 };
+
 
 export const DEFAULT_SITE: SiteKey = "kilkeeleats";
 

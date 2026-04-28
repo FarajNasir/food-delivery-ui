@@ -90,3 +90,13 @@ export async function withOwnerAuth<T = NextResponse>(
 ): Promise<T | NextResponse<ApiError>> {
   return withAuth(req, handler, ["owner", "admin"]);
 }
+
+/**
+ * Specialized version of withAuth for admin routes.
+ */
+export async function withAdminAuth<T = NextResponse>(
+  req: Request,
+  handler: (user: SessionUser) => Promise<T>
+): Promise<T | NextResponse<ApiError>> {
+  return withAuth(req, handler, ["admin"]);
+}

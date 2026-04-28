@@ -19,11 +19,12 @@ export type OrderStatus = (typeof orderStatusEnum)[number];
 
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), // nullable – preserved when user deletes account
   restaurantId: uuid("restaurant_id").notNull().references(() => restaurants.id, { onDelete: "cascade" }),
   status:          text("status").$type<OrderStatus>().default("PENDING_CONFIRMATION").notNull(),
   totalAmount:     decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   deliveryFee:     decimal("delivery_fee", { precision: 10, scale: 2 }).default("0").notNull(),
+  serviceCharge:   decimal("service_charge", { precision: 10, scale: 2 }).default("0").notNull(),
   deliveryAddress: text("delivery_address"),
   deliveryArea:    text("delivery_area"),
   distanceMiles:   decimal("distance_miles", { precision: 10, scale: 4 }),
@@ -31,7 +32,8 @@ export const orders = pgTable("orders", {
   currency:        text("currency").default("GBP").notNull(),
   paymentIntentId: text("payment_intent_id"),
   isSettled:       text("is_settled").$type<"YES" | "NO">().default("NO").notNull(),
-  sessionId:       uuid("session_id").references(() => orderSessions.id, { onDelete: "cascade" }),
+  sessionId:       uuid("session_id").references(() => orderSessions.id, { onDelete: "set null" }),
+  restaurantNameSnapshot: text("restaurant_name_snapshot"),
   createdAt:       timestamp("created_at").defaultNow().notNull(),
   updatedAt:       timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

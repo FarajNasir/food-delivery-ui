@@ -27,7 +27,11 @@ export async function GET(req: Request) {
           site:         restaurants.location, 
           ownerName:    users.name,
           status:       restaurants.status,
-          createdAt:    restaurants.createdAt,
+          deletionStatus: restaurants.deletionStatus,
+          deletionRequestedAt: restaurants.deletionRequestedAt,
+          deletionScheduledAt: restaurants.deletionScheduledAt,
+          isActive:      restaurants.isActive,
+          createdAt:     restaurants.createdAt,
         })
         .from(restaurants)
         .leftJoin(users, eq(restaurants.ownerId, users.id))

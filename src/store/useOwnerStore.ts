@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export interface OwnerOrder {
   id: string;
-  userId: string;
+  userId: string | null;
   restaurantId: string;
   status: string;
   totalAmount: string;

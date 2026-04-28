@@ -157,31 +157,35 @@ export async function PATCH(
           const ownerBody = `Order Update: #${id.slice(0, 8)}\nRestaurant: ${resto.name}\nStatus: ${statusText.toUpperCase()}\n\nItems:\n${itemsSummary}\n\nTotal: £${order.totalAmount}`;
 
           // Dispatch Owner Notifications
-          await NotificationService.dispatchOrderNotifications({
-            userId: resto.ownerId,
-            type: "ORDER",
-            subject,
-            body: ownerBody,
-            metadata: { orderId: id, orderStatus: status },
-            channels: ["FCM", "WHATSAPP"]
-          });
+          if (resto.ownerId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: resto.ownerId,
+              type: "ORDER",
+              subject,
+              body: ownerBody,
+              metadata: { orderId: id, orderStatus: status },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
 
           const customerBody = `Your order #${id.slice(0, 8)} from ${resto.name} is now ${statusText.toUpperCase()}.`;
 
           // Dispatch Customer Notifications
-          const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
-          if (status === "PAID") {
-            customerChannels.push("EMAIL");
-          }
+          if (order.userId) {
+            const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
+            if (status === "PAID") {
+              customerChannels.push("EMAIL");
+            }
 
-          await NotificationService.dispatchOrderNotifications({
-            userId: order.userId,
-            type: "ORDER",
-            subject,
-            body: customerBody,
-            metadata: { orderId: id, orderStatus: status },
-            channels: customerChannels
-          });
+            await NotificationService.dispatchOrderNotifications({
+              userId: order.userId,
+              type: "ORDER",
+              subject,
+              body: customerBody,
+              metadata: { orderId: id, orderStatus: status },
+              channels: customerChannels
+            });
+          }
         }
       } catch (notifyErr) {
         console.error("[api/orders/status] Failed to notify owner:", notifyErr);

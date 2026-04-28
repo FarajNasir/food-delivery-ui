@@ -57,7 +57,7 @@ export default function CheckoutView() {
 
   // Option B: Sum fees for all restaurants
   React.useEffect(() => {
-    if (site.key !== "downpatrickeats" || !userCoords || isCalculating) return;
+    if (site.deliveryPricing?.type !== "distance_slabs" || !userCoords || isCalculating) return;
 
     // Check if we already calculated everything for current userCoords
     const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
@@ -69,38 +69,43 @@ export default function CheckoutView() {
       const newDistances: Record<string, number> = {};
       const newFees: Record<string, number> = {};
       let total = 0;
-
+ 
       for (const restaurantId of uniqueRestos) {
         const item = cartItems.find(i => i.restaurantId === restaurantId);
         if (!item?.restaurantLat || !item?.restaurantLng) {
           // Fallback to site coordinates if restaurant coords are missing
-          const miles = await getOSRMDistance(site.coordinates!, { lat: userCoords.lat, lng: userCoords.lng });
+          if (!site.coordinates) {
+             console.warn(`Site ${site.key} is missing coordinates fallback.`);
+             continue;
+          }
+          const miles = await getOSRMDistance(site.coordinates, { lat: userCoords.lat, lng: userCoords.lng });
           if (miles !== null) {
             newDistances[restaurantId] = miles;
-            newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+            newFees[restaurantId] = calculateDeliveryFee(site, { miles, isMobileChef: item?.isMobileChef });
             total += newFees[restaurantId];
           }
           continue;
         }
-
+ 
         const miles = await getOSRMDistance(
           { lat: parseFloat(item.restaurantLat), lng: parseFloat(item.restaurantLng) },
           { lat: userCoords.lat, lng: userCoords.lng }
         );
-
+ 
         if (miles !== null) {
           newDistances[restaurantId] = miles;
-          newFees[restaurantId] = calculateDeliveryFee(site, { miles });
+          newFees[restaurantId] = calculateDeliveryFee(site, { miles, isMobileChef: item.isMobileChef });
           total += newFees[restaurantId];
         }
       }
-
+ 
       setDistanceBreakdown(newDistances);
       setDeliveryFeesBreakdown(newFees);
       setDeliveryFee(total);
       setIsCalculating(false);
     })();
   }, [site, userCoords, cartItems]);
+
 
   const groupedItems = React.useMemo(() =>
     cartItems.reduce((acc, item) => {
@@ -144,7 +149,7 @@ export default function CheckoutView() {
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
-    if (site.key === "downpatrickeats" && deliveryFee === 0 && !isStandard) { toast.error("Calculate your delivery distance first"); return; }
+    if (isDistSlabs && deliveryFee === 0) { toast.error("Calculate your delivery distance first"); return; }
 
     try {
       setIsPlacing(true);
@@ -184,8 +189,13 @@ export default function CheckoutView() {
   const isStandard = site.deliveryPricing?.type === "standard";
   const isFixedAreas = site.deliveryPricing?.type === "fixed_areas";
   const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
-  const paysDeliveryAtDoor = site.key === "newcastleeats" || site.key === "downpatrickeats";
-  const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee);
+  const paysDeliveryAtDoor = site.key === "newcastleeats";
+  
+  const uniqueRestosCount = Array.from(new Set(cartItems.map(i => i.restaurantId))).length;
+  const serviceCharge = (site.serviceCharge ?? 0) * uniqueRestosCount;
+  
+  const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee) + serviceCharge;
+
 
   const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
@@ -374,7 +384,14 @@ export default function CheckoutView() {
                       : "FREE"}
                   </span>
                 </div>
+                {serviceCharge > 0 && (
+                  <div className="flex justify-between items-center text-xs font-medium text-gray-400">
+                    <span>Service Charge</span>
+                    <span>£{serviceCharge.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
+
 
               <div className="h-px bg-gray-200/50 my-2" />
               <div className="flex justify-between items-center pt-1">
@@ -384,7 +401,7 @@ export default function CheckoutView() {
                 </span>
               </div>
 
-              {(isFixedAreas || isDistSlabs) && (
+              {paysDeliveryAtDoor && (isFixedAreas || isDistSlabs) && (
                 <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
                   <span className="text-amber-500 text-xs">ⓘ</span>
                   <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">
@@ -392,6 +409,7 @@ export default function CheckoutView() {
                   </p>
                 </div>
               )}
+
             </div>
 
             {/* CTA */}

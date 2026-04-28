@@ -34,12 +34,35 @@ export default function CustomerSettings() {
   const [notifPromos,   setNotifPromos]   = useState(false);
   const [smsUpdates,    setSmsUpdates]    = useState(true);
   const [loggingOut,    setLoggingOut]    = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     await useAuthStore.getState().logout();
     toast.success("Logged out.");
     router.push("/login");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to delete your account? This action is permanent and cannot be undone.")) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await authApi.deleteAccount();
+      if (res.success) {
+        toast.success("Your account has been deleted.");
+        await useAuthStore.getState().logout();
+        router.push("/login");
+      } else {
+        toast.error(res.error || "Failed to delete account.");
+      }
+    } catch (err) {
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const rows: {
@@ -82,9 +105,10 @@ export default function CustomerSettings() {
       action: <ChevronRight className="w-4 h-4 text-red-400" />,
     },
     {
-      label: "Delete account",
+      label: deleting ? "Deleting account…" : "Delete account",
       sub: "Permanently remove your data",
       danger: true,
+      onClick: handleDeleteAccount,
       action: <ChevronRight className="w-4 h-4 text-red-400" />,
     },
   ];

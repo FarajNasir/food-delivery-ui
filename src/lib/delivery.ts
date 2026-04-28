@@ -30,16 +30,17 @@ export async function getOSRMDistance(
  */
 export function calculateDeliveryFee(
   site: SiteConfig,
-  details: { miles?: number; area?: string }
+  details: { miles?: number; area?: string; isMobileChef?: boolean }
 ): number {
   if (!site.deliveryPricing) return 0;
 
-  const { type, rules } = site.deliveryPricing;
+  const { type, rules, mobileChefRules } = site.deliveryPricing;
 
   if (type === "distance_slabs" && details.miles !== undefined) {
+    const activeRules = (details.isMobileChef && mobileChefRules) ? mobileChefRules : rules;
     // Find the first slab where maxMiles is greater than or equal to current miles
-    const slab = rules.find((s: any) => details.miles! <= s.maxMiles);
-    return slab ? slab.fee : rules[rules.length - 1].fee;
+    const slab = activeRules.find((s: any) => details.miles! <= s.maxMiles);
+    return slab ? slab.fee : activeRules[activeRules.length - 1].fee;
   }
 
   if (type === "fixed_areas" && details.area) {
@@ -54,3 +55,4 @@ export function calculateDeliveryFee(
 
   return 0;
 }
+

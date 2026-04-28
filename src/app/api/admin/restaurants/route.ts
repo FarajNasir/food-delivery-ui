@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseBody, ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
 import { restaurants, users } from "@/lib/db/schema";
-import { eq, and, asc, desc, count, sql, SQL } from "drizzle-orm";
+import { eq, and, asc, desc, count, sql, SQL, isNull } from "drizzle-orm";
 
 /* ── Zod schemas ── */
 const DayHoursSchema    = z.object({ open: z.string(), close: z.string() }).nullable();
@@ -19,6 +19,7 @@ const CreateRestaurantSchema = z.object({
   businessRegNo: z.string().max(100).optional().or(z.literal("")).transform(v => v || null),
   openingHours:  OpeningHoursSchema,
   status:        z.enum(["active", "inactive", "suspended"]).default("active"),
+  isMobileChef:  z.boolean().default(false),
 });
 
 /* ── Shared select shape (restaurant + joined owner) ── */
@@ -37,6 +38,11 @@ const restaurantSelect = {
   businessRegNo: restaurants.businessRegNo,
   openingHours:  restaurants.openingHours,
   status:        restaurants.status,
+  deletionStatus: restaurants.deletionStatus,
+  deletionRequestedAt: restaurants.deletionRequestedAt,
+  deletionScheduledAt: restaurants.deletionScheduledAt,
+  isActive:      restaurants.isActive,
+  isMobileChef:  restaurants.isMobileChef,
   createdAt:     restaurants.createdAt,
 } as const;
 
@@ -50,11 +56,17 @@ export async function GET(req: Request) {
       const location = searchParams.get("location") ?? "all";
       const sort     = searchParams.get("sort")     ?? "name";
       const order    = searchParams.get("order")    ?? "asc";
+      const includeDeletions = searchParams.get("includeDeletions") === "true";
       const page     = Math.max(1, Number(searchParams.get("page")  ?? "1"));
       const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("limit") ?? "10")));
       const offset   = (page - 1) * pageSize;
 
       const conditions: SQL[] = [];
+
+      // Exclude restaurants marked for deletion unless requested
+      if (!includeDeletions) {
+        conditions.push(isNull(restaurants.deletionStatus));
+      }
 
       if (search) {
         const tsQuery = search
@@ -114,7 +126,7 @@ export async function POST(req: Request) {
       if ("error" in parsed) return parsed.error;
 
       const { name, location, logoUrl, ownerId, managerPhone, contactEmail,
-              contactPhone, businessRegNo, openingHours, status } = parsed.data;
+              contactPhone, businessRegNo, openingHours, status, isMobileChef } = parsed.data;
 
       /* Verify owner exists and grab their info in one query */
       const [owner] = await db
@@ -127,7 +139,7 @@ export async function POST(req: Request) {
       const [created] = await db
         .insert(restaurants)
         .values({ name, location, logoUrl, ownerId, managerPhone, contactEmail,
-                  contactPhone, businessRegNo, openingHours, status })
+                  contactPhone, businessRegNo, openingHours, status, isMobileChef })
         .returning();
 
       /* Return the full shape the UI expects (same as GET list rows) */

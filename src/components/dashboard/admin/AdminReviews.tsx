@@ -71,9 +71,9 @@ export default function AdminReviews() {
   const filteredReviews = useMemo(() => {
     return reviews.filter(r => {
       const matchSearch = 
-        r.comment?.toLowerCase().includes(search.toLowerCase()) ||
-        r.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        r.restaurant?.name?.toLowerCase().includes(search.toLowerCase());
+        (r.comment || "").toLowerCase().includes(search.toLowerCase()) ||
+        (r.user?.name || "anonymous user").toLowerCase().includes(search.toLowerCase()) ||
+        (r.restaurant?.name || "").toLowerCase().includes(search.toLowerCase());
       const matchStatus = statusFilter === "all" || r.status === statusFilter;
       return matchSearch && matchStatus;
     });
@@ -172,8 +172,8 @@ export default function AdminReviews() {
                          <User className="w-3 h-3 text-gray-400" />
                        </div>
                        <div className="text-xs">
-                         <p className="font-bold uppercase" style={{ color: "var(--dash-text-primary)" }}>{review.user?.name}</p>
-                         <p className="font-medium lowercase" style={{ color: "var(--dash-text-secondary)" }}>{review.user?.email}</p>
+                         <p className="font-bold uppercase" style={{ color: "var(--dash-text-primary)" }}>{review.user?.name || "Anonymous User"}</p>
+                         <p className="font-medium lowercase" style={{ color: "var(--dash-text-secondary)" }}>{review.user?.email || "Deleted Account"}</p>
                        </div>
                     </div>
                     <div className="flex items-center gap-2">

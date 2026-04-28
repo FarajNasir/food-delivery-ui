@@ -12,10 +12,11 @@ export type SessionStatus = (typeof sessionStatusEnum)[number];
 
 export const orderSessions = pgTable("order_sessions", {
   id:                uuid("id").primaryKey().defaultRandom(),
-  userId:           uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId:           uuid("user_id").references(() => users.id, { onDelete: "set null" }), // nullable – preserved when user deletes account
   status:            text("status").$type<SessionStatus>().default("PENDING").notNull(),
   totalItemsAmount:  decimal("total_items_amount", { precision: 10, scale: 2 }).default("0").notNull(),
   totalDeliveryFee:  decimal("total_delivery_fee", { precision: 10, scale: 2 }).default("0").notNull(),
+  totalServiceCharge: decimal("total_service_charge", { precision: 10, scale: 2 }).default("0").notNull(),
   deliveryAddress:   text("delivery_address"),
   deliveryArea:      text("delivery_area"),
   distanceMiles:     decimal("distance_miles", { precision: 10, scale: 4 }),

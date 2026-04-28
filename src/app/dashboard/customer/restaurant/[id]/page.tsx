@@ -52,7 +52,7 @@ export default async function RestaurantPage({
           userName: users.name,
         })
         .from(reviews)
-        .innerJoin(users, eq(reviews.userId, users.id))
+        .leftJoin(users, eq(reviews.userId, users.id))
         .where(
           and(
             eq(reviews.restaurantId, id),

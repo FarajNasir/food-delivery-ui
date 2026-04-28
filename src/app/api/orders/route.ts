@@ -3,6 +3,17 @@ import { db } from "@/lib/db";
 import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions } from "@/lib/db/schema";
 import { eq, inArray, desc, sql } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
+import { SITES, DEFAULT_SITE } from "@/config/sites";
+import type { SiteKey } from "@/config/sites";
+
+function getSiteFromLocation(location: string | null) {
+  if (!location) return SITES[DEFAULT_SITE];
+  const normalized = location.trim().toLowerCase();
+  const match = Object.values(SITES).find(
+    (s) => s.location.trim().toLowerCase() === normalized
+  );
+  return match ?? SITES[DEFAULT_SITE];
+}
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +85,7 @@ export async function POST(req: Request) {
           status: "PENDING",
           totalItemsAmount: "0.00", // Will update or calculate
           totalDeliveryFee: deliveryFee ? deliveryFee.toFixed(2) : "0.00",
+          totalServiceCharge: "0.00", // Will update
           deliveryAddress,
           deliveryArea,
           distanceMiles: distanceMiles ? distanceMiles.toFixed(4) : null,
@@ -85,16 +97,22 @@ export async function POST(req: Request) {
         const restaurantsData = await tx.select({
           id: restaurants.id,
           name: restaurants.name,
+          location: restaurants.location,
         }).from(restaurants).where(inArray(restaurants.id, restaurantIds));
 
         const restaurantLookup = new Map(restaurantsData.map(r => [r.id, r]));
 
         const ordersList = [];
         let sessionTotalItems = 0;
+        let sessionTotalServiceCharge = 0;
 
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
           const restaurant = restaurantLookup.get(restaurantId);
           if (!restaurant) throw new Error("RESTAURANT_NOT_FOUND");
+
+          const site = getSiteFromLocation(restaurant.location);
+          const serviceCharge = site.serviceCharge ?? 0;
+          sessionTotalServiceCharge += serviceCharge;
 
           const itemTotal = items.reduce((sum, item) => {
             return sum + (parseFloat(item.price as string) * item.quantity);
@@ -115,12 +133,14 @@ export async function POST(req: Request) {
             sessionId: session.id,
             totalAmount: finalTotalAmount.toFixed(2),
             deliveryFee: restaurantFee.toFixed(2),
+            serviceCharge: serviceCharge.toFixed(2),
             deliveryAddress,
             deliveryArea,
             distanceMiles: distanceMiles ? (distanceMiles / Object.keys(itemsByRestaurant).length).toFixed(4) : null,
             customerPhone,
             status: "PENDING_CONFIRMATION",
             isSettled: "NO",
+            restaurantNameSnapshot: restaurant.name,
           }).returning();
 
           await tx.insert(orderItems).values(
@@ -135,9 +155,12 @@ export async function POST(req: Request) {
           ordersList.push(newOrder);
         }
 
-        // Update session with correct item total
+        // Update session with correct item total and service charge
         await tx.update(orderSessions)
-          .set({ totalItemsAmount: sessionTotalItems.toFixed(2) })
+          .set({ 
+            totalItemsAmount: sessionTotalItems.toFixed(2),
+            totalServiceCharge: sessionTotalServiceCharge.toFixed(2)
+          })
           .where(eq(orderSessions.id, session.id));
 
         return { orders: ordersList, sessionId: session.id };
@@ -172,23 +195,22 @@ export async function POST(req: Request) {
               const customerBody = `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`;
 
               await Promise.all([
-                NotificationService.dispatchOrderNotifications({
+                restaurant.ownerId ? NotificationService.dispatchOrderNotifications({
                   userId: restaurant.ownerId,
                   type: "ORDER",
                   subject: "New Order Received!",
                   body: ownerBody,
                   metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
                   channels: ["FCM", "WHATSAPP"]
-                }),
-                NotificationService.dispatchOrderNotifications({
+                }) : Promise.resolve(),
+                 newOrder.userId ? NotificationService.dispatchOrderNotifications({
                   userId: newOrder.userId,
                   type: "ORDER",
                   subject: "Order Received! 🛍️",
                   body: customerBody,
                   metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
                   channels: ["FCM", "WHATSAPP"]
-                  // Note: No EMAIL here as per requirements (key stages only: PAID, CONFIRMED, DELIVERED)
-                }),
+                }) : Promise.resolve(),
               ]);
             }
           } catch (notifyErr) {
@@ -242,6 +264,7 @@ export async function GET(req: Request) {
             currency: orders.currency,
             paymentIntentId: orders.paymentIntentId,
             sessionId: orders.sessionId,
+            restaurantNameSnapshot: orders.restaurantNameSnapshot,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
@@ -289,7 +312,7 @@ export async function GET(req: Request) {
         paymentIntentId: order.paymentIntentId,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
-        restaurant: { name: order.restaurantName },
+        restaurant: { name: order.restaurantNameSnapshot || order.restaurantName },
         items: itemRows
           .filter((i) => i.orderId === order.id)
           .map((i) => ({

@@ -70,14 +70,25 @@ export async function GET(req: Request) {
         return acc;
       }, { totalPendingPayouts: 0 });
 
+      // Calculate total platform revenue from all PAID/DELIVERED orders
+      const serviceCharges = await db
+        .select({
+          total: sum(orders.serviceCharge)
+        })
+        .from(orders)
+        .where(inArray(orders.status, ["PAID", "DELIVERED"]));
+
+      const totalPlatformRevenue = parseFloat(serviceCharges[0]?.total || "0");
+
       return ok({
         restaurants: result,
         platformSummary: {
           ...platformStats,
-          totalPlatformRevenue: 0,
+          totalPlatformRevenue,
         }
       });
     } catch (err: any) {
+
       console.error("[api/admin/payments GET]", err);
       return fail("Failed to fetch payment summary.", 500);
     }

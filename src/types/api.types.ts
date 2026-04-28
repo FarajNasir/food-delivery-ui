@@ -88,7 +88,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  userId: string;
+  userId: string | null;
   restaurantId: string;
   status: string;
   sessionId?: string | null;

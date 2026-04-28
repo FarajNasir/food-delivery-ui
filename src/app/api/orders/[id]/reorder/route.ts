@@ -101,24 +101,28 @@ export async function POST(
           const ownerBody = `New Order! 🛍️\nOrder: #${newOrder.id.slice(0, 8)}\nRestaurant: ${restaurant.name}\nStatus: NEW\n\nItems:\n${itemsSummary}\n\nTotal: £${newOrder.totalAmount}`;
 
           // Dispatch Owner Notifications
-          await NotificationService.dispatchOrderNotifications({
-            userId: restaurant.ownerId,
-            type: "ORDER",
-            subject,
-            body: ownerBody,
-            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
-            channels: ["FCM", "WHATSAPP"]
-          });
+          if (restaurant.ownerId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: restaurant.ownerId ?? "",
+              type: "ORDER",
+              subject,
+              body: ownerBody,
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
 
-          // Dispatch Customer Notifications
-          await NotificationService.dispatchOrderNotifications({
-            userId: newOrder.userId,
-            type: "ORDER",
-            subject: "Order Received! 🛍️",
-            body: `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received.`,
-            metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
-            channels: ["FCM", "WHATSAPP"]
-          });
+           // Dispatch Customer Notifications
+          if (newOrder.userId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: newOrder.userId,
+              type: "ORDER",
+              subject: "Order Received! 🛍️",
+              body: `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received.`,
+              metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
         }
       } catch (notifyErr) {
         console.error("Failed to queue notification for reorder:", notifyErr);

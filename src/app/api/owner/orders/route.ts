@@ -151,7 +151,7 @@ export async function GET(req: Request) {
 
       // ── 3. Reassemble denormalized rows → structured orders ────────────────
       const orderMap = new Map<string, {
-        id: string; userId: string; restaurantId: string; status: string;
+        id: string; userId: string | null; restaurantId: string; status: string;
         totalAmount: string; deliveryFee: string; deliveryAddress: string | null;
         deliveryArea: string | null; customerPhone: string | null;
         currency: string; createdAt: Date; updatedAt: Date;
