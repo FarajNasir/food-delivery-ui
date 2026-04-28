@@ -23,6 +23,7 @@ export const restaurants = pgTable("restaurants", {
   longitude:     decimal("longitude", { precision: 10, scale: 7 }),
   status:        restaurantStatusEnum("status").default("active").notNull(),
   isActive:      boolean("is_active").default(true).notNull(),
+  isMobileChef:  boolean("is_mobile_chef").default(false).notNull(),
   deletionStatus: text("deletion_status"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
   deletionScheduledAt: timestamp("deletion_scheduled_at"),

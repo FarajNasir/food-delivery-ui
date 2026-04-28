@@ -146,6 +146,7 @@ export interface AdminRestaurantItem {
   deletionRequestedAt: string | null;
   deletionScheduledAt: string | null;
   isActive:      boolean;
+  isMobileChef:  boolean;
   createdAt:     string;
 }
 
@@ -177,6 +178,7 @@ export interface RestaurantPayload {
   businessRegNo?: string;
   openingHours?:  OpeningHours;
   status?:        RestaurantStatus;
+  isMobileChef?:  boolean;
 }
 
 export const restaurantApi = {

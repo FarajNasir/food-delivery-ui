@@ -19,6 +19,7 @@ const CreateRestaurantSchema = z.object({
   businessRegNo: z.string().max(100).optional().or(z.literal("")).transform(v => v || null),
   openingHours:  OpeningHoursSchema,
   status:        z.enum(["active", "inactive", "suspended"]).default("active"),
+  isMobileChef:  z.boolean().default(false),
 });
 
 /* ── Shared select shape (restaurant + joined owner) ── */
@@ -41,6 +42,7 @@ const restaurantSelect = {
   deletionRequestedAt: restaurants.deletionRequestedAt,
   deletionScheduledAt: restaurants.deletionScheduledAt,
   isActive:      restaurants.isActive,
+  isMobileChef:  restaurants.isMobileChef,
   createdAt:     restaurants.createdAt,
 } as const;
 
@@ -124,7 +126,7 @@ export async function POST(req: Request) {
       if ("error" in parsed) return parsed.error;
 
       const { name, location, logoUrl, ownerId, managerPhone, contactEmail,
-              contactPhone, businessRegNo, openingHours, status } = parsed.data;
+              contactPhone, businessRegNo, openingHours, status, isMobileChef } = parsed.data;
 
       /* Verify owner exists and grab their info in one query */
       const [owner] = await db
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
       const [created] = await db
         .insert(restaurants)
         .values({ name, location, logoUrl, ownerId, managerPhone, contactEmail,
-                  contactPhone, businessRegNo, openingHours, status })
+                  contactPhone, businessRegNo, openingHours, status, isMobileChef })
         .returning();
 
       /* Return the full shape the UI expects (same as GET list rows) */

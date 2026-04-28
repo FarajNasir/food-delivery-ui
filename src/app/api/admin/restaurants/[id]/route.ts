@@ -18,6 +18,7 @@ const UpdateRestaurantSchema = z.object({
   businessRegNo: z.string().max(100).optional().or(z.literal("")).transform(v => v || null),
   openingHours:  z.record(z.string(), DayHoursSchema).optional(),
   status:        z.enum(["active", "inactive", "suspended"]).optional(),
+  isMobileChef:  z.boolean().optional(),
 });
 
 /* ── PUT /api/admin/restaurants/[id] ── */

@@ -51,6 +51,7 @@ interface RestaurantForm {
   businessRegNo: string;
   status:        RestaurantStatus;
   hours:         HoursForm;
+  isMobileChef:  boolean;
 }
 
 /* ── Constants ── */
@@ -74,6 +75,7 @@ const EMPTY_FORM: RestaurantForm = {
   name: "", location: "", logoUrl: "", ownerId: "", managerPhone: "",
   contactEmail: "", contactPhone: "", businessRegNo: "", status: "active",
   hours: { ...DEFAULT_HOURS },
+  isMobileChef: false,
 };
 
 const STATUS_META: Record<RestaurantStatus, { label: string; color: string; bg: string }> = {
@@ -111,6 +113,7 @@ function restaurantToForm(r: AdminRestaurantItem): RestaurantForm {
     businessRegNo: r.businessRegNo ?? "",
     status:        r.status,
     hours:         apiToHours(r.openingHours),
+    isMobileChef:  r.isMobileChef,
   };
 }
 
@@ -482,6 +485,27 @@ function RestaurantFormFields({ form, owners, onChange }: {
             <input type="text" placeholder="Optional" value={form.businessRegNo}
               onChange={(e) => onChange({ businessRegNo: e.target.value })} className={input} style={{ color: "var(--dash-text-primary)" }} />
           </Field>
+
+          {/* Mobile Chef Boolean */}
+          <div className="flex items-center justify-between p-3 rounded-xl border" style={fieldBg}>
+            <div className="space-y-0.5">
+              <label className="text-sm font-semibold">Mobile Chef Service</label>
+              <p className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>
+                Is this a mobile chef service instead of a fixed restaurant?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange({ isMobileChef: !form.isMobileChef })}
+              className="relative w-10 h-6 rounded-full transition-colors overflow-hidden"
+              style={{ background: form.isMobileChef ? "var(--dash-accent)" : "var(--dash-card-border)" }}
+            >
+              <span
+                className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
+                style={{ transform: form.isMobileChef ? "translateX(16px)" : "translateX(0px)" }}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -656,6 +680,7 @@ export default function AdminRestaurants() {
       businessRegNo: form.businessRegNo || undefined,
       openingHours:  hoursToApi(form.hours),
       status:        form.status,
+      isMobileChef:  form.isMobileChef,
     });
     setSaving(false);
     if (res.success && res.data) {
@@ -691,6 +716,7 @@ export default function AdminRestaurants() {
       businessRegNo: form.businessRegNo || undefined,
       openingHours:  hoursToApi(form.hours),
       status:        form.status,
+      isMobileChef:  form.isMobileChef,
     });
     setSaving(false);
     if (res.success && res.data) {
