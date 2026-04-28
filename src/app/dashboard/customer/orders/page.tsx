@@ -199,7 +199,7 @@ export default function CustomerOrdersPage() {
         return;
       }
 
-      toast.error("Restaurant didn&apos;t respond in time. Order cancelled.");
+      toast.error("Restaurant didn't respond in time. Order cancelled.");
       await refreshOrders();
     } catch {
       toast.error("A network error occurred. Please try again.");

@@ -6,8 +6,13 @@ import type {
   AuthUser,
   Order,
   OrderItem,
-  Pagination 
 } from "@/types/api.types";
+
+type Pagination = {
+  total: number;
+  page: number;
+  limit: number;
+};
 
 /**
  * customer.service.ts - Handles all public and customer-facing API operations.

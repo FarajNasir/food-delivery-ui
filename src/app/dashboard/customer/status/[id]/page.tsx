@@ -82,7 +82,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; d
 
 export default function OrderStatusPage() {
   const { id } = useParams();
-  const { orders, loading, refreshOrders } = useOrders();
+  const { orders, loading, refreshOrders, updateOrderStatus } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const [isPaying, setIsPaying] = React.useState(false);

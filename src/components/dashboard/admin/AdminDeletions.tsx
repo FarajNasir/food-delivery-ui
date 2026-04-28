@@ -52,7 +52,8 @@ export default function AdminDeletions() {
       const res = await restaurantApi.list({
         search: filters.search,
         page: 1,
-        limit: 100 
+        limit: 100,
+        includeDeletions: true,
       });
       
       if (res.success && res.data) {
