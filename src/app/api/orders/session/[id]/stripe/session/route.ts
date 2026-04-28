@@ -37,6 +37,7 @@ export async function POST(
         .select({
           id: orders.id,
           deliveryFee: orders.deliveryFee,
+          serviceCharge: orders.serviceCharge,
           restaurantLocation: restaurants.location,
         })
         .from(orders)
@@ -77,9 +78,9 @@ export async function POST(
         quantity: item.quantity,
       }));
 
-      // 5. Add delivery fee line item (sum of all accepted restaurants)
+      // 5. Add delivery fee and service charge line items
       const totalDeliveryFee = confirmedOrders.reduce((sum, o) => {
-        if (o.restaurantLocation !== "Kilkeel") return sum;
+        if (o.restaurantLocation !== "Kilkeel" && o.restaurantLocation !== "Downpatrick") return sum;
         return sum + parseFloat(o.deliveryFee);
       }, 0);
       if (totalDeliveryFee > 0) {
@@ -95,6 +96,22 @@ export async function POST(
           quantity: 1,
         } as any);
       }
+
+      const totalServiceCharge = confirmedOrders.reduce((sum, o) => sum + parseFloat(o.serviceCharge), 0);
+      if (totalServiceCharge > 0) {
+        lineItems.push({
+          price_data: {
+            currency: (session.currency || "GBP").toLowerCase(),
+            product_data: {
+              name: "Service Charge",
+              description: "Platform service fee",
+            },
+            unit_amount: Math.round(totalServiceCharge * 100),
+          },
+          quantity: 1,
+        } as any);
+      }
+
 
       // 6. Create Stripe Session
       const stripeSession = await stripe.checkout.sessions.create({

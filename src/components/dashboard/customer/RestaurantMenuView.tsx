@@ -250,8 +250,10 @@ export default function RestaurantMenuView({
                             price: typeof item.price === "string" ? parseFloat(item.price.replace("£", "")) : (item.price as unknown as number),
                             imageUrl: "imageUrl" in item && item.imageUrl ? item.imageUrl : "",
                             restaurantId: restaurant.id,
-                            restaurantName: restaurant.name
+                            restaurantName: restaurant.name,
+                            isMobileChef: restaurant.isMobileChef
                           })}
+
                           className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition-transform hover:scale-105 active:scale-95"
                         >
                           Add to order

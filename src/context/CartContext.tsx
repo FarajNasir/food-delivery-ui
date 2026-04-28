@@ -16,7 +16,9 @@ export interface CartItem {
   restaurantLocation?: string;
   restaurantLat?: string;
   restaurantLng?: string;
+  isMobileChef?: boolean;
 }
+
 
 interface CartContextType {
   cartItems: CartItem[];

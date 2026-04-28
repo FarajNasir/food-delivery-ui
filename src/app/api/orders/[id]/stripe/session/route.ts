@@ -35,8 +35,6 @@ export async function POST(
         return fail("Order not found.", 404);
       }
 
-      const chargeDeliveryOnline = order.restaurant?.location === "Kilkeel";
-
       const host = (await headers()).get("host");
       const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
       const baseUrl = `${protocol}://${host}`;
@@ -60,6 +58,7 @@ export async function POST(
       });
 
       // Add delivery fee line item
+      const chargeDeliveryOnline = order.restaurant?.location === "Kilkeel" || order.restaurant?.location === "Downpatrick";
       if (chargeDeliveryOnline && parseFloat(order.deliveryFee as string) > 0) {
         lineItems.push({
           price_data: {
@@ -73,6 +72,22 @@ export async function POST(
           quantity: 1,
         } as any);
       }
+
+      // Add service charge line item
+      if (parseFloat(order.serviceCharge as string) > 0) {
+        lineItems.push({
+          price_data: {
+            currency: (order.currency || "GBP").toLowerCase(),
+            product_data: {
+              name: "Service Charge",
+              description: "Platform service fee",
+            },
+            unit_amount: Math.round(parseFloat(order.serviceCharge as string) * 100),
+          },
+          quantity: 1,
+        } as any);
+      }
+
 
       // Create the session with a reasonable timeout (10 seconds)
       const sessionPromise = stripe.checkout.sessions.create({

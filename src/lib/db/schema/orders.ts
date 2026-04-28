@@ -24,6 +24,7 @@ export const orders = pgTable("orders", {
   status:          text("status").$type<OrderStatus>().default("PENDING_CONFIRMATION").notNull(),
   totalAmount:     decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   deliveryFee:     decimal("delivery_fee", { precision: 10, scale: 2 }).default("0").notNull(),
+  serviceCharge:   decimal("service_charge", { precision: 10, scale: 2 }).default("0").notNull(),
   deliveryAddress: text("delivery_address"),
   deliveryArea:    text("delivery_area"),
   distanceMiles:   decimal("distance_miles", { precision: 10, scale: 4 }),
