@@ -138,6 +138,12 @@ export default function CustomerOrdersPage() {
     void refreshOrders(1, tabScope, limit);
   }, [activeTab, refreshOrders, tabScope]);
 
+  const ACTIVE_STATUSES = ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"];
+  const hasActiveOrders = React.useMemo(
+    () => orders.some((o) => ACTIVE_STATUSES.includes(o.status)),
+    [orders]
+  );
+
   const handleReorder = async (orderId: string) => {
     try {
       setIsReordering(orderId);
@@ -366,8 +372,8 @@ export default function CustomerOrdersPage() {
                 onClick={() => setActiveTab(tab)}
                 className={cn(
                   "px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
-                  activeTab === tab 
-                    ? "bg-white text-gray-900 shadow-sm" 
+                  activeTab === tab
+                    ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-400 hover:text-gray-600"
                 )}
               >
@@ -389,7 +395,7 @@ export default function CustomerOrdersPage() {
           </div>
           <div className="text-center">
             <h2 className="text-xl font-black text-gray-900">Your stomach is waiting!</h2>
-        <p className="text-sm text-gray-400 mt-2 max-w-[280px] mx-auto">You haven&apos;t placed any orders yet. Let&apos;s find something delicious for you.</p>
+            <p className="text-sm text-gray-400 mt-2 max-w-[280px] mx-auto">You haven&apos;t placed any orders yet. Let&apos;s find something delicious for you.</p>
           </div>
           <button
             onClick={() => router.push("/dashboard/customer")}

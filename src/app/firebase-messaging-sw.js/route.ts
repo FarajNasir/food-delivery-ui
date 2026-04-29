@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server";
 
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return value;
-}
-
 export async function GET() {
   try {
     const firebaseConfig = {
-      apiKey: getRequiredEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-      authDomain: getRequiredEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-      projectId: getRequiredEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-      storageBucket: getRequiredEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-      messagingSenderId: getRequiredEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-      appId: getRequiredEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
-      measurementId: getRequiredEnv("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"),
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
     };
 
     const sw = `importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js");
@@ -28,10 +20,14 @@ firebase.initializeApp(${JSON.stringify(firebaseConfig)});
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload?.notification?.title || "Notification";
+  console.log("[firebase-messaging-sw] Received background message:", payload);
+  
+  // Extract from data since we use data-only messages for foreground reliability
+  const notificationTitle = payload?.data?.title || payload?.notification?.title || "New Update";
   const notificationOptions = {
-    body: payload?.notification?.body || "You have a new update.",
-    icon: "/icons/icon-192x192.png"
+    body: payload?.data?.body || payload?.notification?.body || "You have a new update.",
+    icon: "/icons/icon-192x192.png",
+    data: payload.data, // pass data for click handling
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

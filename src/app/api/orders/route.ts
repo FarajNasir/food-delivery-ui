@@ -201,24 +201,31 @@ export async function POST(req: Request) {
                 const ownerBody = `New Order Received!\n\nOrder #${newOrder.id.slice(0, 8)}\nItems:\n${itemsSummary}\n\nTotal: £${totalAmount}\n\nAddress: ${newOrder.deliveryAddress}`;
                 const customerBody = `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`;
 
-                await Promise.all([
-                  restaurant.ownerId ? NotificationService.dispatchOrderNotifications({
+                // Dispatch Owner Notification immediately
+                if (restaurant.ownerId) {
+                  await NotificationService.dispatchOrderNotifications({
                     userId: restaurant.ownerId,
                     type: "ORDER",
                     subject: "New Order Received!",
                     body: ownerBody,
                     metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
                     channels: ["FCM", "WHATSAPP"]
-                  }) : Promise.resolve(),
-                  newOrder.userId ? NotificationService.dispatchOrderNotifications({
+                  });
+                }
+
+                // Add a small delay for customer notification to ensure DB commit is visible 
+                // when the frontend tries to fetch the order by ID immediately after FCM.
+                if (newOrder.userId) {
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  await NotificationService.dispatchOrderNotifications({
                     userId: newOrder.userId,
                     type: "ORDER",
                     subject: "Order Received! 🛍️",
                     body: customerBody,
                     metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
                     channels: ["FCM", "WHATSAPP"]
-                  }) : Promise.resolve(),
-                ]);
+                  });
+                }
               }
             })
           );

@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import {
-  ShoppingBag, Clock, Star, Flame, Zap, TrendingUp,
+import { ShoppingBag, Clock, Star, Flame, Zap, TrendingUp,
   ChevronRight, MapPin, Search, Gift, Sparkles, Truck, Store,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
 import { getFeaturedRestaurants } from "@/data/restaurants";
+import { useOrders } from "@/context/OrderContext";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
+import { toast } from "sonner";
+import type { Order } from "@/types/api.types";
+import React from "react";
 
 function greeting() {
   const h = new Date().getHours();
@@ -85,7 +90,50 @@ const quickStats = [
 export default function CustomerOverview({ user }: { user: SessionUser }) {
   const firstName = user.name.split(" ")[0];
   const { site } = useSite();
+  const { orders, loading, refreshOrders } = useOrders();
   const featured = getFeaturedRestaurants(site.key);
+  const router = useRouter();
+
+  const activeOrder = orders.find((o: Order) => 
+    ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status)
+  );
+
+  const displayRecentOrders = orders
+    .filter((o: Order) => ["DELIVERED", "CANCELLED"].includes(o.status))
+    .slice(0, 3);
+
+  const stats = {
+    totalOrders: orders.length.toString(),
+    avgWait: "25m", // Simplified for now
+    favPlace: orders.length > 0 ? orders[0].restaurant?.name : "None yet",
+    totalSpent: `£${orders.reduce((sum: number, o: Order) => sum + parseFloat(o.totalAmount), 0).toFixed(0)}`
+  };
+
+  const [isPaying, setIsPaying] = React.useState(false);
+
+  const handlePayment = async (orderId: string) => {
+    try {
+      setIsPaying(true);
+      const session = useAuthStore.getState().session;
+      const res = await fetch(`/api/orders/${orderId}/stripe/session`, {
+        method: "POST",
+        headers: {
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
+        },
+      });
+      const data = await res.json();
+      const sessionUrl = data.url || data.data?.url;
+      if (sessionUrl) {
+        window.location.href = sessionUrl;
+      } else {
+        toast.error(data.message || data.error || "Failed to initialize payment");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -122,7 +170,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
                   Order from your favourite local restaurants
                 </p>
                 <Link
-                  href="/"
+                  href="/dashboard/customer/search"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                   style={{ background: "var(--dash-accent)" }}
                 >
@@ -141,7 +189,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
 
           {/* Search bar (visual / links to restaurants) */}
           <Link
-            href="/"
+            href="/dashboard/customer/search"
             className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all hover:shadow-md"
             style={{ background: "var(--dash-card)", borderColor: "var(--dash-card-border)" }}
           >
@@ -153,7 +201,12 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
 
           {/* Quick stats — 2×2 on mobile, 4-col on desktop */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {quickStats.map(({ label, value, icon: Icon, color, bg }) => (
+            {[
+              { label: "Orders placed",  value: stats.totalOrders,    icon: ShoppingBag,  color: "#F97316", bg: "#fff3e8" },
+              { label: "Avg. wait",      value: stats.avgWait,   icon: Clock,        color: "#8b5cf6", bg: "#f5f3ff" },
+              { label: "Fav. place",     value: stats.favPlace, icon: Star, color: "#f59e0b", bg: "#fffbeb" },
+              { label: "Total spent",    value: stats.totalSpent,   icon: TrendingUp,   color: "#06b6d4", bg: "#ecfeff" },
+            ].map(({ label, value, icon: Icon, color, bg }) => (
               <div
                 key={label}
                 className="rounded-2xl p-4 flex flex-col gap-2"
@@ -187,7 +240,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
               {categories.map(({ label, emoji }) => (
                 <Link
                   key={label}
-                  href="/"
+                  href="/dashboard/customer/search"
                   className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl transition-all hover:scale-105 active:scale-95"
                   style={{
                     background: "var(--dash-bg)",
@@ -211,7 +264,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
                 Featured in {site.location}
               </h2>
               <Link
-                href="/"
+                href="/dashboard/customer/all-restaurants"
                 className="text-xs font-semibold flex items-center gap-0.5"
                 style={{ color: "var(--dash-accent)" }}
               >
@@ -224,6 +277,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
                   key={r.id}
                   className="shrink-0 w-56 rounded-2xl overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
                   style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
+                  onClick={() => router.push(`/dashboard/customer/restaurant/${r.id}`)}
                 >
                     <div className="relative h-32 w-full bg-gray-50 flex items-center justify-center">
                       {r.image ? (
@@ -295,7 +349,7 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
               <p className="text-white/70 text-xs mt-0.5">Use code FREESHIP at checkout</p>
             </div>
             <Link
-              href="/"
+              href="/dashboard/customer/search"
               className="shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 whitespace-nowrap"
               style={{ background: "rgba(255,255,255,0.2)", color: "#fff" }}
             >
@@ -316,30 +370,69 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
               <h2 className="text-sm font-bold" style={{ color: "var(--dash-text-primary)" }}>
                 Active Order
               </h2>
+              {activeOrder && (
+                <Link href={`/dashboard/customer/status/${activeOrder.id}`} className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
+                  Track Live
+                </Link>
+              )}
             </div>
-            <div className="flex items-center gap-3 py-4 justify-center flex-col text-center">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ background: "var(--dash-accent-light)" }}
-              >
-                <MapPin className="w-6 h-6" style={{ color: "var(--dash-accent)" }} />
+            
+            {activeOrder ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-orange-50/50 border border-orange-100">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-900 truncate">{activeOrder.restaurant?.name}</p>
+                    <p className="text-[10px] font-medium text-orange-600 uppercase tracking-wide mt-0.5">
+                      {activeOrder.status.replace(/_/g, ' ')}
+                    </p>
+                  </div>
+                </div>
+
+                {activeOrder.status === "CONFIRMED" && (
+                  <button
+                    onClick={() => handlePayment(activeOrder.id)}
+                    disabled={isPaying}
+                    className="w-full py-3 rounded-xl bg-orange-500 text-white text-xs font-bold uppercase tracking-widest transition-all hover:bg-orange-600 active:scale-95 disabled:opacity-50 shadow-md shadow-orange-200"
+                  >
+                    {isPaying ? "Processing..." : `Pay £${parseFloat(activeOrder.totalAmount).toFixed(2)} Now`}
+                  </button>
+                )}
+
+                <Link
+                  href={`/dashboard/customer/status/${activeOrder.id}`}
+                  className="block w-full py-3 rounded-xl border border-gray-100 text-center text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                >
+                  View Details
+                </Link>
               </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--dash-text-primary)" }}>
-                  No active order
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
-                  Your live order will appear here
-                </p>
+            ) : (
+              <div className="flex items-center gap-3 py-4 justify-center flex-col text-center">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  style={{ background: "var(--dash-accent-light)" }}
+                >
+                  <MapPin className="w-6 h-6" style={{ color: "var(--dash-accent)" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--dash-text-primary)" }}>
+                    No active order
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--dash-text-secondary)" }}>
+                    Your live order will appear here
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/customer/search"
+                  className="mt-1 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: "var(--dash-accent)" }}
+                >
+                  Place an order
+                </Link>
               </div>
-              <Link
-                href="/"
-                className="mt-1 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-                style={{ background: "var(--dash-accent)" }}
-              >
-                Place an order
-              </Link>
-            </div>
+            )}
           </div>
 
           {/* Recent orders */}
@@ -361,41 +454,47 @@ export default function CustomerOverview({ user }: { user: SessionUser }) {
             </div>
 
             <div className="space-y-3">
-              {recentOrders.slice(0, 3).map((order) => (
+              {displayRecentOrders.length > 0 ? displayRecentOrders.map((order: Order) => (
                 <div
                   key={order.id}
                   className="flex items-center gap-3 p-3 rounded-2xl transition-all hover:shadow-sm cursor-pointer"
                   style={{ background: "var(--dash-bg)", border: "1px solid var(--dash-card-border)" }}
+                  onClick={() => router.push(`/dashboard/customer/status/${order.id}`)}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
                     style={{ background: "var(--dash-card)" }}
                   >
-                    {order.image}
+                    <ShoppingBag className="w-5 h-5 text-gray-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-xs font-bold truncate" style={{ color: "var(--dash-text-primary)" }}>
-                        {order.restaurant}
+                        {order.restaurant?.name || "Restaurant"}
                       </p>
                       <p className="text-xs font-bold shrink-0" style={{ color: "var(--dash-text-primary)" }}>
-                        {order.total}
+                        £{parseFloat(order.totalAmount).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-[10px]" style={{ color: "var(--dash-text-secondary)" }}>
-                        {order.date}
+                        {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                       <span
                         className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ color: order.statusColor, background: order.statusBg }}
+                        style={{ 
+                          color: order.status === "DELIVERED" ? "#22c55e" : "#ef4444", 
+                          background: order.status === "DELIVERED" ? "#f0fdf4" : "#fef2f2" 
+                        }}
                       >
                         {order.status}
                       </span>
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-center py-4 text-xs text-gray-400 font-medium italic">No past orders yet</p>
+              )}
             </div>
           </div>
         </div>

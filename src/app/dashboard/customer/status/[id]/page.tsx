@@ -107,6 +107,8 @@ export default function OrderStatusPage() {
     handleExpire
   );
 
+  const IS_TERMINAL = order?.status === "DELIVERED" || order?.status === "CANCELLED";
+
   const handlePayment = async () => {
     if (!order) return;
 
@@ -184,7 +186,7 @@ export default function OrderStatusPage() {
               <h2 className="text-4xl font-heading font-black text-gray-900 tracking-tight">25 - 40 <span className="text-xl">mins</span></h2>
             </div>
             <div className="flex flex-col items-end">
-              <span 
+              <span
                 className="px-3 py-1 rounded-full text-[10px] font-sans font-black uppercase tracking-widest"
                 style={{ backgroundColor: `${config?.color}15`, color: config?.color }}
               >
@@ -210,25 +212,23 @@ export default function OrderStatusPage() {
             const isCompleted = (config?.step || 0) > item.step || (config?.step === 5 && item.step === 5);
             const isActive = (config?.step || 0) === item.step && !isCompleted;
             const isLast = index === arr.length - 1;
-            
+
             return (
               <div key={item.id} className="flex gap-6 min-h-[80px]">
                 <div className="flex flex-col items-center">
-                  <div 
-                    className={`w-6 h-6 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${
-                      isCompleted ? 'bg-green-500 border-green-500' : 
-                      isActive ? `border-${config?.color} bg-white animate-pulse` : 
-                      'bg-white border-gray-100'
-                    }`}
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-green-500 border-green-500' :
+                      isActive ? `border-${config?.color} bg-white animate-pulse` :
+                        'bg-white border-gray-100'
+                      }`}
                     style={{ borderColor: isActive ? config?.color : undefined }}
                   >
                     {isCompleted && <CheckCircle2 className="w-3 h-3 text-white" />}
                   </div>
                   {!isLast && (
-                    <div 
-                      className={`w-0.5 flex-1 my-1 transition-all duration-1000 ${
-                        isCompleted ? 'bg-green-500' : 'bg-gray-100'
-                      }`} 
+                    <div
+                      className={`w-0.5 flex-1 my-1 transition-all duration-1000 ${isCompleted ? 'bg-green-500' : 'bg-gray-100'
+                        }`}
                     />
                   )}
                 </div>
@@ -238,24 +238,24 @@ export default function OrderStatusPage() {
                   </p>
                   {isActive && (
                     <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-                       {/* Contextual Action Button integrated into timeline */}
-                       {order.status === "CONFIRMED" && (
-                         <button
-                           onClick={handlePayment}
-                           disabled={isPaying}
-                           className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-sans font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all active:scale-95 disabled:opacity-50"
-                         >
-                           {isPaying ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
-                           {isPaying ? "Processing..." : `Pay £${parseFloat(order.totalAmount).toFixed(2)} Now`}
-                         </button>
-                       )}
-                       
-                       {order.status === "PENDING_CONFIRMATION" && !isExpired && (
-                         <div className="inline-flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
-                           <Timer className="w-3 h-3" />
-                           <span className="text-[11px] font-sans font-bold tabular-nums">{formattedTime}</span>
-                         </div>
-                       )}
+                      {/* Contextual Action Button integrated into timeline */}
+                      {order.status === "CONFIRMED" && (
+                        <button
+                          onClick={handlePayment}
+                          disabled={isPaying}
+                          className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-sans font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {isPaying ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
+                          {isPaying ? "Processing..." : `Pay £${parseFloat(order.totalAmount).toFixed(2)} Now`}
+                        </button>
+                      )}
+
+                      {order.status === "PENDING_CONFIRMATION" && !isExpired && (
+                        <div className="inline-flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+                          <Timer className="w-3 h-3" />
+                          <span className="text-[11px] font-sans font-bold tabular-nums">{formattedTime}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -315,7 +315,7 @@ export default function OrderStatusPage() {
             <ShoppingBag className="w-4 h-4 group-hover:scale-110 transition-transform" />
             <span className="text-[10px] font-sans font-bold uppercase tracking-widest">Need help with this order?</span>
           </button>
-          
+
           <p className="text-[9px] font-sans font-semibold text-gray-300 uppercase tracking-[0.3em] text-center">
             Powered by {site.name} Delivery
           </p>
