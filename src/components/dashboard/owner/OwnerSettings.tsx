@@ -141,43 +141,43 @@ export default function OwnerSettings() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl space-y-6 sm:space-y-8">
       <PageHeader title="Settings" subtitle="Manage your restaurant profile and menu" />
 
       {/* Restaurant Selector */}
       {restaurants.length > 1 && (
-        <div className="mb-8 p-1.5 bg-slate-50/8 rounded-2xl border border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-soft">
+        <div className="p-1 bg-white rounded-2xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center shrink-0 shadow-lg">
-              <Store className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shrink-0 shadow-lg shadow-gray-200">
+              <Store className="w-4 h-4 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Active Property</p>
-              <h3 className="text-sm font-black text-gray-900 truncate tracking-tight">{selectedRestaurant?.name}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">Active Property</p>
+              <h3 className="font-heading text-sm font-bold text-gray-900 truncate tracking-tight">{selectedRestaurant?.name}</h3>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pr-3 pl-3 sm:pl-0 pb-2 sm:pb-0">
+          <div className="flex items-center gap-2 pr-2 pl-2 sm:pl-0 pb-2 sm:pb-0">
             <div className="relative min-w-[200px]">
               <select 
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
-                className="w-full h-10 pl-4 pr-10 bg-white border border-border/40 rounded-xl text-xs font-black uppercase tracking-widest outline-none appearance-none cursor-pointer hover:border-gray-900 transition-colors shadow-sm"
+                className="w-full h-9 pl-4 pr-10 bg-gray-50/50 border border-gray-100 rounded-xl text-[10px] font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer hover:border-gray-900 transition-colors"
               >
                 {restaurants.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
           </div>
         </div>
       )}
 
       {/* Tab Switcher */}
-      <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-2xl mb-8 w-fit border border-gray-100">
+      <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-xl w-fit border border-gray-100/50">
         <button
           onClick={() => setActiveTab("profile")}
           className={cn(
-            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            "px-5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
             activeTab === "profile" 
               ? "bg-white text-gray-900 shadow-sm" 
               : "text-gray-400 hover:text-gray-600"
@@ -188,7 +188,7 @@ export default function OwnerSettings() {
         <button
           onClick={() => setActiveTab("menu")}
           className={cn(
-            "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+            "px-5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
             activeTab === "menu" 
               ? "bg-white text-gray-900 shadow-sm" 
               : "text-gray-400 hover:text-gray-600"
@@ -202,15 +202,15 @@ export default function OwnerSettings() {
         <div className="space-y-8">
           {/* Banner for pending deletion */}
           {selectedRestaurant?.deletionStatus === "PENDING_DELETION" && (
-            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
-                  <Clock className="w-6 h-6 text-amber-600" />
+                <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-amber-900 uppercase tracking-tight">Scheduled for Deletion</h3>
-                  <p className="text-xs font-medium text-amber-700/80 mt-0.5">
-                    This restaurant will be permanently removed on {new Date(selectedRestaurant.deletionScheduledAt!).toLocaleDateString()}.
+                  <h3 className="font-heading text-xs font-bold text-amber-900 uppercase tracking-tight">Scheduled for Deletion</h3>
+                  <p className="text-[11px] font-medium text-amber-700/80 mt-0.5">
+                    Permanently removed on {selectedRestaurant.deletionScheduledAt ? new Date(selectedRestaurant.deletionScheduledAt).toLocaleDateString() : "unknown"}.
                   </p>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export default function OwnerSettings() {
                     toast.error(res.error || "Failed to restore restaurant.");
                   }
                 }}
-                className="px-6 py-2.5 rounded-xl bg-amber-600 text-white text-xs font-black uppercase tracking-widest hover:bg-amber-700 transition-all active:scale-95 shadow-lg shadow-amber-200"
+                className="px-5 py-2 rounded-xl bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-700 transition-all active:scale-95 shadow-md shadow-amber-200/50"
               >
                 Restore Restaurant
               </button>
@@ -294,7 +294,7 @@ export default function OwnerSettings() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save All Changes
@@ -304,19 +304,19 @@ export default function OwnerSettings() {
           </div>
 
           {/* Danger Zone */}
-          <div className="pt-12 border-t border-gray-100">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500 mb-6">Danger Zone</h2>
-            <div className="p-8 rounded-[2.5rem] bg-red-50/30 border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="pt-10 border-t border-gray-100">
+            <h2 className="font-heading text-[9px] font-bold uppercase tracking-[0.2em] text-red-500 mb-6 px-1">Danger Zone</h2>
+            <div className="p-6 sm:p-8 rounded-3xl bg-red-50/20 border border-red-100 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="max-w-md">
-                <h3 className="text-base font-black text-gray-900 tracking-tight mb-2">Request Restaurant Deletion</h3>
-                <p className="text-xs font-medium text-gray-500 leading-relaxed">
-                  Your restaurant will be hidden from customers immediately. You have 14 days to cancel this by clicking Restore in your settings. After 14 days all data is permanently removed.
+                <h3 className="font-heading text-sm font-bold text-gray-900 tracking-tight mb-2">Request Restaurant Deletion</h3>
+                <p className="text-[11px] font-medium text-gray-500 leading-relaxed italic">
+                  Your restaurant will be hidden immediately. You have 14 days to cancel this by clicking Restore.
                 </p>
               </div>
               <button
                 onClick={() => setIsDeleteModalOpen(true)}
                 disabled={selectedRestaurant?.deletionStatus === "PENDING_DELETION"}
-                className="whitespace-nowrap px-8 py-3.5 rounded-2xl border-2 border-red-200 text-red-600 text-xs font-black uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="whitespace-nowrap px-6 py-3 rounded-xl border-2 border-red-100 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Request Deletion
               </button>
@@ -327,21 +327,20 @@ export default function OwnerSettings() {
           {isDeleteModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setIsDeleteModalOpen(false)} />
-              <div className="relative w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl border border-red-100 animate-in zoom-in-95 duration-300">
+              <div className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl border border-red-100 animate-in zoom-in-95 duration-300">
                 <div className="flex items-center justify-between mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center">
-                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                  <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
                   </div>
-                  <button onClick={() => setIsDeleteModalOpen(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-colors">
-                    <X className="w-5 h-5 text-gray-400" />
+                  <button onClick={() => setIsDeleteModalOpen(false)} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors">
+                    <X className="w-4 h-4 text-gray-400" />
                   </button>
                 </div>
                 
-                <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Delete Restaurant?</h3>
-                <p className="text-sm font-medium text-gray-500 leading-relaxed mb-8">
-                  Are you sure? Your restaurant will be hidden from customers immediately. 
-                  You have <span className="text-red-600 font-bold">14 days</span> to cancel this by clicking Restore in your settings. 
-                  After 14 days all data is permanently removed.
+                <h3 className="font-heading text-lg font-bold text-gray-900 tracking-tight mb-2">Delete Restaurant?</h3>
+                <p className="text-xs font-medium text-gray-500 leading-relaxed mb-8 italic">
+                  Are you sure? Your restaurant will be hidden immediately. 
+                  You have <span className="text-red-600 font-bold">14 days</span> to restore it before permanent removal.
                 </p>
 
                 <div className="flex flex-col gap-2">
@@ -359,13 +358,13 @@ export default function OwnerSettings() {
                         }
                       });
                     }}
-                    className="w-full py-4 rounded-2xl bg-red-600 text-white text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-200"
+                    className="w-full py-3.5 rounded-xl bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-200/50"
                   >
                     Confirm Deletion
                   </button>
                   <button
                     onClick={() => setIsDeleteModalOpen(false)}
-                    className="w-full py-4 rounded-2xl bg-gray-50 text-gray-500 text-xs font-black uppercase tracking-widest hover:bg-gray-100 transition-all"
+                    className="w-full py-3.5 rounded-xl bg-gray-50 text-gray-500 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
                   >
                     Cancel
                   </button>
@@ -383,14 +382,14 @@ export default function OwnerSettings() {
 
 function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2.5 px-6 py-4 border-b border-gray-50 bg-gray-50/30">
-        <div className="w-7 h-7 rounded-lg bg-white shadow-sm flex items-center justify-center border border-gray-100/50">
-          <Icon className="w-3.5 h-3.5 text-gray-600" />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-50 bg-gray-50/30">
+        <div className="w-6 h-6 rounded-lg bg-white shadow-sm flex items-center justify-center border border-gray-100/50">
+          <Icon className="w-3 h-3 text-gray-600" />
         </div>
-        <h2 className="text-sm font-bold text-gray-900">{title}</h2>
+        <h2 className="font-heading text-xs font-bold text-gray-900 uppercase tracking-tight">{title}</h2>
       </div>
-      <div className="p-6 space-y-5">{children}</div>
+      <div className="p-3 sm:p-5 space-y-4">{children}</div>
     </div>
   );
 }
@@ -398,7 +397,7 @@ function Section({ icon: Icon, title, children }: { icon: any; title: string; ch
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">{label}</label>
+      <label className="font-heading text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">{label}</label>
       {children}
     </div>
   );
@@ -408,66 +407,100 @@ function HoursEditor({ hours, onChange }: { hours: HoursForm; onChange: (h: Hour
   const toggle = (key: DayKey) => onChange({ ...hours, [key]: { ...hours[key], enabled: !hours[key].enabled } });
   const setTime = (key: DayKey, field: "open" | "close", val: string) => onChange({ ...hours, [key]: { ...hours[key], [field]: val } });
 
+  const applyQuick = (keys: DayKey[], open: string, close: string) => {
+    const next = { ...hours };
+    for (const k of keys) next[k] = { enabled: true, open, close };
+    onChange(next);
+  };
+
+  const closeAll = () => {
+    const next = { ...hours };
+    for (const { key } of DAYS) next[key] = { ...next[key], enabled: false };
+    onChange(next);
+  };
+
+  const WEEKDAYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri"];
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick presets */}
+      <div className="flex items-center gap-2 flex-wrap px-1 mb-2">
+        {[
+          { label: "Weekdays", action: () => applyQuick(WEEKDAYS, "09:00", "22:00") },
+          { label: "Every Day", action: () => applyQuick(DAYS.map(d => d.key), "09:00", "22:00") },
+          { label: "Close All", action: closeAll },
+        ].map(({ label, action }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={action}
+            className="text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border border-gray-100 text-gray-400 transition-all hover:bg-gray-50 hover:text-gray-600"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2.5">
       {DAYS.map(({ key, label }) => {
         const row = hours[key];
         return (
           <div key={key} className={cn(
-            "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border transition-all duration-300",
+            "flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border transition-all duration-300",
             row.enabled 
-              ? "bg-white border-border/40 shadow-soft" 
-              : "bg-slate-50/50 border-gray-100 opacity-60"
+              ? "bg-white border-gray-100 shadow-sm" 
+              : "bg-gray-50/50 border-gray-100/50 opacity-60"
           )}>
             <div className="flex items-center gap-3">
                <button
                 type="button"
                 onClick={() => toggle(key)}
                 className={cn(
-                  "relative w-9 h-5 rounded-full transition-colors duration-500",
-                  row.enabled ? "bg-emerald-500" : "bg-slate-200"
+                  "relative w-8 h-4 rounded-full transition-colors duration-500",
+                  row.enabled ? "bg-emerald-500" : "bg-gray-200"
                 )}
               >
                 <div className={cn(
-                  "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-500",
+                  "absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform duration-500",
                   row.enabled ? "translate-x-4" : "translate-x-0"
                 )} />
               </button>
               <span className={cn(
-                "text-xs font-black uppercase tracking-widest",
-                row.enabled ? "text-gray-900" : "text-muted-foreground/40"
+                "font-heading text-[10px] font-bold uppercase tracking-widest",
+                row.enabled ? "text-gray-900" : "text-gray-300"
               )}>{label}</span>
             </div>
 
             {row.enabled ? (
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex items-center group/input">
-                   <Clock className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/10 group-focus-within/input:text-primary transition-colors" />
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                <div className="flex-1 sm:flex-none flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl bg-gray-50/50 border border-gray-100 group/input">
+                   <Clock className="w-3 h-3 text-gray-300 group-focus-within/input:text-gray-900 transition-colors pointer-events-none" />
                    <input 
                     type="time" 
                     value={row.open} 
                     onChange={e => setTime(key, "open", e.target.value)} 
-                    className="w-full sm:w-28 pl-8 pr-2 py-2.5 rounded-xl text-[10px] font-black border border-border/40 bg-slate-50/50 outline-none focus:border-gray-900 focus:bg-white transition-all shadow-inset appearance-none" 
+                    className="flex-1 sm:w-16 bg-transparent text-[10px] font-bold outline-none" 
                    />
                 </div>
-                <div className="hidden sm:block text-[9px] font-black text-muted-foreground/30 tracking-widest px-1">TO</div>
-                <div className="relative flex items-center group/input">
+                <div className="text-[8px] font-bold text-gray-300 tracking-widest px-0.5 sm:px-1">TO</div>
+                <div className="flex-1 sm:flex-none flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl bg-gray-50/50 border border-gray-100 group/input">
                    <input 
                     type="time" 
                     value={row.close} 
                     onChange={e => setTime(key, "close", e.target.value)} 
-                    className="w-full sm:w-28 px-3 py-2.5 rounded-xl text-[10px] font-black border border-border/40 bg-slate-50/50 outline-none focus:border-gray-900 focus:bg-white transition-all shadow-inset appearance-none" 
+                    className="flex-1 sm:w-16 bg-transparent text-[10px] font-bold outline-none" 
                    />
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-muted-foreground/30">
-                <span className="text-[10px] font-black uppercase tracking-widest">Platform Offline</span>
+              <div className="flex items-center gap-2 text-gray-300">
+                <span className="text-[9px] font-bold uppercase tracking-widest">Platform Offline</span>
               </div>
             )}
           </div>
         );
       })}
     </div>
+  </div>
   );
 }

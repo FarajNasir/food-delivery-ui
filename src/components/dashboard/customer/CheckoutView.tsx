@@ -10,12 +10,13 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { toast } from "sonner";
 import {
   ChevronLeft, MapPin, Phone, CreditCard, Loader2,
-  Navigation, Store, ChevronDown, ShieldCheck, CheckCircle2,
+  Navigation, Store, ChevronDown, ShieldCheck, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { getOSRMDistance, calculateDeliveryFee } from "@/lib/delivery";
 import { cn } from "@/lib/utils";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 export default function CheckoutView() {
   const { cartItems, totalPrice, clearCart } = useCart();
@@ -69,14 +70,14 @@ export default function CheckoutView() {
       const newDistances: Record<string, number> = {};
       const newFees: Record<string, number> = {};
       let total = 0;
- 
+
       for (const restaurantId of uniqueRestos) {
         const item = cartItems.find(i => i.restaurantId === restaurantId);
         if (!item?.restaurantLat || !item?.restaurantLng) {
           // Fallback to site coordinates if restaurant coords are missing
           if (!site.coordinates) {
-             console.warn(`Site ${site.key} is missing coordinates fallback.`);
-             continue;
+            console.warn(`Site ${site.key} is missing coordinates fallback.`);
+            continue;
           }
           const miles = await getOSRMDistance(site.coordinates, { lat: userCoords.lat, lng: userCoords.lng });
           if (miles !== null) {
@@ -86,19 +87,19 @@ export default function CheckoutView() {
           }
           continue;
         }
- 
+
         const miles = await getOSRMDistance(
           { lat: parseFloat(item.restaurantLat), lng: parseFloat(item.restaurantLng) },
           { lat: userCoords.lat, lng: userCoords.lng }
         );
- 
+
         if (miles !== null) {
           newDistances[restaurantId] = miles;
           newFees[restaurantId] = calculateDeliveryFee(site, { miles, isMobileChef: item.isMobileChef });
           total += newFees[restaurantId];
         }
       }
- 
+
       setDistanceBreakdown(newDistances);
       setDeliveryFeesBreakdown(newFees);
       setDeliveryFee(total);
@@ -109,11 +110,15 @@ export default function CheckoutView() {
 
   const groupedItems = React.useMemo(() =>
     cartItems.reduce((acc, item) => {
-      const g = acc[item.restaurantId] ?? { name: item.restaurantName, items: [] };
+      const g = acc[item.restaurantId] ?? {
+        name: item.restaurantName,
+        items: [],
+        isOpen: isRestaurantOpen(item.openingHours)
+      };
       g.items.push(item);
       acc[item.restaurantId] = g;
       return acc;
-    }, {} as Record<string, { name: string; items: typeof cartItems }>),
+    }, {} as Record<string, { name: string; items: typeof cartItems; isOpen: boolean }>),
     [cartItems]);
 
   const handleGetLocation = () => {
@@ -146,6 +151,13 @@ export default function CheckoutView() {
   };
 
   const handlePlaceOrder = async () => {
+    // Final check for closed restaurants
+    const closedResto = Object.values(groupedItems).find(g => !g.isOpen);
+    if (closedResto) {
+      toast.error(`${closedResto.name} is currently closed. Please remove it from your cart.`);
+      return;
+    }
+
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
@@ -190,10 +202,10 @@ export default function CheckoutView() {
   const isFixedAreas = site.deliveryPricing?.type === "fixed_areas";
   const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
   const paysDeliveryAtDoor = site.key === "newcastleeats";
-  
+
   const uniqueRestosCount = Array.from(new Set(cartItems.map(i => i.restaurantId))).length;
   const serviceCharge = (site.serviceCharge ?? 0) * uniqueRestosCount;
-  
+
   const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee) + serviceCharge;
 
 
@@ -339,6 +351,9 @@ export default function CheckoutView() {
                 <div className="flex items-center gap-1.5">
                   <Store className="w-3 h-3 text-gray-400" />
                   <span className="text-xs font-bold text-gray-500">{group.name}</span>
+                  {!group.isOpen && (
+                    <span className="text-[9px] font-black uppercase tracking-widest text-red-600 bg-red-50 px-2 py-0.5 rounded">Closed</span>
+                  )}
                 </div>
                 <div className="space-y-4">
                   {group.items.map((item) => (
@@ -413,9 +428,17 @@ export default function CheckoutView() {
             </div>
 
             {/* CTA */}
+            {Object.values(groupedItems).some(g => !g.isOpen) && (
+              <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-50 border border-red-100 mb-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-red-800 font-bold leading-relaxed uppercase tracking-tight">
+                  One or more restaurants are currently closed.
+                </p>
+              </div>
+            )}
             <button
               onClick={handlePlaceOrder}
-              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && Object.keys(distanceBreakdown).length === 0)}
+              disabled={isPlacing || isCalculating || (isFixedAreas && !deliveryArea) || (isDistSlabs && Object.keys(distanceBreakdown).length === 0) || Object.values(groupedItems).some(g => !g.isOpen)}
               className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-sm uppercase tracking-wide shadow-lg transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
             >

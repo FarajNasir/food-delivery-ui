@@ -20,13 +20,15 @@ export async function GET(req: Request) {
 
       const rows = await db
         .select({
-          id:           restaurants.id,
-          name:         restaurants.name,
-          contactEmail: restaurants.contactEmail,
-          contactPhone: restaurants.contactPhone,
-          site:         restaurants.location, 
-          ownerName:    users.name,
-          status:       restaurants.status,
+          id:            restaurants.id,
+          name:          restaurants.name,
+          location:      restaurants.location,
+          logoUrl:       restaurants.logoUrl,
+          contactEmail:  restaurants.contactEmail,
+          contactPhone:  restaurants.contactPhone,
+          openingHours:  restaurants.openingHours,
+          ownerName:     users.name,
+          status:        restaurants.status,
           deletionStatus: restaurants.deletionStatus,
           deletionRequestedAt: restaurants.deletionRequestedAt,
           deletionScheduledAt: restaurants.deletionScheduledAt,

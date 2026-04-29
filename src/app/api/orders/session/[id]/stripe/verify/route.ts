@@ -109,7 +109,7 @@ export async function POST(
           type: "ORDER",
           subject,
           body,
-          metadata: { sessionId: id, status: "PAID", targetRole: "customer" },
+          metadata: { sessionId: id, orderStatus: "PAID", targetRole: "customer" },
           channels: ["FCM", "WHATSAPP", "EMAIL"] // PAID is a key stage for Email
         });
       } catch (notifyErr) {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { cartItems, menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 const AddToCartSchema = z.object({
   menuItemId: z.string().uuid(),
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
           restaurantLocation: restaurants.location,
           restaurantLat: restaurants.latitude,
           restaurantLng: restaurants.longitude,
+          openingHours: restaurants.openingHours,
         })
         .from(cartItems)
         .innerJoin(menuItems, eq(cartItems.menuItemId, menuItems.id))
@@ -56,12 +58,24 @@ export async function POST(req: Request) {
 
       /* 1. Verify item exists and is available */
       const [item] = await db
-        .select({ id: menuItems.id, status: menuItems.status })
+        .select({ 
+          id: menuItems.id, 
+          status: menuItems.status,
+          restaurantId: menuItems.restaurantId,
+          openingHours: restaurants.openingHours,
+          restaurantName: restaurants.name
+        })
         .from(menuItems)
+        .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
         .where(eq(menuItems.id, menuItemId));
 
       if (!item) return fail("Item not found.", 404);
       if (item.status !== "available") return fail("This item is currently unavailable.", 400);
+
+      // Validate Restaurant Operational Hours
+      if (!isRestaurantOpen(item.openingHours)) {
+        return fail(`${item.restaurantName} is currently closed and not accepting new orders.`, 400);
+      }
 
       // Attempt an atomic update first
       const [updated] = await db

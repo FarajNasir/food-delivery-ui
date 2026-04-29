@@ -110,7 +110,8 @@ export class NotificationService {
         .select({
           notification: notifications,
           user: {
-            fcmToken: users.fcmToken
+            fcmToken: users.fcmToken,
+            email: users.email
           }
         })
         .from(notifications)
@@ -147,7 +148,15 @@ export class NotificationService {
       // 3. Send via FCM
       console.log(`[NotificationService] Sending FCM to token: ${user.fcmToken.slice(0, 10)}...`);
       
-      const rawMetadata = (notification.metadata as Record<string, unknown>) || {};
+      let rawMetadata = notification.metadata || {};
+      if (typeof rawMetadata === "string") {
+        try {
+          rawMetadata = JSON.parse(rawMetadata);
+        } catch (e) {
+          rawMetadata = {};
+        }
+      }
+      
       // FCM requires ALL data values to be strings — stringify everything
       const stringifiedMetadata: Record<string, string> = {};
       for (const [key, val] of Object.entries(rawMetadata)) {
@@ -159,23 +168,16 @@ export class NotificationService {
       // Use the actual order status from metadata so clients update correctly.
       // e.g. payment notification → PAID, new order notification → PENDING_CONFIRMATION
       const orderStatus = stringifiedMetadata.orderStatus || "PENDING_CONFIRMATION";
+      console.log(`[NotificationService] Preparing FCM for ${user.email}. Status: ${orderStatus}, Type: ${notification.type}, Metadata:`, stringifiedMetadata);
 
       const message = {
         token: user.fcmToken,
-        notification: {
+        data: {
           title: notification.subject,
           body: notification.body,
-        },
-        data: {
           type: notification.type,  // "ORDER"
           status: orderStatus,       // actual status from metadata
           ...stringifiedMetadata,    // orderId, orderStatus, etc. — all strings
-        },
-        webpush: {
-          notification: {
-            icon: "/icons/icon-192x192.png",
-            badge: "/icons/icon-192x192.png",
-          },
         },
       };
 

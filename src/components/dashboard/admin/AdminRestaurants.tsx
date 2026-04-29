@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { LOCATIONS, locationTheme } from "@/lib/locations";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-number-input";
 import PhoneCountrySelect from "@/components/ui/PhoneCountrySelect";
 import type { E164Number } from "libphonenumber-js";
@@ -246,7 +247,7 @@ export function Modal({ title, onClose, children, icon }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh]"
         style={{ background: "var(--dash-card)", border: "1px solid var(--dash-card-border)" }}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
@@ -329,27 +330,20 @@ function HoursEditor({ hours, onChange }: {
     onChange(next);
   };
 
-  const timeStyle = {
-    background:  "var(--dash-bg)",
-    borderColor: "var(--dash-card-border)",
-    color:       "var(--dash-text-primary)",
-  };
-
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-4">
       {/* Quick presets */}
-      <div className="flex items-center gap-1.5 flex-wrap pb-1">
-        <span className="text-xs font-medium" style={{ color: "var(--dash-text-secondary)" }}>Quick:</span>
+      <div className="flex items-center gap-2 flex-wrap px-1">
         {[
-          { label: "Weekdays",  action: () => applyQuick(WEEKDAYS, "09:00", "22:00") },
-          { label: "Every day", action: () => applyQuick(DAYS.map(d => d.key), "09:00", "22:00") },
-          { label: "Close all", action: closeAll },
+          { label: "Weekdays", action: () => applyQuick(WEEKDAYS, "09:00", "22:00") },
+          { label: "Every Day", action: () => applyQuick(DAYS.map(d => d.key), "09:00", "22:00") },
+          { label: "Close All", action: closeAll },
         ].map(({ label, action }) => (
           <button
             key={label}
             type="button"
             onClick={action}
-            className="text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors hover:bg-black/5"
+            className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border transition-all hover:bg-black/5"
             style={{ borderColor: "var(--dash-card-border)", color: "var(--dash-text-secondary)" }}
           >
             {label}
@@ -357,75 +351,65 @@ function HoursEditor({ hours, onChange }: {
         ))}
       </div>
 
-      {/* Day rows — grid keeps all 4 columns aligned across every row */}
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{ borderColor: "var(--dash-card-border)" }}
-      >
-        {DAYS.map(({ key, short }, i) => {
+      <div className="space-y-2">
+        {DAYS.map(({ key, label }) => {
           const row = hours[key];
           return (
-            <div
-              key={key}
-              className="grid items-center px-3 py-2.5 transition-colors"
-              style={{
-                gridTemplateColumns: "2.5rem 2.5rem 1fr 3rem",
-                columnGap: "0.75rem",
-                borderTop: i === 0 ? "none" : "1px solid var(--dash-card-border)",
-                background: row.enabled ? "rgba(0,0,0,0.015)" : "transparent",
-              }}
+            <div 
+              key={key} 
+              className={cn(
+                "flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border transition-all duration-300",
+                row.enabled 
+                  ? "bg-white border-gray-100 shadow-sm" 
+                  : "bg-gray-50/30 border-gray-100/50 opacity-60"
+              )}
             >
-              {/* Day name */}
-              <span
-                className="text-xs font-semibold"
-                style={{ color: row.enabled ? "var(--dash-text-primary)" : "var(--dash-text-secondary)" }}
-              >
-                {short}
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggle(key)}
+                  className={cn(
+                    "relative w-8 h-4 rounded-full transition-colors duration-300",
+                    row.enabled ? "bg-[#22c55e]" : "bg-gray-200"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform duration-300",
+                    row.enabled ? "translate-x-4" : "translate-x-0"
+                  )} />
+                </button>
+                <span className={cn(
+                  "text-[10px] font-bold uppercase tracking-widest",
+                  row.enabled ? "text-gray-900" : "text-gray-400"
+                )}>
+                  {label}
+                </span>
+              </div>
 
-              {/* Toggle */}
-              <button
-                type="button"
-                onClick={() => toggle(key)}
-                className="relative w-9 h-5 rounded-full transition-colors overflow-hidden"
-                style={{ background: row.enabled ? "var(--dash-accent)" : "var(--dash-card-border)" }}
-              >
-                <span
-                  className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
-                  style={{ transform: row.enabled ? "translateX(16px)" : "translateX(0px)" }}
-                />
-              </button>
-
-              {/* Time range or Closed */}
               {row.enabled ? (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <input
-                    type="time"
-                    value={row.open}
-                    onChange={(e) => setTime(key, "open", e.target.value)}
-                    className="flex-1 min-w-0 text-xs font-medium px-2 py-1 rounded-lg border outline-none"
-                    style={timeStyle}
-                  />
-                  <span className="text-xs shrink-0" style={{ color: "var(--dash-text-secondary)" }}>–</span>
-                  <input
-                    type="time"
-                    value={row.close}
-                    onChange={(e) => setTime(key, "close", e.target.value)}
-                    className="flex-1 min-w-0 text-xs font-medium px-2 py-1 rounded-lg border outline-none"
-                    style={timeStyle}
-                  />
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                  <div className="flex-1 sm:flex-none flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <Clock className="w-3 h-3 text-gray-400" />
+                    <input
+                      type="time"
+                      value={row.open}
+                      onChange={(e) => setTime(key, "open", e.target.value)}
+                      className="flex-1 sm:w-16 bg-transparent text-[10px] font-bold outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-300">TO</span>
+                  <div className="flex-1 sm:flex-none flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <input
+                      type="time"
+                      value={row.close}
+                      onChange={(e) => setTime(key, "close", e.target.value)}
+                      className="flex-1 sm:w-16 bg-transparent text-[10px] font-bold outline-none"
+                    />
+                  </div>
                 </div>
               ) : (
-                <span className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>Closed</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Offline</span>
               )}
-
-              {/* Status */}
-              <span
-                className="text-xs font-semibold text-right"
-                style={{ color: row.enabled ? "var(--dash-accent)" : "var(--dash-card-border)" }}
-              >
-                {row.enabled ? "Open" : "—"}
-              </span>
             </div>
           );
         })}
@@ -583,9 +567,11 @@ function RestaurantFormFields({ form, owners, onChange }: {
       </div>
 
       {/* Opening Hours */}
-      <div>
-        <p className={section} style={{ color: "var(--dash-text-secondary)" }}>Opening Hours</p>
-        <HoursEditor hours={form.hours} onChange={(h) => onChange({ hours: h })} />
+      <div className="pt-4 border-t" style={{ borderColor: "var(--dash-card-border)" }}>
+        <p className={section} style={{ color: "var(--dash-text-secondary)" }}>Operating Schedule</p>
+        <div className="p-5 rounded-3xl bg-gray-50/50 border border-gray-100">
+          <HoursEditor hours={form.hours} onChange={(h) => onChange({ hours: h })} />
+        </div>
       </div>
     </>
   );

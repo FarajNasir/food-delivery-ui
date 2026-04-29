@@ -25,15 +25,15 @@ import { useOrderStore } from "@/store/useOrderStore";
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
-  const { 
-    orders, 
-    isLoading: loading, 
+  const {
+    orders,
+    isLoading: loading,
     pagination,
-    refreshOrders, 
+    refreshOrders,
     updateOrderStatus: storeUpdateOrderStatus,
     reorder: storeReorder
   } = useOrderStore();
-  
+
   const { session, isReady, user } = useAuthStore();
   const userId = user?.id;
 
@@ -43,7 +43,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady || !session) return;
 
-    refreshOrders(1, "all").catch(() => {});
+    refreshOrders(1, "all").catch(() => { });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("[OrderContext] Tab visible, refreshing orders...");
+        refreshOrders(1, "all").catch(() => { });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [session, isReady, refreshOrders]);
 
   const updateOrderStatus = async (id: string, status: string, paymentIntentId?: string) => {

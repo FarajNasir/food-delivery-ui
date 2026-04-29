@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Star, Clock, Truck, Sparkles, Store, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RestaurantItem, FeaturedItem } from "@/types/api.types";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 interface RestaurantCardProps {
   restaurant: RestaurantItem | FeaturedItem | any; // Keep any for mock compatibility during transition
@@ -33,6 +34,9 @@ export default function RestaurantCard({
   const cuisine = (restaurant as any).cuisine || "";
   const rating = (restaurant as any).rating || null;
   const deliveryTime = (restaurant as any).deliveryTime || null;
+  const openingHours = (restaurant as any).openingHours;
+
+  const isOpen = isRestaurantOpen(openingHours);
 
   return (
     <motion.div
@@ -42,7 +46,8 @@ export default function RestaurantCard({
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
       className={cn(
         "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
-        "hover:shadow-elevated shadow-soft transform-gpu"
+        "hover:shadow-elevated shadow-soft transform-gpu",
+        !isOpen && "grayscale-[0.8] opacity-90"
       )}
     >
       {/* Visual Depth Overlay */}
@@ -87,6 +92,15 @@ export default function RestaurantCard({
             <div className="glass-premium flex items-center gap-1 rounded-full px-3 py-1.5 shadow-xl">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
               <span className="text-[12px] font-black text-gray-900">{rating}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Closed Overlay */}
+        {!isOpen && (
+          <div className="absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+            <div className="bg-white/90 px-4 py-2 rounded-full shadow-2xl scale-110">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900">Currently Closed</span>
             </div>
           </div>
         )}

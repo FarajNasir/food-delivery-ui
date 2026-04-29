@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { orders, orderItems, menuItems, restaurants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/orders/[id]
  * Fetches a single order with its items and restaurant details.
@@ -40,6 +42,7 @@ export async function GET(
         .limit(1);
 
       if (!order) {
+        console.warn(`[api/orders/[id] GET] Order ${id} not found for user ${user.id}. Query: id=${id}, userId=${user.id}`);
         return fail("Order not found", 404);
       }
 

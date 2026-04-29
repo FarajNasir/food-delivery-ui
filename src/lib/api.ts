@@ -20,23 +20,23 @@ export interface RegisterResponse extends AuthUser {
   needsEmailVerification: boolean;
 }
 
-export type UserRole   = "customer" | "driver" | "owner" | "admin";
+export type UserRole = "customer" | "driver" | "owner" | "admin";
 export type UserStatus = "active" | "banned";
 
 export interface AdminUserItem {
-  id:        string;
-  name:      string;
-  email:     string;
-  phone:     string;
-  role:      UserRole;
-  status:    UserStatus;
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  status: UserStatus;
   createdAt: string;
 }
 
 export interface AdminUserListResponse {
-  users:    AdminUserItem[];
-  total:    number;
-  page:     number;
+  users: AdminUserItem[];
+  total: number;
+  page: number;
   pageSize: number;
 }
 
@@ -57,9 +57,9 @@ async function parseResponse<T>(res: Response): Promise<ApiResponse<T>> {
 async function post<T>(url: string, body: unknown): Promise<ApiResponse<T>> {
   try {
     const res = await fetch(url, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
+      body: JSON.stringify(body),
       credentials: "same-origin",
     });
     return parseResponse<T>(res);
@@ -80,9 +80,9 @@ async function get<T>(url: string): Promise<ApiResponse<T>> {
 async function put<T>(url: string, body: unknown): Promise<ApiResponse<T>> {
   try {
     const res = await fetch(url, {
-      method:  "PUT",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
+      body: JSON.stringify(body),
       credentials: "same-origin",
     });
     return parseResponse<T>(res);
@@ -128,70 +128,70 @@ export type DayHours = { open: string; close: string } | null;
 export type OpeningHours = Partial<Record<DayKey, DayHours>>;
 
 export interface AdminRestaurantItem {
-  id:            string;
-  name:          string;
-  location:      string | null;
-  logoUrl:       string | null;
-  ownerId:       string | null;
-  ownerName:     string | null;
-  ownerEmail:    string | null;
-  ownerPhone:    string | null;
-  managerPhone:  string | null;
-  contactEmail:  string;
-  contactPhone:  string;
+  id: string;
+  name: string;
+  location: string | null;
+  logoUrl: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  ownerPhone: string | null;
+  managerPhone: string | null;
+  contactEmail: string;
+  contactPhone: string;
   businessRegNo: string | null;
-  openingHours:  OpeningHours | null;
-  status:        RestaurantStatus;
+  openingHours: OpeningHours | null;
+  status: RestaurantStatus;
   deletionStatus: "PENDING_DELETION" | "DELETED" | null;
   deletionRequestedAt: string | null;
   deletionScheduledAt: string | null;
-  isActive:      boolean;
-  isMobileChef:  boolean;
-  createdAt:     string;
+  isActive: boolean;
+  isMobileChef: boolean;
+  createdAt: string;
 }
 
 export interface AdminRestaurantListResponse {
   restaurants: AdminRestaurantItem[];
-  total:       number;
-  page:        number;
-  pageSize:    number;
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface ListRestaurantsParams {
-  search?:   string;
-  status?:   string;
+  search?: string;
+  status?: string;
   location?: string;
-  sort?:     "name" | "createdAt";
-  order?:    "asc" | "desc";
-  page?:     number;
-  limit?:    number;
+  sort?: "name" | "createdAt";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
   includeDeletions?: boolean;
 }
 
 export interface RestaurantPayload {
-  name:           string;
-  location?:      string;
-  logoUrl?:       string;
-  ownerId:        string;
-  managerPhone?:  string;
-  contactEmail:   string;
-  contactPhone:   string;
+  name: string;
+  location?: string;
+  logoUrl?: string;
+  ownerId: string;
+  managerPhone?: string;
+  contactEmail: string;
+  contactPhone: string;
   businessRegNo?: string;
-  openingHours?:  OpeningHours;
-  status?:        RestaurantStatus;
-  isMobileChef?:  boolean;
+  openingHours?: OpeningHours;
+  status?: RestaurantStatus;
+  isMobileChef?: boolean;
 }
 
 export const restaurantApi = {
   list(params: ListRestaurantsParams = {}) {
     const qs = new URLSearchParams();
-    if (params.search)    qs.set("search",   params.search);
-    if (params.status)    qs.set("status",   params.status);
-    if (params.location)  qs.set("location", params.location);
-    if (params.sort)      qs.set("sort",     params.sort);
-    if (params.order)     qs.set("order",    params.order);
-    if (params.page)      qs.set("page",     String(params.page));
-    if (params.limit)     qs.set("limit",    String(params.limit));
+    if (params.search) qs.set("search", params.search);
+    if (params.status) qs.set("status", params.status);
+    if (params.location) qs.set("location", params.location);
+    if (params.sort) qs.set("sort", params.sort);
+    if (params.order) qs.set("order", params.order);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
     if (params.includeDeletions) qs.set("includeDeletions", "true");
     return get<AdminRestaurantListResponse>(`/api/admin/restaurants?${qs.toString()}`);
   },
@@ -226,25 +226,25 @@ export const restaurantApi = {
 /* ── Admin: User Management API ── */
 
 export interface ListUsersParams {
-  search?:  string;
-  role?:    string;
-  status?:  string;
-  sort?:    "name" | "createdAt";
-  order?:   "asc" | "desc";
-  page?:    number;
-  limit?:   number;
+  search?: string;
+  role?: string;
+  status?: string;
+  sort?: "name" | "createdAt";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
 }
 
 export const adminApi = {
   listUsers(params: ListUsersParams = {}) {
     const qs = new URLSearchParams();
-    if (params.search)  qs.set("search",  params.search);
-    if (params.role)    qs.set("role",    params.role);
-    if (params.status)  qs.set("status",  params.status);
-    if (params.sort)    qs.set("sort",    params.sort);
-    if (params.order)   qs.set("order",   params.order);
-    if (params.page)    qs.set("page",    String(params.page));
-    if (params.limit)   qs.set("limit",   String(params.limit));
+    if (params.search) qs.set("search", params.search);
+    if (params.role) qs.set("role", params.role);
+    if (params.status) qs.set("status", params.status);
+    if (params.sort) qs.set("sort", params.sort);
+    if (params.order) qs.set("order", params.order);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
     return get<AdminUserListResponse>(`/api/admin/users?${qs.toString()}`);
   },
 
@@ -266,17 +266,17 @@ export const adminApi = {
 export type MenuItemStatus = "available" | "unavailable";
 
 export interface AdminMenuItemResponse {
-  id:                 string;
-  restaurantId:       string;
-  restaurantName:     string;
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
   restaurantLocation: string | null;
-  name:               string;
-  description:        string | null;
-  category:           string;
-  price:              number;
-  status:             MenuItemStatus;
-  imageUrl:           string;
-  createdAt:          string;
+  name: string;
+  description: string | null;
+  category: string;
+  price: number;
+  status: MenuItemStatus;
+  imageUrl: string;
+  createdAt: string;
 }
 
 export interface DishListResponse {
@@ -284,38 +284,38 @@ export interface DishListResponse {
 }
 
 export interface AdminMenuListResponse {
-  items:    AdminMenuItemResponse[];
-  total:    number;
-  page:     number;
+  items: AdminMenuItemResponse[];
+  total: number;
+  page: number;
   pageSize: number;
 }
 
 export interface ListMenuParams {
-  search?:       string;
+  search?: string;
   restaurantId?: string;
-  status?:       string;
-  page?:         number;
-  limit?:        number;
+  status?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface MenuItemPayload {
   restaurantId: string;
-  name:         string;
+  name: string;
   description?: string;
-  category:     string;
-  price:        number;
-  status?:      MenuItemStatus;
-  imageUrl:     string;
+  category: string;
+  price: number;
+  status?: MenuItemStatus;
+  imageUrl: string;
 }
 
 export const menuApi = {
   list(params: ListMenuParams = {}) {
     const qs = new URLSearchParams();
-    if (params.search)       qs.set("search",       params.search);
+    if (params.search) qs.set("search", params.search);
     if (params.restaurantId) qs.set("restaurantId", params.restaurantId);
-    if (params.status)       qs.set("status",       params.status);
-    if (params.page)         qs.set("page",         String(params.page));
-    if (params.limit)        qs.set("limit",        String(params.limit));
+    if (params.status) qs.set("status", params.status);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
     return get<AdminMenuListResponse>(`/api/admin/menu?${qs.toString()}`);
   },
 
@@ -335,9 +335,9 @@ export const menuApi = {
 export const dishesApi = {
   list(params: { location: string; search?: string; category?: string; limit?: number }) {
     const qs = new URLSearchParams({ location: params.location });
-    if (params.search)   qs.set("search",   params.search);
+    if (params.search) qs.set("search", params.search);
     if (params.category) qs.set("category", params.category);
-    if (params.limit)    qs.set("limit",    String(params.limit));
+    if (params.limit) qs.set("limit", String(params.limit));
     return get<DishListResponse>(`/api/dishes?${qs.toString()}`);
   },
   getOne(id: string) {
@@ -349,26 +349,26 @@ export const dishesApi = {
 /* ── Public Featured API ── */
 
 export interface PublicFeaturedRestaurant {
-  id:        string;
-  entityId:  string;
-  type:      "restaurant";
-  name:      string;
-  location:  string | null;
-  logoUrl:   string | null;
+  id: string;
+  entityId: string;
+  type: "restaurant";
+  name: string;
+  location: string | null;
+  logoUrl: string | null;
   sortOrder: number;
 }
 
 export interface PublicFeaturedDish {
-  id:             string;
-  entityId:       string;
-  type:           "dish";
-  name:           string;
+  id: string;
+  entityId: string;
+  type: "dish";
+  name: string;
   restaurantName: string;
-  restaurantId:   string;
-  price:          number;
-  imageUrl:       string;
-  category:       string;
-  sortOrder:      number;
+  restaurantId: string;
+  price: number;
+  imageUrl: string;
+  category: string;
+  sortOrder: number;
 }
 
 export const featuredApi = {
@@ -386,32 +386,32 @@ export const featuredApi = {
 
 /* ── Admin: Featured Management API ── */
 
-export type FeaturedType   = "restaurant" | "dish";
+export type FeaturedType = "restaurant" | "dish";
 export type FeaturedStatus = "active" | "inactive";
 
 export interface AdminFeaturedItem {
-  id:         string;
-  type:       FeaturedType;
-  entityId:   string;
+  id: string;
+  type: FeaturedType;
+  entityId: string;
   entityName: string;
-  location:   string;
-  status:     FeaturedStatus;
-  sortOrder:  number;
-  createdAt:  string;
+  location: string;
+  status: FeaturedStatus;
+  sortOrder: number;
+  createdAt: string;
 }
 
 export interface AdminFeaturedListResponse {
-  items:    AdminFeaturedItem[];
-  total:    number;
-  page:     number;
+  items: AdminFeaturedItem[];
+  total: number;
+  page: number;
   pageSize: number;
 }
 
 export interface FeaturedPayload {
-  type:       FeaturedType;
-  entityId:   string;
-  location:   string;
-  status?:    FeaturedStatus;
+  type: FeaturedType;
+  entityId: string;
+  location: string;
+  status?: FeaturedStatus;
   sortOrder?: number;
 }
 
@@ -419,10 +419,10 @@ export const adminFeaturedApi = {
   list(params: { location?: string; type?: string; status?: string; page?: number; limit?: number } = {}) {
     const qs = new URLSearchParams();
     if (params.location) qs.set("location", params.location);
-    if (params.type)     qs.set("type",     params.type);
-    if (params.status)   qs.set("status",   params.status);
-    if (params.page)     qs.set("page",     String(params.page));
-    if (params.limit)    qs.set("limit",    String(params.limit));
+    if (params.type) qs.set("type", params.type);
+    if (params.status) qs.set("status", params.status);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
     return get<AdminFeaturedListResponse>(`/api/admin/featured?${qs.toString()}`);
   },
   create(payload: FeaturedPayload) {

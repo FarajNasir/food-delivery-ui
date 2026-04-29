@@ -4,6 +4,7 @@ import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions } 
 import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 import { SITES, DEFAULT_SITE } from "@/config/sites";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 function getSiteFromLocation(location: string | null) {
   if (!location) return SITES[DEFAULT_SITE];
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
           id: restaurants.id,
           name: restaurants.name,
           location: restaurants.location,
+          openingHours: restaurants.openingHours,
         }).from(restaurants).where(inArray(restaurants.id, restaurantIds));
 
         const restaurantLookup = new Map(restaurantsData.map(r => [r.id, r]));
@@ -108,6 +110,11 @@ export async function POST(req: Request) {
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
           const restaurant = restaurantLookup.get(restaurantId);
           if (!restaurant) throw new Error("RESTAURANT_NOT_FOUND");
+
+          // 3.5 Validate Restaurant Operational Hours
+          if (!isRestaurantOpen(restaurant.openingHours)) {
+            throw new Error(`RESTAURANT_CLOSED:${restaurant.name}`);
+          }
 
           const site = getSiteFromLocation(restaurant.location);
           const serviceCharge = site.serviceCharge ?? 0;
@@ -194,24 +201,31 @@ export async function POST(req: Request) {
                 const ownerBody = `New Order Received!\n\nOrder #${newOrder.id.slice(0, 8)}\nItems:\n${itemsSummary}\n\nTotal: £${totalAmount}\n\nAddress: ${newOrder.deliveryAddress}`;
                 const customerBody = `Your order #${newOrder.id.slice(0, 8)} from ${restaurant.name} has been received. We'll notify you when it's confirmed!`;
 
-                await Promise.all([
-                  restaurant.ownerId ? NotificationService.dispatchOrderNotifications({
+                // Dispatch Owner Notification immediately
+                if (restaurant.ownerId) {
+                  await NotificationService.dispatchOrderNotifications({
                     userId: restaurant.ownerId,
                     type: "ORDER",
                     subject: "New Order Received!",
                     body: ownerBody,
                     metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "owner" },
                     channels: ["FCM", "WHATSAPP"]
-                  }) : Promise.resolve(),
-                  newOrder.userId ? NotificationService.dispatchOrderNotifications({
+                  });
+                }
+
+                // Add a small delay for customer notification to ensure DB commit is visible 
+                // when the frontend tries to fetch the order by ID immediately after FCM.
+                if (newOrder.userId) {
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  await NotificationService.dispatchOrderNotifications({
                     userId: newOrder.userId,
                     type: "ORDER",
                     subject: "Order Received! 🛍️",
                     body: customerBody,
                     metadata: { orderId: newOrder.id, orderStatus: "PENDING_CONFIRMATION", targetRole: "customer" },
                     channels: ["FCM", "WHATSAPP"]
-                  }) : Promise.resolve(),
-                ]);
+                  });
+                }
               }
             })
           );
@@ -226,6 +240,10 @@ export async function POST(req: Request) {
       console.error("[api/orders POST]", err);
       if (err instanceof Error && err.message === "CART_EMPTY") {
         return fail("Cart is empty", 400);
+      }
+      if (err instanceof Error && err.message.startsWith("RESTAURANT_CLOSED:")) {
+        const name = err.message.split(":")[1];
+        return fail(`${name} is currently closed and not accepting orders.`, 400);
       }
       return fail("Failed to create orders.", 500);
     }

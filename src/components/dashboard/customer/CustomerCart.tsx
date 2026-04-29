@@ -16,11 +16,13 @@ import LocationPermissionModal from "@/components/shared/LocationPermissionModal
 import DishCard, { SkeletonDishCard } from "@/components/dashboard/customer/DishCard";
 import { featuredApi, type PublicFeaturedDish } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 export default function CustomerCart() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
+  const isEmpty = cartItems.length === 0;
   const { profile, isReady: authReady } = useAuthStore();
   const isLoggedIn = authReady && !!profile;
   const { userCoords } = useConfigStore();
@@ -64,21 +66,25 @@ export default function CustomerCart() {
 
   const groupedItems = React.useMemo(() => {
     return cartItems.reduce((acc, item) => {
-      const g = acc[item.restaurantId] || { name: item.restaurantName, items: [] };
+      const g = acc[item.restaurantId] || {
+        name: item.restaurantName,
+        items: [],
+        isOpen: isRestaurantOpen(item.openingHours)
+      };
       g.items.push(item);
       acc[item.restaurantId] = g;
       return acc;
-    }, {} as Record<string, { name: string; items: typeof cartItems }>);
+    }, {} as Record<string, { name: string; items: typeof cartItems; isOpen: boolean }>);
   }, [cartItems]);
 
   const handleCheckout = () => {
     router.push("/dashboard/customer/checkout");
   };
 
-  const isEmpty = !loading && cartItems.length === 0;
   const hasOutOfLocationItems = cartItems.some(
     i => i.restaurantLocation && i.restaurantLocation !== site.location
   );
+  const hasClosedRestaurants = Object.values(groupedItems).some(g => !g.isOpen);
 
   if (loading) {
     return (
@@ -153,6 +159,15 @@ export default function CustomerCart() {
             </div>
           )}
 
+          {hasClosedRestaurants && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-100/50">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-bold text-red-800 leading-relaxed uppercase tracking-tight">
+                Some restaurants in your cart are currently closed. Please remove their items to proceed.
+              </p>
+            </div>
+          )}
+
           {/* Unified List Surface */}
           <div className="space-y-6">
             {Object.entries(groupedItems).map(([rid, group]) => {
@@ -170,6 +185,9 @@ export default function CustomerCart() {
                       <span className={cn("text-xs font-bold", isOutOfLocation ? "text-amber-600" : "text-gray-900")}>
                         {group.name}
                       </span>
+                      {!group.isOpen && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-red-600 bg-red-50 px-2 py-0.5 rounded">Currently Closed</span>
+                      )}
                     </div>
                   </div>
 
@@ -287,6 +305,13 @@ export default function CustomerCart() {
                   className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-gray-100 text-gray-300 cursor-not-allowed"
                 >
                   Items from multiple locations
+                </button>
+              ) : hasClosedRestaurants ? (
+                <button
+                  disabled
+                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-gray-100 text-red-400 cursor-not-allowed border border-red-100"
+                >
+                  Closed restaurants in cart
                 </button>
               ) : (
                 <button

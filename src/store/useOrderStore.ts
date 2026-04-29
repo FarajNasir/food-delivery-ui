@@ -66,32 +66,38 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
   },
 
   updateSingleOrder: async (updatedOrder) => {
-    const state = get();
-    const exists = state.orders.find((o) => o.id === updatedOrder.id);
+    console.log(`[useOrderStore] Received ping for order ${updatedOrder.id}. Fetching latest state from server...`);
+    let response = await customerService.getOrderById(updatedOrder.id);
+    
+    if (!response.success) {
+      console.warn(`[useOrderStore] Order ${updatedOrder.id} not found on first attempt. Retrying in 2s...`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      response = await customerService.getOrderById(updatedOrder.id);
+    }
 
-    if (exists) {
-      set({
-        orders: state.orders.map((o) =>
-          o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
-        ),
-      });
-      console.log(`[useOrderStore] Updated local order ${updatedOrder.id} status to ${updatedOrder.status}`);
-    } else {
-      // Order is missing from current view (e.g. on another page or brand new)
-      console.log(`[useOrderStore] Order ${updatedOrder.id} missing from local state. Fetching from server...`);
-      const { success, data } = await customerService.getOrderById(updatedOrder.id);
-      
-      if (success && data) {
+    if (response.success && response.data) {
+      const serverOrder = response.data;
+      const state = get();
+      const exists = state.orders.find((o) => o.id === serverOrder.id);
+
+      if (exists) {
         set({
-          orders: [data, ...get().orders].filter((o, idx, self) => 
+          orders: state.orders.map((o) =>
+            o.id === serverOrder.id ? serverOrder : o
+          ),
+        });
+        console.log(`[useOrderStore] Successfully synced existing order ${serverOrder.id} to status ${serverOrder.status}`);
+      } else {
+        set({
+          orders: [serverOrder, ...state.orders].filter((o, idx, self) => 
             self.findIndex(other => other.id === o.id) === idx
           )
         });
-        console.log(`[useOrderStore] Successfully fetched and prepended missing order ${updatedOrder.id}`);
-      } else {
-        // Fallback: full refresh if single fetch fails
-        await get().refreshOrders();
+        console.log(`[useOrderStore] Successfully fetched and prepended new order ${serverOrder.id}`);
       }
+    } else {
+      console.error(`[useOrderStore] Failed to fetch order ${updatedOrder.id} after retry. Refreshing all orders.`);
+      await get().refreshOrders();
     }
   },
   reorder: async (orderId: string) => {
