@@ -12,6 +12,7 @@ import type { AdminMenuItemResponse } from "@/lib/api";
 import ReviewSheet from "./ReviewSheet";
 import ReviewCard from "./ReviewCard";
 import { formatReviewCount } from "@/lib/utils/reviewUtils";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 interface RestaurantMenuViewProps {
   restaurant: any; // Allow flexible restaurant data
@@ -19,8 +20,8 @@ interface RestaurantMenuViewProps {
   reviews?: any[];
 }
 
-export default function RestaurantMenuView({ 
-  restaurant, 
+export default function RestaurantMenuView({
+  restaurant,
   initialMenuItems,
   reviews = []
 }: RestaurantMenuViewProps) {
@@ -28,6 +29,7 @@ export default function RestaurantMenuView({
   const { gradientFrom, accent } = site.theme;
   const { cartItems, addItem: addToCart, updateQuantity } = useCart();
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const isOpen = isRestaurantOpen(restaurant.openingHours);
 
   // 1. Determine the menu source (DB vs Mock)
   const menu = useMemo(() => {
@@ -40,7 +42,7 @@ export default function RestaurantMenuView({
         items: initialMenuItems.filter(m => m.category === cat).map(item => ({
           ...item,
           // DB price is a number or string (numeric), mock price is a string like "£10"
-          price: (function() {
+          price: (function () {
             const p = item.price as any;
             if (typeof p === "number") return `£${p.toFixed(2)}`;
             if (typeof p === "string") {
@@ -67,7 +69,7 @@ export default function RestaurantMenuView({
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center bg-white rounded-[2rem] shadow-sm border border-gray-100 my-10">
         <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-           <Store className="w-10 h-10 text-gray-200" />
+          <Store className="w-10 h-10 text-gray-200" />
         </div>
         <h2 className="font-black text-2xl text-gray-900 mb-2">
           Menu coming soon
@@ -125,9 +127,9 @@ export default function RestaurantMenuView({
                   {restaurant.cuisine}
                 </span>
               )}
-              
+
               {reviews.length > 0 ? (
-                <button 
+                <button
                   onClick={() => setIsReviewOpen(true)}
                   className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all hover:scale-105 active:scale-95 group"
                 >
@@ -157,6 +159,12 @@ export default function RestaurantMenuView({
                 <span className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/10">
                   <Truck className="w-3.5 h-3.5" />
                   {restaurant.deliveryFee}
+                </span>
+              )}
+
+              {!isOpen && (
+                <span className="flex items-center gap-1.5 bg-red-600/90 text-white text-[10px] font-black uppercase tracking-[0.15em] px-4 py-1.5 rounded-full shadow-lg animate-pulse">
+                  Currently Closed
                 </span>
               )}
             </div>
@@ -206,7 +214,7 @@ export default function RestaurantMenuView({
             {activeSection.items.map((item) => {
               const cartItem = cartItems.find(i => i.menuItemId === item.id);
               const qty = cartItem?.quantity ?? 0;
-              
+
               return (
                 <div
                   key={item.id}
@@ -236,7 +244,7 @@ export default function RestaurantMenuView({
                         {item.description}
                       </p>
                     </div>
-                    
+
                     <div className="flex items-center justify-between mt-3">
                       <p className="text-sm font-black" style={{ color: accent }}>
                         {item.price}
@@ -244,7 +252,7 @@ export default function RestaurantMenuView({
 
                       {qty === 0 ? (
                         <button
-                          onClick={() => addToCart({
+                          onClick={() => isOpen && addToCart({
                             menuItemId: item.id,
                             name: item.name,
                             price: typeof item.price === "string" ? parseFloat(item.price.replace("£", "")) : (item.price as unknown as number),
@@ -253,10 +261,15 @@ export default function RestaurantMenuView({
                             restaurantName: restaurant.name,
                             isMobileChef: restaurant.isMobileChef
                           })}
-
-                          className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition-transform hover:scale-105 active:scale-95"
+                          disabled={!isOpen}
+                          className={cn(
+                            "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all active:scale-95",
+                            isOpen
+                              ? "bg-gray-900 text-white hover:scale-105"
+                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          )}
                         >
-                          Add to order
+                          {isOpen ? "Add to order" : "Closed"}
                         </button>
                       ) : (
                         <div className="flex items-center gap-3">
@@ -288,7 +301,7 @@ export default function RestaurantMenuView({
 
       </div>
 
-      <ReviewSheet 
+      <ReviewSheet
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
         reviews={reviews}

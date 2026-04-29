@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   CreditCard, 
   TrendingUp, 
@@ -14,7 +14,8 @@ import {
   Banknote,
   Info,
   History,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft
 } from "lucide-react";
 import { adminPaymentApi, type SettlementSummary, type AdminRestaurantItem } from "@/lib/api";
 import { toast } from "sonner";
@@ -93,7 +94,7 @@ function SettleModal({
     }
     setLoading(true);
     console.log("Processing settlement for:", restaurant.name, "Order count:", orders.length);
-    const orderIds = orders.map(o => o.id);
+    const orderIds = orders.map((o: any) => o.id);
     const res = await adminPaymentApi.settle({
       restaurantId: restaurant.id,
       orderIds,
@@ -155,7 +156,7 @@ function SettleModal({
             ) : orders.length === 0 ? (
               <div className="py-8 text-center text-xs text-gray-400">No unpaid orders found.</div>
             ) : (
-              orders.map(o => (
+              orders.map((o: any) => (
                 <div key={o.id} className="flex justify-between items-center text-xs p-2 rounded-lg bg-white border border-gray-100">
                   <span className="font-medium text-gray-600">#{o.id.slice(0, 8)}</span>
                   <div className="flex gap-3">
@@ -196,6 +197,10 @@ export default function AdminPayments() {
   const [settleTarget, setSettleTarget] = useState<SettlementSummary['restaurants'][0] | null>(null);
   const [search, setSearch] = useState("");
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const refresh = async () => {
     setLoading(true);
     const res = await adminPaymentApi.getSummary();
@@ -209,9 +214,23 @@ export default function AdminPayments() {
     refresh();
   }, []);
 
-  const filteredRestaurants = summary?.restaurants.filter(r => 
-    r.name.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  // Reset page on search
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, pageSize]);
+
+  const filteredRestaurants = useMemo(() => {
+    return summary?.restaurants.filter((r: any) => 
+      r.name.toLowerCase().includes(search.toLowerCase())
+    ) || [];
+  }, [summary, search]);
+
+  const paginatedRestaurants = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRestaurants.slice(start, start + pageSize);
+  }, [filteredRestaurants, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredRestaurants.length / pageSize);
 
   if (loading && !summary) {
     return (
@@ -245,19 +264,19 @@ export default function AdminPayments() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Platform Revenue" 
-          value="£0.00"
+          value={`£${summary?.platformSummary.totalPlatformRevenue.toFixed(2) || "0.00"}`}
           icon={TrendingUp}
           description="Standard payout model"
         />
         <StatCard 
           title="Pending Payouts" 
-          value={`£${summary?.platformSummary.totalPendingPayouts.toFixed(2)}`}
+          value={`£${summary?.platformSummary.totalPendingPayouts.toFixed(2) || "0.00"}`}
           icon={Clock}
           description="Earnings owed to restaurants"
         />
         <StatCard 
           title="Settled Amount" 
-          value={`£${(summary!.restaurants.reduce((sum, r) => sum + r.totalPaid, 0)).toFixed(2)}`}
+          value={`£${(summary?.restaurants.reduce((sum: number, r: any) => sum + r.totalPaid, 0) || 0).toFixed(2)}`}
           icon={CheckCircle2}
           description="Verified money sent to restaurants"
         />
@@ -268,19 +287,34 @@ export default function AdminPayments() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-base font-bold" style={{ color: "var(--dash-text-primary)" }}>Restaurant Earnings</h2>
           
-          <div 
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border w-full sm:w-64"
-            style={{ background: "var(--dash-card)", borderColor: "var(--dash-card-border)" }}
-          >
-            <Search className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />
-            <input 
-              type="text" 
-              placeholder="Filter by restaurant name..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 text-sm bg-transparent outline-none"
-              style={{ color: "var(--dash-text-primary)" }}
-            />
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div 
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border flex-1 sm:w-64"
+              style={{ background: "var(--dash-card)", borderColor: "var(--dash-card-border)" }}
+            >
+              <Search className="w-4 h-4" style={{ color: "var(--dash-text-secondary)" }} />
+              <input 
+                type="text" 
+                placeholder="Filter by restaurant name..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none"
+                style={{ color: "var(--dash-text-primary)" }}
+              />
+            </div>
+            <div className="relative">
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="appearance-none text-xs font-semibold px-3 py-2.5 pr-8 rounded-xl border bg-white shadow-sm cursor-pointer outline-none hover:bg-gray-50 transition-all"
+                style={{ borderColor: "var(--dash-card-border)", color: "var(--dash-text-secondary)" }}
+              >
+                {[10, 25, 50].map(size => (
+                  <option key={size} value={size}>{size} / page</option>
+                ))}
+              </select>
+              <ChevronLeft className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rotate-270 pointer-events-none" style={{ color: "var(--dash-text-secondary)" }} />
+            </div>
           </div>
         </div>
 
@@ -306,7 +340,7 @@ export default function AdminPayments() {
                 className="divide-y"
                 style={{ borderColor: "var(--dash-card-border)" }}
               >
-                {filteredRestaurants.map((r) => (
+                {paginatedRestaurants.map((r: any) => (
                   <tr key={r.id} className="hover:bg-black/[0.015] transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -359,13 +393,51 @@ export default function AdminPayments() {
               </tbody>
             </table>
             
-            {filteredRestaurants.length === 0 && (
+            {paginatedRestaurants.length === 0 && (
               <div className="py-12 text-center text-sm" style={{ color: "var(--dash-text-secondary)" }}>
                 No restaurants matching your criteria.
               </div>
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {filteredRestaurants.length > 0 && (
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <p className="text-xs font-semibold" style={{ color: "var(--dash-text-secondary)" }}>
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredRestaurants.length)} of {filteredRestaurants.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <PageBtn
+                onClick={() => setCurrentPage((p: number) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </PageBtn>
+
+              {paginationRange(currentPage, totalPages).map((item, i) =>
+                item === "…" ? (
+                  <span key={`ellipsis-${i}`} className="px-2 text-sm" style={{ color: "var(--dash-text-secondary)" }}>…</span>
+                ) : (
+                  <PageBtn
+                    key={item}
+                    onClick={() => setCurrentPage(Number(item))}
+                    active={currentPage === item}
+                  >
+                    {item}
+                  </PageBtn>
+                )
+              )}
+
+              <PageBtn
+                onClick={() => setCurrentPage((p: number) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </PageBtn>
+            </div>
+          </div>
+        )}
       </div>
 
       {settleTarget && (
@@ -376,5 +448,33 @@ export default function AdminPayments() {
         />
       )}
     </div>
+  );
+}
+
+/* ── Pagination helpers ── */
+function paginationRange(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  if (current <= 4) return [1, 2, 3, 4, 5, "…", total];
+  if (current >= total - 3) return [1, "…", total - 4, total - 3, total - 2, total - 1, total];
+  return [1, "…", current - 1, current, current + 1, "…", total];
+}
+
+function PageBtn({ children, onClick, disabled, active }: {
+  children: React.ReactNode; onClick: () => void;
+  disabled?: boolean; active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-8 h-8 rounded-lg text-sm font-semibold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed border"
+      style={
+        active
+          ? { background: "var(--dash-accent)", color: "#fff", borderColor: "var(--dash-accent)" }
+          : { background: "var(--dash-card)", color: "var(--dash-text-secondary)", borderColor: "var(--dash-card-border)" }
+      }
+    >
+      {children}
+    </button>
   );
 }

@@ -8,6 +8,8 @@ import { useSite } from "@/context/SiteContext";
 import { customerService } from "@/services/customer.service";
 import type { RestaurantItem, MenuItem } from "@/types/api.types";
 import { useSearchParams, useRouter } from "next/navigation";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
+import { cn } from "@/lib/utils";
 
 const RECENT = ["Pizza", "Burger", "Chicken", "Salad"];
 
@@ -263,7 +265,10 @@ function RestaurantRow({
   return (
     <Link
       href={`/dashboard/customer/restaurant/${r.id}`}
-      className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 hover:shadow-md transition-all group"
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 hover:shadow-md transition-all group",
+        !isRestaurantOpen(r.openingHours) && "grayscale opacity-80"
+      )}
     >
       <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-50 flex items-center justify-center">
         {r.logoUrl ? (
@@ -271,9 +276,19 @@ function RestaurantRow({
         ) : (
           <Store className="w-8 h-8 text-gray-300" style={{ color: theme.accent }} />
         )}
+        {!isRestaurantOpen(r.openingHours) && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="text-[7px] font-black uppercase text-white tracking-widest">Closed</span>
+          </div>
+        )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-900 truncate">{r.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-gray-900 truncate">{r.name}</p>
+          {!isRestaurantOpen(r.openingHours) && (
+            <span className="text-[8px] font-bold uppercase tracking-widest text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Closed</span>
+          )}
+        </div>
         {/* Fake cuisine / rating / delivery since they aren't on base RestaurantItem model yet */}
         <p className="text-xs font-medium truncate" style={{ color: theme.accent }}>Restaurant</p>
       </div>

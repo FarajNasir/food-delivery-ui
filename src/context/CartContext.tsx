@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { type OpeningHours } from "@/lib/api";
 
 export interface CartItem {
   id: string;
@@ -17,6 +18,7 @@ export interface CartItem {
   restaurantLat?: string;
   restaurantLng?: string;
   isMobileChef?: boolean;
+  openingHours?: OpeningHours;
 }
 
 

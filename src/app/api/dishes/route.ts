@@ -8,9 +8,9 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const location = searchParams.get("location");
-    const search   = searchParams.get("search")   ?? "";
+    const search = searchParams.get("search") ?? "";
     const category = searchParams.get("category") ?? "";
-    const limit    = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
 
     if (!location) return fail("Location is required.", 400);
 
@@ -28,24 +28,24 @@ export async function GET(req: Request) {
 
     const rows = await db
       .select({
-        id:                 menuItems.id,
-        restaurantId:       menuItems.restaurantId,
-        restaurantName:     restaurants.name,
+        id: menuItems.id,
+        restaurantId: menuItems.restaurantId,
+        restaurantName: restaurants.name,
         restaurantLocation: restaurants.location,
-        name:               menuItems.name,
-        description:        menuItems.description,
-        category:           menuItems.category,
-        price:              menuItems.price,
-        status:             menuItems.status,
-        imageUrl:           menuItems.imageUrl,
-        createdAt:          menuItems.createdAt,
-        isFeatured:         sql<boolean>`CASE WHEN ${featuredItems.id} IS NOT NULL THEN true ELSE false END`.as("is_featured"),
+        name: menuItems.name,
+        description: menuItems.description,
+        category: menuItems.category,
+        price: menuItems.price,
+        status: menuItems.status,
+        imageUrl: menuItems.imageUrl,
+        createdAt: menuItems.createdAt,
+        isFeatured: sql<boolean>`CASE WHEN ${featuredItems.id} IS NOT NULL THEN true ELSE false END`.as("is_featured"),
       })
       .from(menuItems)
       .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
       .leftJoin(featuredItems, and(
-        eq(featuredItems.entityId, menuItems.id), 
-        eq(featuredItems.type, 'dish'), 
+        eq(featuredItems.entityId, menuItems.id),
+        eq(featuredItems.type, 'dish'),
         eq(featuredItems.status, 'active')
       ))
       .where(and(...conditions))

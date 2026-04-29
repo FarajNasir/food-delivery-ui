@@ -341,33 +341,33 @@ export default function CustomerOrdersPage() {
 
 
   return (
-    <div className="w-full max-w-5xl mx-auto pt-8 sm:pt-12 pb-24 px-4 sm:px-6 space-y-10">
+    <div className="w-full max-w-4xl mx-auto pt-6 sm:pt-10 pb-20 px-4 sm:px-6 space-y-8">
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-100 pb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight sm:text-4xl">Order History</h1>
-          <p className="text-sm text-gray-500 mt-2 font-medium">Manage your past cravings and track active deliveries</p>
+          <h1 className="font-heading text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Order History</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium italic">Manage your past cravings and track active deliveries</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
             className={cn(
-              "p-3 bg-white rounded-2xl border border-gray-200 shadow-sm text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-all active:scale-95",
+              "p-2.5 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-all active:scale-95",
               refreshing && "animate-spin"
             )}
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="w-4 h-4" />
           </button>
-          <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner">
+          <div className="flex bg-gray-100/80 p-1 rounded-xl border border-gray-200/50 shadow-inner">
             {(["all", "active", "past"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all",
+                  "px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
                   activeTab === tab 
-                    ? "bg-white text-gray-900 shadow-md scale-[1.02]" 
+                    ? "bg-white text-gray-900 shadow-sm" 
                     : "text-gray-400 hover:text-gray-600"
                 )}
               >
@@ -400,7 +400,7 @@ export default function CustomerOrdersPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-12">
+        <div className="space-y-4 sm:space-y-6">
 
           {/* Conditional List Rendering */}
           <div className="space-y-6">

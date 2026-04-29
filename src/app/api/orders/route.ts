@@ -4,6 +4,7 @@ import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions } 
 import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 import { SITES, DEFAULT_SITE } from "@/config/sites";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 function getSiteFromLocation(location: string | null) {
   if (!location) return SITES[DEFAULT_SITE];
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
           id: restaurants.id,
           name: restaurants.name,
           location: restaurants.location,
+          openingHours: restaurants.openingHours,
         }).from(restaurants).where(inArray(restaurants.id, restaurantIds));
 
         const restaurantLookup = new Map(restaurantsData.map(r => [r.id, r]));
@@ -108,6 +110,11 @@ export async function POST(req: Request) {
         for (const [restaurantId, items] of Object.entries(itemsByRestaurant)) {
           const restaurant = restaurantLookup.get(restaurantId);
           if (!restaurant) throw new Error("RESTAURANT_NOT_FOUND");
+
+          // 3.5 Validate Restaurant Operational Hours
+          if (!isRestaurantOpen(restaurant.openingHours)) {
+            throw new Error(`RESTAURANT_CLOSED:${restaurant.name}`);
+          }
 
           const site = getSiteFromLocation(restaurant.location);
           const serviceCharge = site.serviceCharge ?? 0;
@@ -226,6 +233,10 @@ export async function POST(req: Request) {
       console.error("[api/orders POST]", err);
       if (err instanceof Error && err.message === "CART_EMPTY") {
         return fail("Cart is empty", 400);
+      }
+      if (err instanceof Error && err.message.startsWith("RESTAURANT_CLOSED:")) {
+        const name = err.message.split(":")[1];
+        return fail(`${name} is currently closed and not accepting orders.`, 400);
       }
       return fail("Failed to create orders.", 500);
     }

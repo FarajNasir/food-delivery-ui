@@ -58,34 +58,34 @@ export default function OrderCard({
 
   return (
     <div className={cn(
-      "bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-lg group",
+      "bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md group",
       isPending && "border-amber-200"
     )}>
       {/* Header Info - Desktop Horizontal, Mobile Stacked */}
-      <div className="p-5 sm:p-6">
+      <div className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Restaurant Image/Icon Placeholder */}
             <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 border border-gray-50 shadow-sm transition-transform group-hover:scale-105"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center shrink-0 border border-gray-50 shadow-sm transition-transform group-hover:scale-105"
               style={{ background: `${config.hex}10` }}
             >
-              <ShoppingBag className="w-7 h-7" style={{ color: config.hex }} />
+              <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: config.hex }} />
             </div>
 
             <div className="min-w-0">
-              <h3 className="font-bold text-gray-900 text-lg truncate leading-tight group-hover:text-gray-950">
+              <h3 className="font-heading font-bold text-gray-900 text-base sm:text-lg truncate leading-tight group-hover:text-gray-950">
                 {order.restaurant?.name ?? "Restaurant"}
               </h3>
-              <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 flex items-center gap-2 font-medium">
                 <span>{date}</span>
                 <span className="w-1 h-1 bg-gray-300 rounded-full" />
                 <span>ID: {order.id.slice(-6).toUpperCase()}</span>
               </p>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-1.5">
                 <span
                   className={cn(
-                    "text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full flex items-center gap-1.5",
+                    "text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1.5",
                     config.bg, config.color
                   )}
                 >
@@ -93,7 +93,7 @@ export default function OrderCard({
                   {config.label}
                 </span>
                 {isPending && !isExpired && (
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full animate-pulse border border-amber-100">
+                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full animate-pulse border border-amber-100">
                     Auto-cancels in {formattedTime}
                   </span>
                 )}
@@ -101,27 +101,27 @@ export default function OrderCard({
             </div>
           </div>
 
-          <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-4 sm:pt-0">
-            <p className="font-black text-gray-900 text-xl tracking-tight">
+          <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 border-t sm:border-t-0 pt-3 sm:pt-0">
+            <p className="font-heading font-black text-gray-900 text-lg sm:text-xl tracking-tight">
               £{parseFloat(order.totalAmount).toFixed(2)}
             </p>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{itemLabel}</p>
+            <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{itemLabel}</p>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="my-5 border-t border-gray-50" />
+        <div className="my-4 border-t border-gray-50" />
 
         {/* Content Area: Items + Actions */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Items Summary */}
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2">Order Items</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mb-1.5">Order Items</p>
+            <div className="flex flex-wrap gap-1.5">
               {order.items?.map((item, idx) => (
                 <span 
                   key={idx} 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg text-xs font-medium text-gray-600 border border-gray-100/50"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50/80 rounded-md text-[11px] font-medium text-gray-600 border border-gray-100/50"
                 >
                   <span className="font-bold text-gray-400">{item.quantity}×</span>
                   {item.menuItem?.name}
@@ -169,10 +169,10 @@ export default function OrderCard({
 
             <button
               onClick={() => onTrack(order.id)}
-              className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2 shadow-sm"
+              className="px-5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
             >
               Track Order
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
