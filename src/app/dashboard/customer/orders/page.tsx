@@ -15,7 +15,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import FeedbackModal from "@/components/dashboard/customer/FeedbackModal";
 import OrderCard from "@/components/dashboard/customer/OrderCard";
-import OrderSessionCard from "@/components/dashboard/customer/OrderSessionCard";
 
 export interface StatusConfig {
   label: string;
@@ -25,25 +24,6 @@ export interface StatusConfig {
   bg: string;
   description: string;
 }
-
-type OrderSessionSummary = {
-  type: "session";
-  data: {
-    id: string;
-    orders: import("@/types/api.types").Order[];
-    createdAt: string;
-    status: string;
-    totalItemsAmount: string;
-    totalDeliveryFee: string;
-  };
-  date: Date;
-};
-
-type OrderItemSummary = {
-  type: "order";
-  data: import("@/types/api.types").Order;
-  date: Date;
-};
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
   PENDING_CONFIRMATION: {
@@ -112,6 +92,8 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
   },
 };
 
+const ACTIVE_STATUSES: string[] = ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"];
+
 export default function CustomerOrdersPage() {
   const {
     orders,
@@ -137,12 +119,6 @@ export default function CustomerOrdersPage() {
     const limit = tabScope === "all" ? 20 : 100;
     void refreshOrders(1, tabScope, limit);
   }, [activeTab, refreshOrders, tabScope]);
-
-  const ACTIVE_STATUSES = ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"];
-  const hasActiveOrders = React.useMemo(
-    () => orders.some((o) => ACTIVE_STATUSES.includes(o.status)),
-    [orders]
-  );
 
   const handleReorder = async (orderId: string) => {
     try {
@@ -242,68 +218,13 @@ export default function CustomerOrdersPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSessionPayment = async (sessionId: string) => {
-    try {
-      setIsPaying(sessionId);
-      const res = await fetch(`/api/orders/session/${sessionId}/stripe/session`, { method: "POST" });
-      const data = await res.json();
-      const sessionUrl = data.url || data.data?.url;
-      if (sessionUrl) {
-        window.location.href = sessionUrl;
-      } else {
-        toast.error(data.message || data.error || "Failed to initialize session payment");
-      }
-    } catch {
-      toast.error("A network error occurred. Please try again.");
-    } finally {
-      setIsPaying(null);
+  const displayedOrders = React.useMemo(() => {
+    if (activeTab === "all") return orders;
+    if (activeTab === "active") {
+      return orders.filter((order) => ACTIVE_STATUSES.includes(order.status));
     }
-  };
-
-  // --- Grouping Logic ---
-  const groupedItems = React.useMemo(() => {
-    const sessionsMap: Record<string, {
-      id: string;
-      orders: typeof orders;
-      createdAt: string;
-      status: string;
-      totalItemsAmount: string;
-      totalDeliveryFee: string;
-    }> = {};
-    const standalones: typeof orders = [];
-
-    orders.forEach((order) => {
-      if (!order.sessionId) {
-        standalones.push(order);
-        return;
-      }
-
-      if (!sessionsMap[order.sessionId]) {
-        sessionsMap[order.sessionId] = {
-          id: order.sessionId,
-          orders: [],
-          createdAt: order.createdAt,
-          status: "PENDING",
-          totalItemsAmount: "0",
-          totalDeliveryFee: "0",
-        };
-      }
-
-      const session = sessionsMap[order.sessionId];
-      session.orders.push(order);
-
-      const amount = Number.parseFloat(order.totalAmount || "0");
-      const delivery = Number.parseFloat(order.deliveryFee || "0");
-      session.totalItemsAmount = (Number.parseFloat(session.totalItemsAmount) + amount).toFixed(2);
-      session.totalDeliveryFee = (Number.parseFloat(session.totalDeliveryFee) + delivery).toFixed(2);
-      session.createdAt = new Date(Math.min(new Date(session.createdAt).getTime(), new Date(order.createdAt).getTime())).toISOString();
-      if (order.status === "PAID") session.status = "PAID";
-      else if (order.status === "CONFIRMED" && session.status !== "PAID") session.status = "READY_TO_PAY";
-      else if (order.status === "CANCELLED" && session.status !== "PAID") session.status = "CANCELLED";
-    });
-
-    return { sessions: Object.values(sessionsMap), standalones };
-  }, [orders]);
+    return orders.filter((order) => ["DELIVERED", "CANCELLED"].includes(order.status));
+  }, [activeTab, orders]);
 
   if (loading) {
     return (
@@ -313,37 +234,6 @@ export default function CustomerOrdersPage() {
       </div>
     );
   }
-
-  const allItems: (OrderItemSummary | OrderSessionSummary)[] = [
-    ...groupedItems.standalones.map(o => ({ type: "order" as const, data: o, date: new Date(o.createdAt) })),
-    ...groupedItems.sessions.map(s => ({ type: "session" as const, data: s, date: new Date(s.createdAt) }))
-  ].sort((a, b) => b.date.getTime() - a.date.getTime());
-
-  const activeItems = allItems.filter(item => {
-    if (item.type === "order") {
-      return ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(item.data.status);
-    } else {
-      const s = item.data;
-      if (s.orders && s.orders.length > 0) {
-        return s.orders.some((o: { status: string }) => ["PENDING_CONFIRMATION", "CONFIRMED", "PAID", "PREPARING", "DISPATCH_REQUESTED", "OUT_FOR_DELIVERY"].includes(o.status));
-      }
-      return ["PENDING", "READY_TO_PAY", "PAID"].includes(s.status);
-    }
-  });
-
-  const pastItems = allItems.filter(item => {
-    if (item.type === "order") {
-      return ["DELIVERED", "CANCELLED"].includes(item.data.status);
-    } else {
-      const s = item.data;
-      if (s.orders && s.orders.length > 0) {
-        return s.orders.every((o: { status: string }) => ["DELIVERED", "CANCELLED"].includes(o.status));
-      }
-      return ["CANCELLED"].includes(s.status);
-    }
-  });
-
-  const displayedItems = activeTab === "all" ? allItems : activeTab === "active" ? activeItems : pastItems;
 
 
   return (
@@ -410,30 +300,20 @@ export default function CustomerOrdersPage() {
 
           {/* Conditional List Rendering */}
           <div className="space-y-6">
-            {displayedItems.length === 0 ? (
+            {displayedOrders.length === 0 ? (
               <div className="py-20 text-center bg-gray-50/50 rounded-3xl border border-gray-100">
                 <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No {activeTab} orders found</p>
               </div>
             ) : (
-              displayedItems.map((item) => item.type === "session" ? (
-                <OrderSessionCard
-                  key={`session-${item.data.id}`}
-                  session={item.data}
-                  accent={accent}
-                  gradientFrom={gradientFrom}
-                  isPaying={isPaying === item.data.id}
-                  onPay={handleSessionPayment}
-                  onTrack={(id) => router.push(`/dashboard/customer/status/${id}`)}
-                />
-              ) : (
+              displayedOrders.map((order) => (
                 <OrderCard
-                  key={`order-${item.data.id}`}
-                  order={item.data}
-                  config={STATUS_CONFIG[item.data.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
+                  key={`order-${order.id}`}
+                  order={order}
+                  config={STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING_CONFIRMATION}
                   accent={accent}
                   gradientFrom={gradientFrom}
-                  isPaying={isPaying === item.data.id}
-                  isReordering={isReordering === item.data.id}
+                  isPaying={isPaying === order.id}
+                  isReordering={isReordering === order.id}
                   onPay={handlePayment}
                   onReorder={handleReorder}
                   onRate={(o) => { setSelectedOrderForFeedback(o); setIsFeedbackOpen(true); }}
@@ -445,7 +325,7 @@ export default function CustomerOrdersPage() {
           </div>
 
           {/* Pagination */}
-          {!loading && displayedItems.length > 0 && (
+          {!loading && displayedOrders.length > 0 && (
             <Pagination
               total={pagination.total}
               page={pagination.page}

@@ -12,7 +12,6 @@ import { useAdminStore } from "@/store/useAdminStore";
 export const useFcmToken = (userId: string | undefined) => {
   const [token, setToken] = useState<string | null>(null);
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<NotificationPermission>("default");
-  const { session } = useAuthStore();
 
   const registerToken = useCallback(async (fcmToken: string) => {
     const currentSession = useAuthStore.getState().session;
@@ -117,20 +116,22 @@ export const useFcmToken = (userId: string | undefined) => {
         };
       })();
 
-      if (!isMerchantAlert) {
-        // If the order is just received/pending, use a neutral toast so it doesn't look like an approval.
-        const status = payload.data?.status || payload.data?.orderStatus;
-        if (status === "PENDING_CONFIRMATION") {
-          toast(toastContent.title, {
-            description: toastContent.description,
-            duration: 3000,
-          });
-        } else {
-          toast.success(toastContent.title, {
-            description: toastContent.description,
-            duration: 3000,
-          });
-        }
+      const status = payload.data?.status || payload.data?.orderStatus;
+      if (status === "PENDING_CONFIRMATION") {
+        toast(toastContent.title, {
+          description: toastContent.description,
+          duration: 4000,
+        });
+      } else if (isMerchantAlert) {
+        toast(toastContent.title, {
+          description: toastContent.description,
+          duration: 3000,
+        });
+      } else {
+        toast.success(toastContent.title, {
+          description: toastContent.description,
+          duration: 3000,
+        });
       }
 
       if (isOrder) {
@@ -146,16 +147,12 @@ export const useFcmToken = (userId: string | undefined) => {
             useOrderStore.getState().updateSingleOrder({ id: orderId, status });
           }
 
-          // Owner store — update if it's a brand new order OR if it's not targeted at owner (to avoid action echos)
+          // Owner store — always sync owner/admin dashboards from live order updates.
+          // A full refresh is safer than suppressing owner-targeted events because
+          // kitchen cards depend on complete server data, not just the changed status.
           if ((role === "owner" || role === "admin")) {
-            const isTargetedAtOwner = targetRole === "owner" || targetRole === "admin";
-            // We ALWAYS update if it's a new order (so it shows up in dashboard)
-            // For existing orders, we only update if NOT targeted at owner to avoid "echo bounce" 
-            // when the owner themselves triggered the status change.
-            if (isNewOrder || !isTargetedAtOwner) {
-              console.log(`[useFcmToken] Updating Owner Store for ${orderId}`);
-              useOwnerStore.getState().updateSingleOrder({ id: orderId, status });
-            }
+            console.log(`[useFcmToken] Refreshing Owner Store for ${orderId}`);
+            useOwnerStore.getState().refreshOrders();
           }
 
           // Admin store — only if the user is an admin (avoids 403 for owners)

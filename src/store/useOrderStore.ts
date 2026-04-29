@@ -15,6 +15,8 @@ interface OrderState {
     page: number;
     limit: number;
   };
+  currentScope: "all" | "active" | "past";
+  currentLimit: number;
 
   // Actions
   refreshOrders: (page?: number, scope?: "all" | "active" | "past", limit?: number) => Promise<void>;
@@ -31,6 +33,8 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     page: 1,
     limit: 20,
   },
+  currentScope: "all",
+  currentLimit: 20,
 
   refreshOrders: async (page, scope = "all", limit = 20) => {
     set({ isLoading: true });
@@ -40,7 +44,9 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       if (success && data) {
         set({ 
           orders: data.orders,
-          pagination: data.pagination ?? get().pagination
+          pagination: data.pagination ?? get().pagination,
+          currentScope: scope,
+          currentLimit: limit,
         });
       }
     } finally {
@@ -79,6 +85,12 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       const serverOrder = response.data;
       const state = get();
       const exists = state.orders.find((o) => o.id === serverOrder.id);
+
+      if (serverOrder.sessionId) {
+        console.log(`[useOrderStore] Order ${serverOrder.id} belongs to session ${serverOrder.sessionId}. Refreshing current order list to resync sibling state.`);
+        await get().refreshOrders(state.pagination.page, state.currentScope, state.currentLimit);
+        return;
+      }
 
       if (exists) {
         set({

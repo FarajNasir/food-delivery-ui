@@ -336,6 +336,7 @@ export async function GET(req: Request) {
         userId: order.userId,
         restaurantId: order.restaurantId,
         status: order.status,
+        sessionId: order.sessionId,
         totalAmount: order.totalAmount,
         deliveryFee: order.deliveryFee,
         deliveryAddress: order.deliveryAddress,
