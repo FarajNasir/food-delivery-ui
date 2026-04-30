@@ -4,6 +4,7 @@ import { parseBody, ok, fail } from "@/lib/proxy";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { checkIpRateLimit } from "@/lib/rate-limit";
 
 const RegisterSchema = z.object({
   name:     z.string().min(2, "Name must be at least 2 characters.").max(150),
@@ -16,6 +17,11 @@ export async function POST(req: Request) {
   const parsed = await parseBody(req, RegisterSchema);
   if ("error" in parsed) return parsed.error;
   const { name, email, phone, password } = parsed.data;
+
+  const blocked = await checkIpRateLimit("REGISTER", req, { email });
+  if (!blocked.allowed) {
+    return fail("Unable to create account right now. Please try again.", 429);
+  }
 
   // 1. Create auth user (normal signup with publishable key)
   const supabase = createClient(
@@ -78,6 +84,8 @@ export async function POST(req: Request) {
     await admin.auth.admin.deleteUser(userId).catch(() => null);
     return fail("Registration failed. Please try again.", 500);
   }
+
+  await checkIpRateLimit("REGISTER", req, { email });
 
   return ok({
     id: userId,

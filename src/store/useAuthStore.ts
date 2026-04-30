@@ -17,6 +17,7 @@ interface AuthState {
   setRole:    (role: UserRole | null)   => void;
   setIsReady: (ready: boolean)          => void;
   logout:     () => Promise<void>;
+  refresh:    () => Promise<void>;
 }
 
 const supabase = createClient();
@@ -39,6 +40,15 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         await supabase.auth.signOut();
         set({ session: null, user: null, profile: null, role: null, isReady: true });
+      },
+
+      refresh: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await loadProfile(session);
+        } else {
+          set({ session: null, user: null, profile: null, role: null, isReady: true });
+        }
       },
     }),
     {

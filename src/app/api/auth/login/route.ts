@@ -3,7 +3,9 @@ import { parseBody, ok, fail } from "@/lib/proxy";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { checkIpRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { ipRateLimits } from "@/lib/db/schema";
 
 const LoginSchema = z.object({
   email:    z.string().email("Enter a valid email address."),
@@ -14,6 +16,11 @@ export async function POST(req: Request) {
   const parsed = await parseBody(req, LoginSchema);
   if ("error" in parsed) return parsed.error;
   const { email, password } = parsed.data;
+
+  const blocked = await checkIpRateLimit("LOGIN_FAILED", req, { email });
+  if (!blocked.allowed) {
+    return fail("Too many login attempts. Please try again in an hour.", 429);
+  }
 
   // 1. Verify credentials — sets session cookie
   const supabase = await createClient();
@@ -26,6 +33,15 @@ export async function POST(req: Request) {
     console.error("[login] signIn error:", signInError?.message);
     return fail("Invalid email or password.", 401);
   }
+
+  const ip = getRequestIp(req);
+  const rateKey = `${ip}:${email.trim().toLowerCase()}`;
+  await db.delete(ipRateLimits).where(
+    and(
+      eq(ipRateLimits.ipAddress, rateKey),
+      eq(ipRateLimits.action, "LOGIN_FAILED")
+    )
+  );
 
   // 2. Fetch role + status from DB — single source of truth
   const [dbUser] = await db

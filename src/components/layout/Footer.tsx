@@ -25,10 +25,10 @@ export default function Footer() {
   ];
 
   const legalLinks = [
-    "Privacy Policy",
-    "Terms of Service",
-    "Cookie Policy",
-    "Refund Policy",
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms & Conditions", href: "/terms" },
+    { label: "Cookie Policy", href: "#" },
+    { label: "Refund Policy", href: "#" },
   ];
 
   return (
@@ -130,9 +130,9 @@ export default function Footer() {
             </h4>
             <ul className="space-y-3">
               {legalLinks.map((l) => (
-                <li key={l}>
-                  <Link href="#" className="text-sm font-bold tracking-tight hover:text-white transition-colors duration-300">
-                    {l}
+                <li key={l.label}>
+                  <Link href={l.href} className="text-sm font-bold tracking-tight hover:text-white transition-colors duration-300">
+                    {l.label}
                   </Link>
                 </li>
               ))}

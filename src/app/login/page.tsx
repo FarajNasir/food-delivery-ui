@@ -64,24 +64,16 @@ function LoginContent() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    });
+    const result = await authApi.login(form.email, form.password);
 
-    if (error) {
-      setLoading(false);
-      toast.error(error.message || "Login failed.");
-      return;
-    }
-
-    const result = await authApi.getMe();
     if (!result.success) {
-      await supabase.auth.signOut();
       setLoading(false);
-      toast.error(result.error ?? "Login failed.");
+      toast.error(result.error || "Login failed.");
       return;
     }
+
+    // Refresh the auth store session/user state
+    await useAuthStore.getState().refresh();
 
 
     router.replace(redirectTo);
