@@ -305,11 +305,11 @@ export default function RegisterPage() {
             />
             <Label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer font-normal leading-relaxed">
               I agree to the{" "}
-              <Link href="#" className="font-semibold hover:underline" style={{ color: site.theme.primary }}>
+              <Link href="/terms" className="font-semibold hover:underline" style={{ color: site.theme.primary }}>
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="#" className="font-semibold hover:underline" style={{ color: site.theme.primary }}>
+              <Link href="/privacy" className="font-semibold hover:underline" style={{ color: site.theme.primary }}>
                 Privacy Policy
               </Link>
             </Label>
