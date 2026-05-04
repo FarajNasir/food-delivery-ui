@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Mail, Phone, User, ShieldCheck, Calendar } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { useSite } from "@/context/SiteContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 
 export default function CustomerProfile({ user }: { user: SessionUser }) {
@@ -24,6 +25,8 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
     return normalized.length >= 7;
   };
 
+  const { session, setProfile } = useAuthStore();
+
   const handleSave = async () => {
     const trimmedPhone = phone.trim();
     if (!trimmedPhone) {
@@ -36,11 +39,39 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
     }
 
     setSaving(true);
-    // Placeholder — wire to API later
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    toast.success("Profile updated!");
+    try {
+      const res = await fetch("/api/customer/account", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ name, phone }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update profile");
+      }
+
+      // Update global auth store state to keep the frontend in sync
+      if (user.id) {
+        setProfile({
+          ...user,
+          name,
+          phone,
+        });
+      }
+
+      toast.success("Profile updated successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
+
 
   const initials = user.name
     .split(" ")

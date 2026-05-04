@@ -72,6 +72,7 @@ export interface FeaturedItem {
   restaurantId?: string;
   price?: number;
   category?: string;
+  openingHours?: OpeningHours | null;
   sortOrder: number;
 }
 

@@ -1,9 +1,57 @@
 import { db } from "@/lib/db";
 import { users, notifications, cartItems, orders, reviews } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { ok, fail, withAuth } from "@/lib/proxy";
+import { ok, fail, withAuth, parseBody } from "@/lib/proxy";
 import { invalidateUserCache } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { z } from "zod";
+
+const updateProfileSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(150),
+  phone: z.string().min(7, "Phone number must be at least 7 characters").max(30),
+});
+
+/**
+ * PATCH /api/customer/account
+ * Update profile details (name, phone) for the logged-in user.
+ */
+export async function PATCH(req: Request) {
+  return withAuth(req, async (user) => {
+    const res = await parseBody(req, updateProfileSchema);
+    if ("error" in res) return res.error;
+    const { data } = res;
+
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          name: data.name,
+          phone: data.phone,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id))
+        .returning();
+
+      if (!updatedUser) {
+        return fail("User record not found in database.", 404);
+      }
+
+      // Invalidate cache to ensure subsequent requests get fresh data
+      invalidateUserCache(user.id);
+
+      return ok({ 
+        message: "Profile updated successfully.",
+        user: {
+          name: updatedUser.name,
+          phone: updatedUser.phone
+        }
+      });
+    } catch (err) {
+      console.error("[Profile Update] Error:", err);
+      return fail("Failed to update profile. Please try again later.", 500);
+    }
+  }, ["customer", "admin", "driver", "owner"]);
+}
 
 /**
  * DELETE /api/customer/account
@@ -57,3 +105,4 @@ export async function DELETE(req: Request) {
     }
   }, ["customer", "admin", "driver", "owner"]);
 }
+

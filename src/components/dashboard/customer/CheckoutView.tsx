@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 export default function CheckoutView() {
-  const { cartItems, totalPrice, clearCart } = useCart();
+  const { cartItems, currentCartItems, totalPrice, clearCart } = useCart();
   const { refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
@@ -61,7 +61,7 @@ export default function CheckoutView() {
     if (site.deliveryPricing?.type !== "distance_slabs" || !userCoords || isCalculating) return;
 
     // Check if we already calculated everything for current userCoords
-    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const uniqueRestos = Array.from(new Set(currentCartItems.map(i => i.restaurantId)));
     const allDone = uniqueRestos.every(rid => deliveryFeesBreakdown[rid] !== undefined);
     if (allDone && Object.keys(deliveryFeesBreakdown).length === uniqueRestos.length) return;
 
@@ -72,7 +72,7 @@ export default function CheckoutView() {
       let total = 0;
 
       for (const restaurantId of uniqueRestos) {
-        const item = cartItems.find(i => i.restaurantId === restaurantId);
+        const item = currentCartItems.find(i => i.restaurantId === restaurantId);
         if (!item?.restaurantLat || !item?.restaurantLng) {
           // Fallback to site coordinates if restaurant coords are missing
           if (!site.coordinates) {
@@ -105,11 +105,11 @@ export default function CheckoutView() {
       setDeliveryFee(total);
       setIsCalculating(false);
     })();
-  }, [site, userCoords, cartItems]);
+  }, [site, userCoords, currentCartItems]);
 
 
   const groupedItems = React.useMemo(() =>
-    cartItems.reduce((acc, item) => {
+    currentCartItems.reduce((acc, item) => {
       const g = acc[item.restaurantId] ?? {
         name: item.restaurantName,
         items: [],
@@ -118,8 +118,8 @@ export default function CheckoutView() {
       g.items.push(item);
       acc[item.restaurantId] = g;
       return acc;
-    }, {} as Record<string, { name: string; items: typeof cartItems; isOpen: boolean }>),
-    [cartItems]);
+    }, {} as Record<string, { name: string; items: typeof currentCartItems; isOpen: boolean }>),
+    [currentCartItems]);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
@@ -140,7 +140,7 @@ export default function CheckoutView() {
     // For Option B in fixed_areas, we'd also sum if we had multiple areas.
     // For now, assume fixed fee applies per restaurant in the cart.
     const perRestoFee = calculateDeliveryFee(site, { area });
-    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const uniqueRestos = Array.from(new Set(currentCartItems.map(i => i.restaurantId)));
     const total = perRestoFee * uniqueRestos.length;
 
     const breakdown: Record<string, number> = {};
@@ -203,7 +203,7 @@ export default function CheckoutView() {
   const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
   const paysDeliveryAtDoor = site.key === "newcastleeats";
 
-  const uniqueRestosCount = Array.from(new Set(cartItems.map(i => i.restaurantId))).length;
+  const uniqueRestosCount = Array.from(new Set(currentCartItems.map(i => i.restaurantId))).length;
   const serviceCharge = (site.serviceCharge ?? 0) * uniqueRestosCount;
 
   const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee) + serviceCharge;
@@ -211,7 +211,7 @@ export default function CheckoutView() {
 
   const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
-  if (cartItems.length === 0) {
+  if (currentCartItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <p className="text-base font-bold text-gray-500">Your basket is empty</p>

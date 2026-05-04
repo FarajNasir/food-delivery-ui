@@ -5,10 +5,11 @@ import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Search, MapPin, Star, Clock, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useSearchStore } from "@/store/useSearchStore";
 
 export default function HeroSection() {
   const { site, setSite } = useSite();
-  const [query, setQuery] = useState("");
+  const { query, setQuery } = useSearchStore();
 
   return (
     <section
@@ -60,7 +61,7 @@ export default function HeroSection() {
                 />
               </div>
               <a
-                href="#restaurants"
+                href="#all-restaurants"
                 className="px-6 py-3.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 active:scale-95 shadow-lg whitespace-nowrap text-center text-white"
                 style={{
                   background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,

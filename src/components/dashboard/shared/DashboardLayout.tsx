@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
 import type { SessionUser } from "@/lib/auth";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
@@ -14,6 +16,29 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isReady, profile } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    // If auth state is resolved and no profile is found, the user is logged out.
+    // Redirecting to login ensures they can't stay on the dashboard.
+    if (isReady && !profile) {
+      router.replace("/login");
+    }
+  }, [isReady, profile, router]);
+
+  useEffect(() => {
+    // Handle BFCache (Back-Forward Cache) — if the page is loaded from cache
+    // when clicking the back button, force a reload to re-run auth checks.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   const isCustomer = user.role === "customer";
 
   return (

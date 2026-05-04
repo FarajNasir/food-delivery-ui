@@ -31,6 +31,7 @@ export async function GET(req: Request) {
           name:      restaurants.name,
           location:  restaurants.location,
           logoUrl:   restaurants.logoUrl,
+          openingHours: restaurants.openingHours,
           sortOrder: featuredItems.sortOrder,
         })
         .from(featuredItems)
@@ -67,6 +68,7 @@ export async function GET(req: Request) {
         price:          menuItems.price,
         imageUrl:       menuItems.imageUrl,
         category:       menuItems.category,
+        openingHours:   restaurants.openingHours,
         sortOrder:      featuredItems.sortOrder,
       })
       .from(featuredItems)

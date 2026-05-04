@@ -21,8 +21,8 @@ import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 export default function CustomerCart() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
-  const { cartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
-  const isEmpty = cartItems.length === 0;
+  const { currentCartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
+  const isEmpty = currentCartItems.length === 0;
   const { profile, isReady: authReady } = useAuthStore();
   const isLoggedIn = authReady && !!profile;
   const { userCoords } = useConfigStore();
@@ -65,7 +65,7 @@ export default function CustomerCart() {
   }, [site.location]);
 
   const groupedItems = React.useMemo(() => {
-    return cartItems.reduce((acc, item) => {
+    return currentCartItems.reduce((acc, item) => {
       const g = acc[item.restaurantId] || {
         name: item.restaurantName,
         items: [],
@@ -74,16 +74,13 @@ export default function CustomerCart() {
       g.items.push(item);
       acc[item.restaurantId] = g;
       return acc;
-    }, {} as Record<string, { name: string; items: typeof cartItems; isOpen: boolean }>);
-  }, [cartItems]);
+    }, {} as Record<string, { name: string; items: typeof currentCartItems; isOpen: boolean }>);
+  }, [currentCartItems]);
 
   const handleCheckout = () => {
     router.push("/dashboard/customer/checkout");
   };
 
-  const hasOutOfLocationItems = cartItems.some(
-    i => i.restaurantLocation && i.restaurantLocation !== site.location
-  );
   const hasClosedRestaurants = Object.values(groupedItems).some(g => !g.isOpen);
 
   if (loading) {
@@ -149,16 +146,6 @@ export default function CustomerCart() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Out-of-location warning banner */}
-          {hasOutOfLocationItems && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-100/50">
-              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] font-medium text-amber-800 leading-relaxed uppercase tracking-tight">
-                Some items are outside your current delivery location. Please remove them.
-              </p>
-            </div>
-          )}
-
           {hasClosedRestaurants && (
             <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-100/50">
               <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -171,18 +158,15 @@ export default function CustomerCart() {
           {/* Unified List Surface */}
           <div className="space-y-6">
             {Object.entries(groupedItems).map(([rid, group]) => {
-              const isOutOfLocation = group.items.some(
-                i => i.restaurantLocation && i.restaurantLocation !== site.location
-              );
               return (
                 <div key={rid} className="space-y-4">
                   {/* Restaurant Info */}
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100">
-                        <Store className={cn("w-4 h-4", isOutOfLocation ? "text-amber-500" : "text-gray-400")} />
+                        <Store className="w-4 h-4 text-gray-400" />
                       </div>
-                      <span className={cn("text-xs font-bold", isOutOfLocation ? "text-amber-600" : "text-gray-900")}>
+                      <span className="text-xs font-bold text-gray-900">
                         {group.name}
                       </span>
                       {!group.isOpen && (
@@ -194,9 +178,8 @@ export default function CustomerCart() {
                   {/* Items List */}
                   <div className="space-y-4">
                     {group.items.map((item) => {
-                      const unavailable = !!(item.restaurantLocation && item.restaurantLocation !== site.location);
                       return (
-                        <div key={item.id} className={cn("py-4 flex gap-6 transition-all", unavailable && "opacity-40")}>
+                        <div key={item.id} className="py-4 flex gap-6 transition-all">
                           <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white shrink-0 border border-gray-100">
                             {item.imageUrl ? (
                               <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
@@ -213,40 +196,28 @@ export default function CustomerCart() {
                             </h3>
                             <div className="flex items-center gap-3">
                               <span className="text-sm font-black text-gray-900">£{item.price.toFixed(2)}</span>
-                              {unavailable && (
-                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded">Switch Location</span>
-                              )}
                             </div>
                           </div>
 
                           <div className="flex flex-col items-end justify-center">
-                            {unavailable ? (
+                            <div className="flex items-center gap-3 h-10 px-1 rounded-full border border-gray-100 bg-gray-50/30">
                               <button
-                                onClick={() => removeItem(item.menuItemId)}
-                                className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 transition-colors"
+                                onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-gray-900 shadow-sm transition-all"
                               >
-                                <Trash2 className="w-5 h-5" />
+                                <Minus className="w-3.5 h-3.5" />
                               </button>
-                            ) : (
-                              <div className="flex items-center gap-3 h-10 px-1 rounded-full border border-gray-100 bg-gray-50/30">
-                                <button
-                                  onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
-                                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-gray-900 shadow-sm transition-all"
-                                >
-                                  <Minus className="w-3.5 h-3.5" />
-                                </button>
-                                <span className="text-sm font-bold text-gray-900 tabular-nums w-4 text-center">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                                  className="w-8 h-8 flex items-center justify-center rounded-full text-white shadow-sm transition-all hover:scale-105 active:scale-95"
-                                  style={{ background: accent }}
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
+                              <span className="text-sm font-bold text-gray-900 tabular-nums w-4 text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-white shadow-sm transition-all hover:scale-105 active:scale-95"
+                                style={{ background: accent }}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -299,13 +270,6 @@ export default function CustomerCart() {
                     Enable Access
                   </button>
                 </div>
-              ) : hasOutOfLocationItems ? (
-                <button
-                  disabled
-                  className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-gray-100 text-gray-300 cursor-not-allowed"
-                >
-                  Items from multiple locations
-                </button>
               ) : hasClosedRestaurants ? (
                 <button
                   disabled
