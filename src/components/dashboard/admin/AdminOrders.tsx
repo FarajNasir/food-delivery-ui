@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import {
   Search, ChevronDown, ChevronLeft, ChevronRight,
-  ChevronsUpDown, ChevronUp, ShoppingBag, DollarSign, Clock, Eye
+  ChevronsUpDown, ChevronUp, ShoppingBag, PoundSterling, Clock, Eye
 } from "lucide-react";
 import PageHeader from "@/components/dashboard/shared/PageHeader";
 import StatCard from "@/components/dashboard/shared/StatCard";
@@ -18,7 +18,7 @@ type SortOrder = "asc" | "desc";
 export const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   PENDING_CONFIRMATION: { label: "Pending",          color: "#6b7280", bg: "#f3f4f6" },
   CONFIRMED:            { label: "Confirmed",        color: "#3b82f6", bg: "#eff6ff" },
-  PAID:                 { label: "Paid",             color: "#3b82f6", bg: "#eff6ff" },
+  PAID:                 { label: "Paid",             color: "#8b5cf6", bg: "#f5f3ff" },
   PREPARING:            { label: "Preparing",        color: "#f59e0b", bg: "#fffbeb" },
   DISPATCH_REQUESTED:   { label: "Dispatch Requested", color: "#fb923c", bg: "#fff7ed" },
   OUT_FOR_DELIVERY:     { label: "Out for Delivery", color: "#8b5cf6", bg: "#f5f3ff" },
@@ -110,7 +110,7 @@ export default function AdminOrders() {
         <StatCard
           label="Total Revenue"
           value={`£${parseFloat(stats.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          icon={DollarSign}
+          icon={PoundSterling}
           color="green"
         />
         <StatCard

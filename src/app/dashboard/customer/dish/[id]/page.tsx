@@ -23,7 +23,7 @@ async function getDishDetails(id: string) {
         price: menuItems.price,
         status: menuItems.status,
         imageUrl: menuItems.imageUrl,
-        isFeatured: sql<boolean>`CASE WHEN ${featuredItems.id} IS NOT NULL THEN true ELSE false END`.as("is_featured"),
+        isFeatured: sql<boolean>`CASE WHEN ${featuredItems.id} IS NOT NULL THEN true ELSE false END`,
       })
       .from(menuItems)
       .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))

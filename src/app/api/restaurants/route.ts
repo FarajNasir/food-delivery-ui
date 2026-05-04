@@ -15,6 +15,7 @@ export async function GET(req: Request) {
     const conditions: SQL[] = [
       ilike(restaurants.location, location),
       eq(restaurants.status, "active"),
+      eq(restaurants.isActive, true),
     ];
 
     let query = db
@@ -25,8 +26,10 @@ export async function GET(req: Request) {
         logoUrl:       restaurants.logoUrl,
         contactEmail:  restaurants.contactEmail,
         contactPhone:  restaurants.contactPhone,
+        openingHours:  restaurants.openingHours,
       })
       .from(restaurants);
+
 
     if (category) {
       // Join with menuItems to find restaurants that have at least one dish in this category

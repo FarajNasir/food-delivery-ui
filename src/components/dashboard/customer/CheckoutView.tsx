@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 export default function CheckoutView() {
-  const { cartItems, totalPrice, clearCart } = useCart();
+  const { cartItems, currentCartItems, totalPrice, clearCart } = useCart();
   const { refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
@@ -61,7 +61,7 @@ export default function CheckoutView() {
     if (site.deliveryPricing?.type !== "distance_slabs" || !userCoords || isCalculating) return;
 
     // Check if we already calculated everything for current userCoords
-    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const uniqueRestos = Array.from(new Set(currentCartItems.map(i => i.restaurantId)));
     const allDone = uniqueRestos.every(rid => deliveryFeesBreakdown[rid] !== undefined);
     if (allDone && Object.keys(deliveryFeesBreakdown).length === uniqueRestos.length) return;
 
@@ -72,7 +72,7 @@ export default function CheckoutView() {
       let total = 0;
 
       for (const restaurantId of uniqueRestos) {
-        const item = cartItems.find(i => i.restaurantId === restaurantId);
+        const item = currentCartItems.find(i => i.restaurantId === restaurantId);
         if (!item?.restaurantLat || !item?.restaurantLng) {
           // Fallback to site coordinates if restaurant coords are missing
           if (!site.coordinates) {
@@ -105,11 +105,11 @@ export default function CheckoutView() {
       setDeliveryFee(total);
       setIsCalculating(false);
     })();
-  }, [site, userCoords, cartItems]);
+  }, [site, userCoords, currentCartItems]);
 
 
   const groupedItems = React.useMemo(() =>
-    cartItems.reduce((acc, item) => {
+    currentCartItems.reduce((acc, item) => {
       const g = acc[item.restaurantId] ?? {
         name: item.restaurantName,
         items: [],
@@ -118,8 +118,8 @@ export default function CheckoutView() {
       g.items.push(item);
       acc[item.restaurantId] = g;
       return acc;
-    }, {} as Record<string, { name: string; items: typeof cartItems; isOpen: boolean }>),
-    [cartItems]);
+    }, {} as Record<string, { name: string; items: typeof currentCartItems; isOpen: boolean }>),
+    [currentCartItems]);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
@@ -140,7 +140,7 @@ export default function CheckoutView() {
     // For Option B in fixed_areas, we'd also sum if we had multiple areas.
     // For now, assume fixed fee applies per restaurant in the cart.
     const perRestoFee = calculateDeliveryFee(site, { area });
-    const uniqueRestos = Array.from(new Set(cartItems.map(i => i.restaurantId)));
+    const uniqueRestos = Array.from(new Set(currentCartItems.map(i => i.restaurantId)));
     const total = perRestoFee * uniqueRestos.length;
 
     const breakdown: Record<string, number> = {};
@@ -160,6 +160,7 @@ export default function CheckoutView() {
 
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
+    if (phone.length < 10) { toast.error("Phone number must be at least 10 digits"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
     if (isDistSlabs && deliveryFee === 0) { toast.error("Calculate your delivery distance first"); return; }
 
@@ -189,7 +190,7 @@ export default function CheckoutView() {
         // Redirect to the first sub-order or a custom session status page
         router.push(`/dashboard/customer/orders`);
       } else {
-        toast.error(data.message ?? "Failed to place order");
+        toast.error(data.error || data.message || "Failed to place order");
       }
     } catch {
       toast.error("Something went wrong.");
@@ -203,7 +204,7 @@ export default function CheckoutView() {
   const isDistSlabs = site.deliveryPricing?.type === "distance_slabs";
   const paysDeliveryAtDoor = site.key === "newcastleeats";
 
-  const uniqueRestosCount = Array.from(new Set(cartItems.map(i => i.restaurantId))).length;
+  const uniqueRestosCount = Array.from(new Set(currentCartItems.map(i => i.restaurantId))).length;
   const serviceCharge = (site.serviceCharge ?? 0) * uniqueRestosCount;
 
   const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee) + serviceCharge;
@@ -211,7 +212,7 @@ export default function CheckoutView() {
 
   const inputClass = "w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:border-gray-300 focus:bg-white transition-all";
 
-  if (cartItems.length === 0) {
+  if (currentCartItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <p className="text-base font-bold text-gray-500">Your basket is empty</p>
@@ -276,15 +277,32 @@ export default function CheckoutView() {
                   type="tel"
                   placeholder="e.g. 07700 900000"
                   value={phone}
+                  onKeyDown={(e) => {
+                    // Allow: backspace, delete, tab, escape, enter, and numbers
+                    if (
+                      [46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                      // Allow: Ctrl+A, Command+A, Ctrl+V, Ctrl+C, etc.
+                      ((e.keyCode === 65 || e.keyCode === 86 || e.keyCode === 67) && (e.ctrlKey === true || e.metaKey === true)) ||
+                      // Allow: home, end, left, right
+                      (e.keyCode >= 35 && e.keyCode <= 40)
+                    ) {
+                      return;
+                    }
+                    // Ensure that it is a number and stop the keypress
+                    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                      e.preventDefault();
+                    }
+                  }}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    const val = e.target.value.replace(/\D/g, ""); // Remove all non-digits
+                    setPhone(val);
                     setPhoneEdited(true);
                   }}
                   className={inputClass}
                 />
               </div>
               <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
-                The driver will use this number if they need to contact you. You can change it if you're ordering for someone else.
+                The driver will use this number if they need to contact you. You can change it if you&apos;re ordering for someone else.
               </p>
             </div>
 

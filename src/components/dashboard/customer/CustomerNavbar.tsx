@@ -150,22 +150,24 @@ export default function CustomerNavbar({ user: serverUser }: { user: SessionUser
           </div>
 
           {/* ── MIDDLE: Global Search ── */}
-          <div className="flex-1 max-w-md hidden sm:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchValue}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-4 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 transition-all"
-                style={{ 
-                  "--tw-ring-color": `${accent}33`,
-                  borderColor: searchValue ? accent : "border-gray-100" 
-                } as any}
-              />
+          {!pathname.includes("/dashboard/customer/search") && pathname !== "/dashboard/customer" && (
+            <div className="flex-1 max-w-md hidden sm:block">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchValue}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full h-9 pl-9 pr-4 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 transition-all"
+                  style={{ 
+                    "--tw-ring-color": `${accent}33`,
+                    borderColor: searchValue ? accent : "border-gray-100" 
+                  } as any}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── RIGHT: Actions ── */}
           <div className="flex items-center gap-0.5 shrink-0">

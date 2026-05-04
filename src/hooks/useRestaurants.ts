@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { customerService } from "@/services/customer.service";
 import type { RestaurantItem, FeaturedItem } from "@/types/api.types";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
 /**
  * useRestaurants.ts - Unified hook for fetching and managing restaurant data.
@@ -45,21 +46,24 @@ export function useRestaurants(searchQuery: string = "") {
     fetchRestaurants();
   }, [fetchRestaurants]);
 
-  // Filtering Logic
+  // Filtering Logic - Only show OPEN restaurants
   const filteredFeatured = useMemo(() => {
-    if (!searchQuery) return featured;
-    return featured.filter(r => 
+    const base = featured.filter(r => isRestaurantOpen(r.openingHours as any));
+    if (!searchQuery) return base;
+    return base.filter(r => 
       r.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [featured, searchQuery]);
 
   const filteredNormal = useMemo(() => {
-    if (!searchQuery) return normal;
+    const base = normal.filter(r => isRestaurantOpen(r.openingHours as any));
+    if (!searchQuery) return base;
     const query = searchQuery.toLowerCase();
-    return normal.filter(r => 
+    return base.filter(r => 
       r.name.toLowerCase().includes(query)
     );
   }, [normal, searchQuery]);
+
 
   return {
     featured: filteredFeatured,

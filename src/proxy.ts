@@ -128,11 +128,19 @@ export default async function proxy(request: NextRequest) {
     request: { headers: requestHeaders },
   });
 
+  // Prevent caching for protected routes to fix back-button access after logout
+  if (isProtected) {
+    finalResponse.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+    finalResponse.headers.set("Pragma", "no-cache");
+    finalResponse.headers.set("Expires", "0");
+  }
+
   // Copy Supabase cookies to the final response
   supabaseResponse.cookies.getAll().forEach((cookie) => finalResponse.cookies.set(cookie));
 
   return finalResponse;
 }
+
 
 export const config = {
   matcher: [

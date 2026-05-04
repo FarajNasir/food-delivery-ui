@@ -5,10 +5,11 @@ import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Search, MapPin, Star, Clock, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useSearchStore } from "@/store/useSearchStore";
 
 export default function HeroSection() {
   const { site, setSite } = useSite();
-  const [query, setQuery] = useState("");
+  const { query, setQuery } = useSearchStore();
 
   return (
     <section
@@ -48,7 +49,13 @@ export default function HeroSection() {
             </p>
 
             {/* Search bar */}
-            <div className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto lg:mx-0 mb-8">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                document.getElementById("all-restaurants")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto lg:mx-0 mb-8"
+            >
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -59,8 +66,8 @@ export default function HeroSection() {
                   className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white text-gray-800 placeholder-gray-400 text-sm font-medium outline-none shadow-lg"
                 />
               </div>
-              <a
-                href="#restaurants"
+              <button
+                type="submit"
                 className="px-6 py-3.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 active:scale-95 shadow-lg whitespace-nowrap text-center text-white"
                 style={{
                   background: `linear-gradient(135deg, ${site.theme.gradientFrom}, ${site.theme.gradientVia})`,
@@ -68,8 +75,8 @@ export default function HeroSection() {
                 }}
               >
                 Find Food
-              </a>
-            </div>
+              </button>
+            </form>
 
             {/* Stats row */}
             <div className="flex flex-wrap gap-6 justify-center lg:justify-start">

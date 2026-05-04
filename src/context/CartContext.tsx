@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { type OpeningHours } from "@/lib/api";
+import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
+import { useSite } from "@/context/SiteContext";
 
 export interface CartItem {
   id: string;
@@ -28,6 +30,7 @@ interface CartContextType {
   isGuest: boolean;
   totalItems: number;
   totalPrice: number;
+  currentCartItems: CartItem[];
   addItem: (item: Omit<CartItem, "id" | "quantity">) => Promise<void>;
   removeItem: (menuItemId: string) => Promise<void>;
   updateQuantity: (menuItemId: string, quantity: number) => Promise<void>;
@@ -38,6 +41,10 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const GUEST_CART_KEY = "guest_cart";
+
+function normalizeLocation(value?: string | null) {
+  return value?.trim().toLowerCase() ?? "";
+}
 
 // ── localStorage helpers ─────────────────────────────────────
 function loadGuestCart(): CartItem[] {
@@ -56,14 +63,12 @@ function saveGuestCart(items: CartItem[]) {
 }
 
 import { useAuthStore } from "@/store/useAuthStore";
-import { useConfigStore } from "@/store/useConfigStore";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { session, isReady } = useAuthStore();
-  const { site } = useConfigStore();
-  const prevSiteRef = useRef(site.key);
+  const { site } = useSite();
   const initCalledFor = useRef<string | null>(null);
   const isGuest = !session;
 
@@ -174,6 +179,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // ── Add item ─────────────────────────────────────────────────
   const addItem = async (item: Omit<CartItem, "id" | "quantity">) => {
+    // Validate Restaurant Operational Hours before adding
+    if (!isRestaurantOpen(item.openingHours)) {
+      toast.error(`${item.restaurantName} is currently closed.`);
+      return;
+    }
+
     // If we are currently a guest, use localStorage
     if (isGuest) {
       // Guest: pure localStorage
@@ -210,15 +221,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify({ menuItemId: item.menuItemId, quantity: 1 }),
       });
-      if (!res.ok) throw new Error();
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add item");
+      }
       
       // Successfully updated on server, no need for fetchDBCart()
-      toast.success(`'${item.name}' added to order`);
-    } catch {
-      toast.error("Failed to add item. Please try again.");
+      toast.success(`'${item.name}' added to cart`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to add item. Please try again.";
+      toast.error(message);
       await fetchDBCart(); // rollback to server state
     }
   };
+
 
   // ── Update quantity ──────────────────────────────────────────
   const updateQuantity = async (menuItemId: string, quantity: number) => {
@@ -226,16 +243,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     // If guest mode
     if (isGuest) {
-      const current = loadGuestCart()
+      const current = loadGuestCart();
+      const itemToRemove = current.find(i => i.menuItemId === menuItemId);
+      const updated = current
         .map(i => i.menuItemId === menuItemId ? { ...i, quantity } : i)
         .filter(i => i.quantity > 0);
-      saveGuestCart(current);
-      setCartItems(current);
-      if (quantity === 0) toast.info("Item removed from cart");
+      saveGuestCart(updated);
+      setCartItems(updated);
+      if (quantity === 0) toast.info(`'${itemToRemove?.name || "Item"}' removed from cart`);
       return;
     }
 
     // Logged-in: optimistic + DB
+    const itemToRemove = cartItems.find(i => i.menuItemId === menuItemId);
     const newItems = cartItems
       .map(i => i.menuItemId === menuItemId ? { ...i, quantity } : i)
       .filter(i => i.quantity > 0);
@@ -254,7 +274,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error();
       
       // Successfully updated on server, no need for fetchDBCart()
-      if (quantity === 0) toast.info("Item removed from cart");
+      if (quantity === 0) toast.info(`'${itemToRemove?.name || "Item"}' removed from cart`);
     } catch {
       toast.error("Failed to update quantity");
       await fetchDBCart(); // rollback to server state
@@ -268,30 +288,46 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // ── Clear cart ───────────────────────────────────────────────
   const clearCart = useCallback(async (silent?: boolean) => {
+    const activeLocation = normalizeLocation(site.location);
+    const scopedItems = cartItems.filter(
+      item => normalizeLocation(item.restaurantLocation) === activeLocation
+    );
+
     if (isGuest) {
-      localStorage.removeItem(GUEST_CART_KEY);
-      setCartItems([]);
+      const remainingItems = cartItems.filter(
+        item => normalizeLocation(item.restaurantLocation) !== activeLocation
+      );
+      saveGuestCart(remainingItems);
+      setCartItems(remainingItems);
       if (!silent) toast.success("Cart cleared");
       return;
     }
 
     const backup = [...cartItems];
-    setCartItems([]);
+    const remainingItems = cartItems.filter(
+      item => normalizeLocation(item.restaurantLocation) !== activeLocation
+    );
+    setCartItems(remainingItems);
     try {
       const currentSession = useAuthStore.getState().session;
-      const res = await fetch("/api/cart/clear", { 
-        method: "POST",
-        headers: {
-            "Authorization": currentSession ? `Bearer ${currentSession.access_token}` : ""
-        }
-      });
-      if (!res.ok) throw new Error();
-      if (!silent) toast.success("Order cleared");
+      await Promise.all(
+        scopedItems.map(item =>
+          fetch(`/api/cart/${item.menuItemId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: currentSession ? `Bearer ${currentSession.access_token}` : ""
+            }
+          }).then((res) => {
+            if (!res.ok) throw new Error();
+          })
+        )
+      );
+      if (!silent) toast.success("Cart cleared");
     } catch {
       if (!silent) toast.error("Failed to clear cart");
       setCartItems(backup);
     }
-  }, [isGuest, cartItems]);
+  }, [isGuest, cartItems, site.location]);
 
   const replaceCart = useCallback(async (items: { menuItemId: string; quantity: number }[]) => {
     if (items.length === 0) {
@@ -357,18 +393,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cartItems, fetchDBCart, isGuest]);
 
-  useEffect(() => {
-    if (prevSiteRef.current !== site.key) {
-      prevSiteRef.current = site.key;
-      clearCart(true);
-    }
-  }, [site.key, clearCart]);
+  // Removed: automatic cart clearing on site change to persist cart as per user request.
+  // useEffect(() => {
+  //   if (prevSiteRef.current !== site.key) {
+  //     prevSiteRef.current = site.key;
+  //     clearCart(true);
+  //   }
+  // }, [site.key, clearCart]);
 
-  const totalItems = useMemo(() => cartItems.reduce((acc, item) => acc + item.quantity, 0), [cartItems]);
-  const totalPrice = useMemo(() => cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0), [cartItems]);
+
+  const currentCartItems = useMemo(() => {
+    const activeLocation = normalizeLocation(site.location);
+    return cartItems.filter(
+      item => normalizeLocation(item.restaurantLocation) === activeLocation
+    );
+  }, [cartItems, site.location]);
+
+  const totalItems = useMemo(() => currentCartItems.reduce((acc, item) => acc + item.quantity, 0), [currentCartItems]);
+  const totalPrice = useMemo(() => currentCartItems.reduce((acc, item) => acc + item.price * item.quantity, 0), [currentCartItems]);
 
   const value = useMemo(() => ({
     cartItems,
+    currentCartItems,
     loading,
     isGuest,
     totalItems,
@@ -378,7 +424,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     updateQuantity,
     clearCart,
     replaceCart,
-  }), [cartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart, replaceCart]);
+  }), [cartItems, currentCartItems, loading, isGuest, totalItems, totalPrice, addItem, removeItem, updateQuantity, clearCart, replaceCart]);
 
   return (
     <CartContext.Provider value={value}>
