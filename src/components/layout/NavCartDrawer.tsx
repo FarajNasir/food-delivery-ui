@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { X, ShoppingBag, Plus, Minus, Trash2, ChevronRight, AlertTriangle } from "lucide-react";
+import { X, ShoppingBag, Plus, Minus, ChevronRight } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useCart } from "@/context/CartContext";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -17,18 +17,18 @@ interface Props {
 
 export default function NavCartDrawer({ isOpen, onClose }: Props) {
   const { site } = useSite();
-  const { gradientFrom, gradientTo, accent } = site.theme;
-  const { cartItems, currentCartItems, totalItems, totalPrice, updateQuantity, removeItem } = useCart();
+  const { gradientFrom, accent } = site.theme;
+  const { currentCartItems, totalItems, totalPrice, updateQuantity } = useCart();
   const { profile, isReady: authReady } = useAuthStore();
   const router = useRouter();
   const isLoggedIn = authReady && !!profile;
 
   const drawerRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Close on outside click
   useEffect(() => {
@@ -55,10 +55,6 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
-
-  const hasOutOfLocation = cartItems.some(
-    i => i.restaurantLocation && i.restaurantLocation !== site.location
-  );
 
   if (!mounted) return null;
 

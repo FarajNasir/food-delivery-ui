@@ -81,8 +81,11 @@ export default function RegisterPage() {
     if (!form.name.trim()) e.name = "Full name is required.";
     if (!form.email.trim()) e.email = "Email address is required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email.";
-    if (!phone) e.phone = "Phone number is required.";
-    else if (!isValidPhoneNumber(phone)) e.phone = "Enter a valid phone number for the selected country.";
+    if (!phone) {
+      e.phone = "Phone number is required.";
+    } else if (!isValidPhoneNumber(phone)) {
+      e.phone = "Please enter a complete and valid phone number.";
+    }
     if (!form.password) e.password = "Password is required.";
     else if (form.password.length < 8) e.password = "Password must be at least 8 characters.";
     if (!form.confirmPassword) e.confirmPassword = "Please confirm your password.";

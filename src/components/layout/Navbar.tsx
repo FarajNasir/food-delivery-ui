@@ -52,7 +52,7 @@ export default function Navbar() {
   }, [locationOpen]);
 
   const navLinks = [
-    { label: "Home",        href: "/" },
+    { label: "Home",        href: "/#home" },
     { label: "Restaurants", href: "/#restaurants" },
     { label: "How It Works",href: "/#how-it-works" },
     { label: "Offers",      href: "/#offers" },
@@ -95,10 +95,12 @@ export default function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
 
-            {/* Location switcher */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <div className="relative">
               <button
-                onClick={() => setLocationOpen(!locationOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocationOpen(!locationOpen);
+                }}
                 className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-300 ${
                   scrolled ? "bg-gray-100 hover:bg-gray-200 text-gray-700" : "bg-white/20 hover:bg-white/30 text-white"
                 }`}

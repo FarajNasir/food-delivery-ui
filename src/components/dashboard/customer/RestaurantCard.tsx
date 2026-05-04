@@ -46,7 +46,7 @@ export default function RestaurantCard({
       onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
       className={cn(
         "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
-        "hover:shadow-elevated shadow-soft transform-gpu",
+        "hover:shadow-elevated shadow-soft",
         !isOpen && "grayscale-[0.8] opacity-90"
       )}
     >
@@ -74,7 +74,7 @@ export default function RestaurantCard({
         )}
 
         {/* Glass Badge - Top Left */}
-        {(featured || (restaurant as any).type === "restaurant") && (
+        {featured && (
           <div className="absolute left-4 top-4 z-10">
             <div 
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight text-white shadow-lg backdrop-blur-xl"
@@ -142,18 +142,17 @@ export default function RestaurantCard({
 
           <motion.div
             whileHover={{ 
-              scale: 1.02, 
+              scale: 1.05, 
               backgroundColor: `${theme.accent}15`,
-              borderColor: `${theme.accent}40` 
             }}
-            whileTap={{ scale: 0.98 }}
-            className="ml-auto flex min-w-[140px] items-center justify-center whitespace-nowrap rounded-full px-6 py-2.5 text-[11px] font-black uppercase tracking-widest leading-none transition-all duration-300 border border-transparent shadow-sm"
+            whileTap={{ scale: 0.95 }}
+            className="ml-auto flex items-center justify-center rounded-full px-6 py-2.5 transition-all duration-300"
             style={{ 
               color: theme.accent,
               backgroundColor: `${theme.accent}08`, 
             }}
           >
-            Explore Menu
+            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Explore Menu</span>
           </motion.div>
         </div>
       </div>

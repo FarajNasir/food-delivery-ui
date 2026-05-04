@@ -27,7 +27,7 @@ export default function RestaurantMenuView({
 }: RestaurantMenuViewProps) {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
-  const { cartItems, addItem: addToCart, updateQuantity } = useCart();
+  const { cartItems, currentCartItems, addItem: addToCart, updateQuantity } = useCart();
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const isOpen = isRestaurantOpen(restaurant.openingHours);
 
@@ -63,7 +63,7 @@ export default function RestaurantMenuView({
   const [activeTab, setActiveTab] = useState(menu[0]?.category ?? "");
   const activeSection = menu.find((s) => s.category === activeTab);
 
-  const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const cartCount = currentCartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   if (menu.length === 0) {
     return (
@@ -259,7 +259,11 @@ export default function RestaurantMenuView({
                             imageUrl: "imageUrl" in item && item.imageUrl ? item.imageUrl : "",
                             restaurantId: restaurant.id,
                             restaurantName: restaurant.name,
-                            isMobileChef: restaurant.isMobileChef
+                            restaurantLocation: restaurant.location ?? site.location,
+                            restaurantLat: restaurant.latitude,
+                            restaurantLng: restaurant.longitude,
+                            isMobileChef: restaurant.isMobileChef,
+                            openingHours: restaurant.openingHours,
                           })}
                           disabled={!isOpen}
                           className={cn(

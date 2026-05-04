@@ -160,6 +160,7 @@ export default function CheckoutView() {
 
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
+    if (phone.length < 10) { toast.error("Phone number must be at least 10 digits"); return; }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
     if (isDistSlabs && deliveryFee === 0) { toast.error("Calculate your delivery distance first"); return; }
 
@@ -189,7 +190,7 @@ export default function CheckoutView() {
         // Redirect to the first sub-order or a custom session status page
         router.push(`/dashboard/customer/orders`);
       } else {
-        toast.error(data.message ?? "Failed to place order");
+        toast.error(data.error || data.message || "Failed to place order");
       }
     } catch {
       toast.error("Something went wrong.");
@@ -276,15 +277,32 @@ export default function CheckoutView() {
                   type="tel"
                   placeholder="e.g. 07700 900000"
                   value={phone}
+                  onKeyDown={(e) => {
+                    // Allow: backspace, delete, tab, escape, enter, and numbers
+                    if (
+                      [46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                      // Allow: Ctrl+A, Command+A, Ctrl+V, Ctrl+C, etc.
+                      ((e.keyCode === 65 || e.keyCode === 86 || e.keyCode === 67) && (e.ctrlKey === true || e.metaKey === true)) ||
+                      // Allow: home, end, left, right
+                      (e.keyCode >= 35 && e.keyCode <= 40)
+                    ) {
+                      return;
+                    }
+                    // Ensure that it is a number and stop the keypress
+                    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                      e.preventDefault();
+                    }
+                  }}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    const val = e.target.value.replace(/\D/g, ""); // Remove all non-digits
+                    setPhone(val);
                     setPhoneEdited(true);
                   }}
                   className={inputClass}
                 />
               </div>
               <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
-                The driver will use this number if they need to contact you. You can change it if you're ordering for someone else.
+                The driver will use this number if they need to contact you. You can change it if you&apos;re ordering for someone else.
               </p>
             </div>
 

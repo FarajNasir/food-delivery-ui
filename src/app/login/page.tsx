@@ -20,8 +20,8 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <AuthCard title="Loading..." subtitle="Checking authentication status...">
-        <div className="flex justify-center py-12">
-          <div className="w-10 h-10 border-4 border-gray-100 border-t-gray-900 rounded-full animate-spin" />
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="w-12 h-12 border-4 border-gray-100 border-t-gray-900 rounded-full animate-spin" />
         </div>
       </AuthCard>
     }>
@@ -74,9 +74,6 @@ function LoginContent() {
 
     // Refresh the auth store session/user state
     await useAuthStore.getState().refresh();
-
-
-    router.replace(redirectTo);
     setLoading(false);
   };
 

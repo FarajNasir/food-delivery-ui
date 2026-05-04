@@ -17,7 +17,7 @@ export default function Footer() {
   const { contact } = site;
 
   const quickLinks = [
-    { label: "Home", href: "/" },
+    { label: "Home", href: "/#home" },
     { label: "Restaurants", href: "/#restaurants" },
     { label: "How It Works", href: "/#how-it-works" },
     { label: "Offers", href: "/#offers" },

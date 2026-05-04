@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ShoppingBag, ArrowRight, Minus, Plus, Trash2,
-  Store, MapPin, AlertTriangle, Sparkles, ChevronRight
+  Store, MapPin, AlertTriangle, Sparkles, ChevronRight, Loader2
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
@@ -13,6 +13,7 @@ import { useCart } from "@/context/CartContext";
 import { useConfigStore } from "@/store/useConfigStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import LocationPermissionModal from "@/components/shared/LocationPermissionModal";
+import ConfirmModal from "@/components/shared/ConfirmModal";
 import DishCard, { SkeletonDishCard } from "@/components/dashboard/customer/DishCard";
 import { featuredApi, type PublicFeaturedDish } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export default function CustomerCart() {
   const { userCoords } = useConfigStore();
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [checkingOut, setCheckingOut] = React.useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -109,7 +111,7 @@ export default function CustomerCart() {
         </div>
         {!isEmpty && (
           <button
-            onClick={() => clearCart()}
+            onClick={() => setShowClearModal(true)}
             className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-all flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-50 rounded-full"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -284,7 +286,7 @@ export default function CustomerCart() {
                   className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all hover:opacity-90 hover:shadow-2xl active:scale-[0.98] disabled:opacity-50"
                   style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${accent})` }}
                 >
-                  {checkingOut ? "..." : "Proceed to Checkout"}
+                  {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : "Proceed to Checkout"}
                   <ChevronRight className="w-6 h-6" />
                 </button>
               )}
@@ -316,7 +318,19 @@ export default function CustomerCart() {
                 <DishCard key={dish.id} dish={dish} theme={site.theme} />
               ))
             }
-          </div>
+            <ConfirmModal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={() => {
+          clearCart();
+          setShowClearModal(false);
+        }}
+        title="Clear Cart?"
+        message="Are you sure you want to clear all items from your cart?"
+        confirmText="Clear Everything"
+        danger={true}
+      />
+    </div>
         </div>
       )}
     </div>

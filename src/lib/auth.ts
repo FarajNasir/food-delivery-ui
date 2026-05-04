@@ -13,6 +13,7 @@ export interface SessionUser {
   phone: string;
   role: UserRole;
   status: "active" | "banned";
+  createdAt: string;
 }
 
 /* ── In-process user cache ───────────────────────────────────────────────────
@@ -82,6 +83,7 @@ async function fetchAndCacheUser(userId: string): Promise<SessionUser | null> {
     phone:  dbUser.phone,
     role:   dbUser.role as UserRole,
     status: dbUser.status,
+    createdAt: dbUser.createdAt.toISOString(),
   };
 
   userCache.set(userId, { user: sessionUser, expiresAt: Date.now() + CACHE_TTL_MS });

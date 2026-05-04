@@ -21,8 +21,9 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
   };
 
   const isValidPhone = (value: string) => {
+    // Basic international phone validation: starts with + or digit, followed by 7-15 digits
     const normalized = value.replace(/\D/g, "");
-    return normalized.length >= 7;
+    return normalized.length >= 10 && normalized.length <= 15;
   };
 
   const { session, setProfile } = useAuthStore();
@@ -200,7 +201,7 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
           <div>
             <p className="text-xs" style={{ color: "var(--dash-text-secondary)" }}>Member since</p>
             <p className="text-sm font-semibold" style={{ color: "var(--dash-text-primary)" }}>
-              April 2026
+              {new Date(user.createdAt).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
             </p>
           </div>
         </div>

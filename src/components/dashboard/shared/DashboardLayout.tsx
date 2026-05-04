@@ -23,7 +23,8 @@ export default function DashboardLayout({
     // If auth state is resolved and no profile is found, the user is logged out.
     // Redirecting to login ensures they can't stay on the dashboard.
     if (isReady && !profile) {
-      router.replace("/login");
+      const currentPath = window.location.pathname + window.location.search;
+      router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
     }
   }, [isReady, profile, router]);
 

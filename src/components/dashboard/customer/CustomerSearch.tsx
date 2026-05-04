@@ -172,7 +172,7 @@ export default function CustomerSearch() {
                 All restaurants
               </h2>
               <Link
-                href="/dashboard/customer"
+                href="/dashboard/customer/all-restaurants"
                 className="text-xs font-semibold flex items-center gap-0.5"
                 style={{ color: accent }}
               >
@@ -228,7 +228,7 @@ export default function CustomerSearch() {
                       <p className="text-xs text-gray-400 truncate">{dish.restaurantName || "Restaurant"}</p>
                     </div>
                     <p className="text-sm font-bold shrink-0" style={{ color: gradientFrom }}>
-                      £{dish.price}
+                      £{Number(dish.price).toFixed(2)}
                     </p>
                   </Link>
                 ))}

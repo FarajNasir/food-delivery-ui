@@ -311,10 +311,13 @@ export default function OrderStatusPage() {
 
         {/* Footer Actions */}
         <div className="mt-12 flex flex-col items-center gap-6">
-          <button className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors group">
+          <Link 
+            href="/contact"
+            className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors group"
+          >
             <ShoppingBag className="w-4 h-4 group-hover:scale-110 transition-transform" />
             <span className="text-[10px] font-sans font-bold uppercase tracking-widest">Need help with this order?</span>
-          </button>
+          </Link>
 
           <p className="text-[9px] font-sans font-semibold text-gray-300 uppercase tracking-[0.3em] text-center">
             Powered by {site.name} Delivery
