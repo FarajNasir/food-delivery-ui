@@ -1,10 +1,28 @@
 import { db } from "@/lib/db";
-import { orders, restaurants, users, notifications, orderItems, menuItems } from "@/lib/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { orders, restaurants, orderItems, menuItems } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { NotificationService } from "@/services/notification.service";
+
+async function ensureKitchenStartsFromPaid(orderId: string) {
+  await db
+    .update(orders)
+    .set({
+      status: "PAID",
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(orders.id, orderId),
+      inArray(orders.status, [
+        "PENDING_CONFIRMATION",
+        "CONFIRMED",
+        "DISPATCH_REQUESTED",
+        "OUT_FOR_DELIVERY",
+      ])
+    ));
+}
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -22,9 +40,10 @@ export async function POST(req: Request) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch (err: any) {
-    console.error(`[Stripe Webhook] Error: ${err.message}`);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown webhook error";
+    console.error(`[Stripe Webhook] Error: ${message}`);
+    return new NextResponse(`Webhook Error: ${message}`, { status: 400 });
   }
 
   // Handle the event
@@ -43,11 +62,22 @@ export async function POST(req: Request) {
             status: "PAID",
             updatedAt: new Date()
           })
-          .where(and(eq(orders.id, orderId), ne(orders.status, "PAID")))
+          .where(and(
+            eq(orders.id, orderId),
+            inArray(orders.status, ["PENDING_CONFIRMATION", "CONFIRMED"])
+          ))
           .returning();
 
         if (!updatedOrder) {
-          console.log(`[Stripe Webhook] Order ${orderId} already PAID or not found. Skipping notifications.`);
+          console.log(`[Stripe Webhook] Order ${orderId} already PAID or not found.`);
+          try {
+            const { ShipdayService } = await import("@/services/shipday.service");
+            await ShipdayService.triggerShipdayOrder(orderId, "DISPATCH_REQUESTED");
+            await ensureKitchenStartsFromPaid(orderId);
+            console.log(`[Stripe Webhook] Shipday scheduled delivery ensured for already-paid order ${orderId}.`);
+          } catch (shipdayErr) {
+            console.error("[Stripe Webhook] Failed to ensure Shipday scheduled delivery:", shipdayErr);
+          }
           return new NextResponse(null, { status: 200 });
         }
 
@@ -112,6 +142,16 @@ export async function POST(req: Request) {
           } catch (notifyErr) {
             console.error("[Stripe Webhook] Failed to notify customer:", notifyErr);
           }
+
+          try {
+            const { ShipdayService } = await import("@/services/shipday.service");
+            await ShipdayService.triggerShipdayOrder(updatedOrder.id, "DISPATCH_REQUESTED");
+            await ensureKitchenStartsFromPaid(updatedOrder.id);
+            console.log(`[Stripe Webhook] Shipday scheduled delivery created for order ${orderId}.`);
+          } catch (shipdayErr) {
+            console.error("[Stripe Webhook] Failed to create Shipday scheduled delivery:", shipdayErr);
+          }
+
         }
       } catch (dbErr) {
         console.error("[Stripe Webhook] Database Error:", dbErr);

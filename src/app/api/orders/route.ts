@@ -1,6 +1,6 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions } from "@/lib/db/schema";
+import { orders, orderItems, cartItems, menuItems, restaurants, orderSessions, deliveryJobs } from "@/lib/db/schema";
 import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { NotificationService } from "@/services/notification.service";
 import { SITES, DEFAULT_SITE } from "@/config/sites";
@@ -345,13 +345,19 @@ export async function GET(req: Request) {
             currency: orders.currency,
             paymentIntentId: orders.paymentIntentId,
             sessionId: orders.sessionId,
-            restaurantNameSnapshot: orders.restaurantNameSnapshot,
-            createdAt: orders.createdAt,
-            updatedAt: orders.updatedAt,
-          })
-          .from(orders)
-          .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
-          .where(scopeCondition)
+          restaurantNameSnapshot: orders.restaurantNameSnapshot,
+          deliveryJobStatus: deliveryJobs.status,
+          trackingUrl: deliveryJobs.trackingUrl,
+          driverName: deliveryJobs.driverName,
+          driverPhone: deliveryJobs.driverPhone,
+          eta: deliveryJobs.eta,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+        })
+        .from(orders)
+        .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+        .leftJoin(deliveryJobs, eq(deliveryJobs.orderId, orders.id))
+        .where(scopeCondition)
           .orderBy(
             sql`CASE WHEN ${orders.status} IN ('DELIVERED', 'CANCELLED') THEN 1 ELSE 0 END ASC`,
             desc(orders.createdAt)
@@ -395,6 +401,15 @@ export async function GET(req: Request) {
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
         restaurant: { name: order.restaurantNameSnapshot || order.restaurantName },
+        deliveryJob: order.deliveryJobStatus || order.trackingUrl || order.driverName || order.driverPhone || order.eta
+          ? {
+              status: order.deliveryJobStatus,
+              trackingUrl: order.trackingUrl,
+              driverName: order.driverName,
+              driverPhone: order.driverPhone,
+              eta: order.eta,
+            }
+          : undefined,
         items: itemRows
           .filter((i) => i.orderId === order.id)
           .map((i) => ({

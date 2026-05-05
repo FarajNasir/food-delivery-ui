@@ -1,6 +1,6 @@
 import { ok, fail, withAuth } from "@/lib/proxy";
 import { db } from "@/lib/db";
-import { orders, orderItems, menuItems, restaurants } from "@/lib/db/schema";
+import { orders, orderItems, menuItems, restaurants, deliveryJobs } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -33,11 +33,17 @@ export async function GET(
           paymentIntentId: orders.paymentIntentId,
           sessionId: orders.sessionId,
           restaurantNameSnapshot: orders.restaurantNameSnapshot,
+          deliveryJobStatus: deliveryJobs.status,
+          trackingUrl: deliveryJobs.trackingUrl,
+          driverName: deliveryJobs.driverName,
+          driverPhone: deliveryJobs.driverPhone,
+          eta: deliveryJobs.eta,
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
         })
         .from(orders)
         .innerJoin(restaurants, eq(orders.restaurantId, restaurants.id))
+        .leftJoin(deliveryJobs, eq(deliveryJobs.orderId, orders.id))
         .where(and(eq(orders.id, id), eq(orders.userId, user.id)))
         .limit(1);
 
@@ -62,6 +68,15 @@ export async function GET(
       const result = {
         ...order,
         restaurant: { name: order.restaurantNameSnapshot || order.restaurantName },
+        deliveryJob: order.deliveryJobStatus || order.trackingUrl || order.driverName || order.driverPhone || order.eta
+          ? {
+              status: order.deliveryJobStatus,
+              trackingUrl: order.trackingUrl,
+              driverName: order.driverName,
+              driverPhone: order.driverPhone,
+              eta: order.eta,
+            }
+          : undefined,
         items: items.map((i) => ({
           id: i.id,
           quantity: i.quantity,
