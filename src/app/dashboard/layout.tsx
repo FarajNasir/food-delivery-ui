@@ -1,4 +1,4 @@
-import { getCurrentUser, requireAuth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import DashboardLayout from "@/components/dashboard/shared/DashboardLayout";
 
 export const dynamic = "force-dynamic";

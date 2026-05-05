@@ -57,19 +57,16 @@ function mapShipdayStatus(payload: ShipdayWebhookPayload) {
 
   if (!rawStatus) return null;
   if (
-    rawStatus.includes("DELIVERED") ||
-    rawStatus.includes("COMPLETED") ||
-    rawStatus.includes("SUCCESS")
+    rawStatus === "DELIVERED" ||
+    rawStatus.includes("ORDER_DELIVERED") ||
+    rawStatus.includes("DELIVERY_COMPLETED")
   ) {
     return "DELIVERED" as const;
   }
   if (
-    rawStatus.includes("PRE_ASSIGNED") ||
-    rawStatus.includes("ASSIGNED") ||
     rawStatus.includes("OUT_FOR_DELIVERY") ||
     rawStatus.includes("ON_THE_WAY") ||
     rawStatus.includes("EN_ROUTE") ||
-    rawStatus.includes("STARTED") ||
     rawStatus.includes("PICKED_UP")
   ) {
     return "OUT_FOR_DELIVERY" as const;
@@ -81,7 +78,12 @@ function mapShipdayStatus(payload: ShipdayWebhookPayload) {
   ) {
     return "CANCELLED" as const;
   }
-  if (rawStatus.includes("NOT_ASSIGNED") || rawStatus.includes("PENDING")) {
+  if (
+    rawStatus.includes("PRE_ASSIGNED") ||
+    rawStatus.includes("ASSIGNED") ||
+    rawStatus.includes("NOT_ASSIGNED") ||
+    rawStatus.includes("PENDING")
+  ) {
     return "DISPATCH_REQUESTED" as const;
   }
   return null;
@@ -103,6 +105,14 @@ export async function POST(req: Request) {
       console.error("[Shipday Webhook] Invalid JSON or unexpected end of input:", body);
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
+
+    console.log(`[Shipday Webhook] Raw status fields:`, {
+      orderStatus: payload.orderStatus,
+      order_status: payload.order_status,
+      status: payload.status,
+      deliveryStatus: payload.deliveryStatus,
+      delivery_status: payload.delivery_status,
+    });
 
     // Verify token if configured
     const expectedToken = process.env.SHIPDAY_WEBHOOK_TOKEN;
@@ -189,6 +199,8 @@ export async function POST(req: Request) {
     }
 
     const mappedStatus = mapShipdayStatus(payload);
+    console.log(`[Shipday Webhook] Raw Status: "${mappedStatus ? (pickFirstString(payload.orderStatus, payload.order_status, payload.status) || "unknown") : "none"}" -> Mapped: "${mappedStatus}"`);
+
     const updateDeliveryJob: Record<string, string | Date | null> = {
       providerOrderId: providerOrderId || deliveryJob.providerOrderId,
       trackingId: trackingId || deliveryJob.trackingId,
@@ -220,8 +232,39 @@ export async function POST(req: Request) {
       .set(updateDeliveryJob)
       .where(eq(deliveryJobs.id, deliveryJob.id));
 
-    if (mappedStatus) {
+    // 3. Update the Order Status (STRICTLY CONTROLLED)
+    // We only allow the webhook to advance the order to terminal states (DELIVERED/CANCELLED).
+    // The "OUT_FOR_DELIVERY" status MUST be triggered by the owner in the dashboard.
+    const isTerminal = mappedStatus === "DELIVERED" || mappedStatus === "CANCELLED";
+    console.log(`[Shipday Webhook Debug] OrderId: ${deliveryJob.orderId}, MappedStatus: ${mappedStatus}, isTerminal: ${isTerminal}`);
+
+    // HARD BLOCK: Never allow OUT_FOR_DELIVERY from webhook
+    if (mappedStatus === "OUT_FOR_DELIVERY") {
+      console.log(`[Shipday Webhook] REJECTED OUT_FOR_DELIVERY for ${deliveryJob.orderId}. Owner must dispatch manually.`);
+      return NextResponse.json({ ok: true, message: "Logistics updated, order status preserved." });
+    }
+
+    if (isTerminal) {
       const orderId = deliveryJob.orderId;
+
+      const [currentOrder] = await db
+        .select({ status: orders.status })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
+
+      const allowedTransitions: Record<string, string[]> = {
+        DELIVERED: ["OUT_FOR_DELIVERY", "DISPATCH_REQUESTED", "PREPARING"],
+        CANCELLED: ["DISPATCH_REQUESTED", "PREPARING", "PAID", "CONFIRMED", "PENDING_CONFIRMATION"],
+      };
+
+      if (!currentOrder || !allowedTransitions[mappedStatus]?.includes(currentOrder.status)) {
+        console.warn(
+          `[Shipday Webhook] BLOCKED ${mappedStatus} for order ${orderId}. ` +
+          `Current status "${currentOrder?.status}" is not a valid source for this transition.`
+        );
+        return NextResponse.json({ ok: true, message: "Transition blocked — invalid status." });
+      }
 
       await db
         .update(orders)
@@ -229,33 +272,9 @@ export async function POST(req: Request) {
           status: mappedStatus,
           updatedAt: new Date(),
         })
-        .where(and(
-          eq(orders.id, orderId),
-          mappedStatus === "DELIVERED"
-            ? or(
-                eq(orders.status, "CONFIRMED"),
-                eq(orders.status, "PAID"),
-                eq(orders.status, "PREPARING"),
-                eq(orders.status, "DISPATCH_REQUESTED"),
-                eq(orders.status, "OUT_FOR_DELIVERY")
-              )
-            : mappedStatus === "CANCELLED"
-              ? or(
-                  eq(orders.status, "CONFIRMED"),
-                  eq(orders.status, "PAID"),
-                  eq(orders.status, "PREPARING"),
-                  eq(orders.status, "DISPATCH_REQUESTED"),
-                  eq(orders.status, "OUT_FOR_DELIVERY")
-                )
-              : or(
-                  eq(orders.status, "CONFIRMED"),
-                  eq(orders.status, "PAID"),
-                  eq(orders.status, "PREPARING"),
-                  eq(orders.status, "DISPATCH_REQUESTED")
-                )
-        ));
+        .where(eq(orders.id, orderId));
 
-      // --- Notify Owner ---
+      // --- Notify for terminal states ---
       try {
         const [orderData] = await db
           .select({
@@ -271,63 +290,43 @@ export async function POST(req: Request) {
           .where(eq(orders.id, orderId))
           .limit(1);
 
-          if (orderData) {
-            const statusText = mappedStatus.replace(/_/g, " ").toLowerCase();
-            const subject = mappedStatus === "DELIVERED" ? "Order Delivered! 🎉" : `Order Update: #${orderData.orderId.slice(0, 8)}`;
-            
-            // Build Detailed Body for Owner
-            const itemsRows = await db
-              .select({
-                name: menuItems.name,
-                quantity: orderItems.quantity,
-              })
-              .from(orderItems)
-              .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
-              .where(eq(orderItems.orderId, orderData.orderId));
-            
-            const itemsSummary = itemsRows.length > 0 
-              ? itemsRows.map(i => `${i.quantity}x ${i.name || "Unknown Item"}`).join("\n")
-              : "No specific items found.";
-            
-            const ownerBody = `*Order Update: #${orderData.orderId.slice(0, 8)}*\nRestaurant: ${orderData.restaurantName}\nStatus: ${statusText.toUpperCase()}\n\n*Items:*\n${itemsSummary}\n\n*Total:* £${orderData.totalAmount}\n(Ref: SHIPDAY)`;
+        if (orderData) {
+          const statusText = mappedStatus.replace(/_/g, " ").toLowerCase();
+          const subject = mappedStatus === "DELIVERED" ? "Order Delivered! 🎉" : `Order Update: #${orderData.orderId.slice(0, 8)}`;
 
-            // Build Customer Body
-            let customerBody = `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is now ${statusText.toUpperCase()}.`;
-            if (mappedStatus === "DELIVERED") {
-              customerBody = `Congratulations! Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is successfully delivered. Enjoy your meal! 🍴`;
-            } else if (mappedStatus === "DISPATCH_REQUESTED" || mappedStatus === "OUT_FOR_DELIVERY") {
-              customerBody = `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is now dispatched!`;
-            }
+          const customerBody = mappedStatus === "DELIVERED"
+            ? `Congratulations! Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} is successfully delivered. Enjoy your meal! 🍴`
+            : `Your order #${orderData.orderId.slice(0, 8)} from ${orderData.restaurantName} was ${statusText.toUpperCase()}.`;
 
-            // 1. Notify Owner (WhatsApp + FCM)
-            if (orderData.ownerId) {
-              await NotificationService.dispatchOrderNotifications({
-                userId: orderData.ownerId,
-                type: "ORDER",
-                subject,
-                body: ownerBody,
-                metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
-                channels: ["FCM", "WHATSAPP"]
-              });
-            }
-
-            if (orderData.userId) {
-              const customerChannels: (typeof notificationChannelEnum)[number][] = ["FCM", "WHATSAPP"];
-
-              await NotificationService.dispatchOrderNotifications({
-                userId: orderData.userId,
-                type: "ORDER",
-                subject,
-                body: customerBody,
-                metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
-                channels: customerChannels
-              });
-            }
+          // Notify Owner
+          if (orderData.ownerId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.ownerId,
+              type: "ORDER",
+              subject,
+              body: `Order #${orderData.orderId.slice(0, 8)}: ${statusText.toUpperCase()}`,
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "owner" },
+              channels: ["FCM", "WHATSAPP"]
+            });
           }
 
+          // Notify Customer
+          if (orderData.userId) {
+            await NotificationService.dispatchOrderNotifications({
+              userId: orderData.userId,
+              type: "ORDER",
+              subject,
+              body: customerBody,
+              metadata: { orderId: orderData.orderId, orderStatus: mappedStatus, targetRole: "customer" },
+              channels: ["FCM", "WHATSAPP"]
+            });
+          }
+        }
       } catch (notifyErr) {
-        console.error("[Shipday Webhook] Failed to notify owner:", notifyErr);
+        console.error("[Shipday Webhook] Failed to notify terminal status:", notifyErr);
       }
+    } else {
+      console.log(`[Shipday Webhook] Status "${mappedStatus}" is logistical. Updated delivery job ${deliveryJob.id} only.`);
     }
 
     return NextResponse.json({ ok: true });

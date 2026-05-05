@@ -27,7 +27,7 @@ export default function CustomerNavbar({ user: serverUser }: { user: SessionUser
   // Once the client-side store is ready, use the DB profile (always fresh).
   // Until then, fall back to the server-passed user to avoid a "Sign In" flash
   // on first render before the auth listener fires.
-  const user = isReady ? profile : serverUser;
+  const user = isReady ? (profile ?? serverUser) : serverUser;
 
   const [locationOpen, setLocationOpen] = useState(false);
   const [profileOpen,  setProfileOpen]  = useState(false);

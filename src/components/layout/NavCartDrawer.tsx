@@ -19,9 +19,9 @@ export default function NavCartDrawer({ isOpen, onClose }: Props) {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const { currentCartItems, totalItems, totalPrice, updateQuantity } = useCart();
-  const { profile, isReady: authReady } = useAuthStore();
+  const { session } = useAuthStore();
   const router = useRouter();
-  const isLoggedIn = authReady && !!profile;
+  const isLoggedIn = !!session;
 
   const drawerRef = useRef<HTMLDivElement>(null);
   const mounted = useSyncExternalStore(

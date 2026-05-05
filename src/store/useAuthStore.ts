@@ -10,12 +10,14 @@ interface AuthState {
   profile:  AuthUser | null;   // DB profile — use for name, email, role display
   role:     UserRole | null;   // kept for fast role checks across the app
   isReady:  boolean;
+  authError: string | null;
 
   setSession: (session: Session | null) => void;
   setUser:    (user: User | null)       => void;
   setProfile: (profile: AuthUser | null) => void;
   setRole:    (role: UserRole | null)   => void;
   setIsReady: (ready: boolean)          => void;
+  setAuthError: (error: string | null)  => void;
   logout:     () => Promise<void>;
   refresh:    () => Promise<void>;
 }
@@ -30,24 +32,32 @@ export const useAuthStore = create<AuthState>()(
       profile:  null,
       role:     null,
       isReady:  false,
+      authError: null,
 
       setSession: (session) => set({ session }),
       setUser:    (user)    => set({ user }),
       setProfile: (profile) => set({ profile }),
       setRole:    (role)    => set({ role }),
       setIsReady: (isReady) => set({ isReady }),
+      setAuthError: (authError) => set({ authError }),
 
       logout: async () => {
         await supabase.auth.signOut();
-        set({ session: null, user: null, profile: null, role: null, isReady: true });
+        set({ session: null, user: null, profile: null, role: null, isReady: true, authError: null });
       },
 
       refresh: async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await loadProfile(session);
-        } else {
-          set({ session: null, user: null, profile: null, role: null, isReady: true });
+        try {
+          set({ authError: null });
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await loadProfile(session);
+          } else {
+            set({ session: null, user: null, profile: null, role: null, isReady: true, authError: null });
+          }
+        } catch (error) {
+          console.error("[auth-store] refresh failed:", error);
+          set({ isReady: true, authError: "We could not verify your session. Please retry." });
         }
       },
     }),
@@ -66,6 +76,7 @@ export const useAuthStore = create<AuthState>()(
 // then marks the store as ready. Used on INITIAL_SESSION and SIGNED_IN.
 async function loadProfile(session: Session) {
   const store = useAuthStore.getState();
+  store.setAuthError(null);
 
   if (store.profile && store.profile.id === session.user.id) {
     store.setSession(session);
@@ -82,13 +93,16 @@ async function loadProfile(session: Session) {
     if (res.success && res.data) {
       store.setProfile(res.data);
       store.setRole(res.data.role);
+      store.setAuthError(null);
     } else {
       store.setProfile(null);
       store.setRole(null);
+      store.setAuthError("We could not load your account profile. You can retry.");
     }
   } catch {
     store.setProfile(null);
     store.setRole(null);
+    store.setAuthError("We could not load your account profile. You can retry.");
   } finally {
     // isReady only becomes true AFTER profile is resolved —
     // prevents CartContext / OrderContext from firing with a null role.
@@ -121,6 +135,9 @@ if (typeof window !== 'undefined') {
         // Update session silently without touching isReady.
         store.setSession(session);
         store.setUser(session?.user ?? null);
+        if (session && !store.profile) {
+          loadProfile(session);
+        }
         break;
 
       case 'SIGNED_OUT':

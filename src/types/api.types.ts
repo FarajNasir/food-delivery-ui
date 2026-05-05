@@ -100,7 +100,14 @@ export interface Order {
   updatedAt: string;
   paymentIntentId?: string | null;
   restaurant?: { name: string };
-  review?: any | null;
+  deliveryJob?: {
+    status: string | null;
+    trackingUrl: string | null;
+    driverName: string | null;
+    driverPhone: string | null;
+    eta: string | null;
+  };
+  review?: unknown | null;
   items?: {
     id: string;
     quantity: number;
