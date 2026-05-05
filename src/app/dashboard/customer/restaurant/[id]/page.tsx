@@ -68,10 +68,10 @@ export default async function RestaurantPage({
   if (!restaurantData) notFound();
 
   return (
-    <RestaurantMenuView 
-      restaurant={restaurantData} 
-      initialMenuItems={DBMenuItems.length > 0 ? DBMenuItems : undefined}
-      reviews={DBReviews}
-    />
+      <RestaurantMenuView 
+        restaurant={restaurantData} 
+        initialMenuItems={DBMenuItems.length > 0 ? DBMenuItems : undefined}
+        reviews={DBReviews}
+      />
   );
 }

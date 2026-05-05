@@ -24,8 +24,8 @@ export default function CustomerCart() {
   const { gradientFrom, accent } = site.theme;
   const { currentCartItems, totalItems, totalPrice, updateQuantity, removeItem, clearCart, loading } = useCart();
   const isEmpty = currentCartItems.length === 0;
-  const { profile, isReady: authReady } = useAuthStore();
-  const isLoggedIn = authReady && !!profile;
+  const { session } = useAuthStore();
+  const isLoggedIn = !!session;
   const { userCoords } = useConfigStore();
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [checkingOut, setCheckingOut] = React.useState(false);

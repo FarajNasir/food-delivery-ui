@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bell, Shield, Trash2, LogOut,
-  ChevronRight, Smartphone,
+  Shield, Trash2, LogOut,
+  ChevronRight,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { authApi } from "@/lib/api";
@@ -12,27 +12,10 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/shared/ConfirmModal";
 
-function Toggle({ on, onToggle, accentColor }: { on: boolean; onToggle: () => void; accentColor: string }) {
-  return (
-    <button
-      onClick={onToggle}
-      className="relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0"
-      style={{ background: on ? accentColor : "#d1d5db" }}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
-        style={{ transform: on ? "translateX(20px)" : "translateX(0)" }}
-      />
-    </button>
-  );
-}
-
 export default function CustomerSettings() {
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
   const router = useRouter();
-  const [notifOrders, setNotifOrders] = useState(true);
-  const [smsUpdates, setSmsUpdates] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -75,16 +58,6 @@ export default function CustomerSettings() {
     onClick?: () => void;
   }[] = [
       {
-        label: "Order updates",
-        sub: "Notify when order status changes",
-        action: <Toggle on={notifOrders} onToggle={() => setNotifOrders(!notifOrders)} accentColor={gradientFrom} />,
-      },
-      {
-        label: "SMS updates",
-        sub: "Text messages for delivery tracking",
-        action: <Toggle on={smsUpdates} onToggle={() => setSmsUpdates(!smsUpdates)} accentColor={gradientFrom} />,
-      },
-      {
         label: "Privacy",
         sub: "Review our terms and data policy",
         onClick: () => router.push("/privacy"),
@@ -106,7 +79,7 @@ export default function CustomerSettings() {
       },
     ];
 
-  const icons = [Bell, Smartphone, Shield, LogOut, Trash2];
+  const icons = [Shield, LogOut, Trash2];
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 space-y-5">

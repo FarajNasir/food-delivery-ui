@@ -18,6 +18,10 @@ import { getOSRMDistance, calculateDeliveryFee } from "@/lib/delivery";
 import { cn } from "@/lib/utils";
 import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export default function CheckoutView() {
   const { cartItems, currentCartItems, totalPrice, clearCart } = useCart();
   const { refreshOrders } = useOrders();
@@ -160,7 +164,11 @@ export default function CheckoutView() {
 
     if (!address.trim()) { toast.error("Enter your delivery address"); return; }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
-    if (phone.length < 10) { toast.error("Phone number must be at least 10 digits"); return; }
+    const digitsOnlyPhone = normalizePhone(phone);
+    if (digitsOnlyPhone.length < 10) {
+      toast.error("Contact number must contain at least 10 digits.");
+      return;
+    }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
     if (isDistSlabs && deliveryFee === 0) { toast.error("Calculate your delivery distance first"); return; }
 
@@ -173,15 +181,16 @@ export default function CheckoutView() {
           "Content-Type": "application/json",
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
-        body: JSON.stringify({
-          deliveryAddress: address,
-          deliveryArea,
-          deliveryFee,
-          deliveryFeesBreakdown, // Sum-up breakdown
-          distanceMiles: 0, // No longer a single distance
-          customerPhone: phone
-        }),
-      });
+          body: JSON.stringify({
+            deliveryAddress: address,
+            deliveryArea,
+            deliveryFee,
+            deliveryFeesBreakdown, // Sum-up breakdown
+            distanceMiles: 0, // No longer a single distance
+            customerPhone: digitsOnlyPhone,
+            siteLocation: site.location,
+          }),
+        });
       const data = await res.json();
       if (res.ok) {
         toast.success("Order placed!");

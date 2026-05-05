@@ -131,15 +131,15 @@ export default function DishCard({
             e.stopPropagation();
             e.preventDefault();
             if (!isUnavailable) {
-              addItem({
-                menuItemId: id,
-                name,
-                price,
-                imageUrl: imageUrl || "",
-                restaurantId: "restaurantId" in dish ? dish.restaurantId : id,
-                restaurantName: restaurantName || "Restaurant",
-                restaurantLocation: site.location,
-              });
+          addItem({
+              menuItemId: id,
+              name,
+              price,
+              imageUrl: imageUrl || "",
+              restaurantId: "restaurantId" in dish ? dish.restaurantId : id,
+              restaurantName: restaurantName || "Restaurant",
+              restaurantLocation: "restaurantLocation" in dish && dish.restaurantLocation ? dish.restaurantLocation : site.location,
+            });
             }
           }}
           className={`w-full mt-auto flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-200 ${isUnavailable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "text-white shadow-sm hover:opacity-90 active:scale-95"}`}

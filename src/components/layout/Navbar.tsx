@@ -6,10 +6,9 @@ import { usePathname } from "next/navigation";
 import { useSite } from "@/context/SiteContext";
 import { ALL_SITES, SiteKey } from "@/config/sites";
 import { Menu, X, MapPin, ChevronDown, ShoppingBag, LogIn, LayoutDashboard } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { type Session, type User } from "@supabase/supabase-js";
 import { useCart } from "@/context/CartContext";
 import NavCartDrawer from "@/components/layout/NavCartDrawer";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function Navbar() {
   const { site, setSite } = useSite();
@@ -19,23 +18,10 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen]         = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const [scrolled, setScrolled]         = useState(!isHome);
-  const [loggedIn, setLoggedIn]         = useState(false);
   const [cartOpen, setCartOpen]         = useState(false);
   const { totalItems } = useCart();
-
-  // Check session on mount
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
-      setLoggedIn(!!data?.user);
-    });
-    // Listen for auth state changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
-      if (event === "SIGNED_IN") setLoggedIn(true);
-      else if (event === "SIGNED_OUT") setLoggedIn(false);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const { session, isReady } = useAuthStore();
+  const loggedIn = isReady ? !!session : false;
 
   useEffect(() => {
     if (!isHome) { setScrolled(true); return; }
