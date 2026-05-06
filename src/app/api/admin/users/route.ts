@@ -8,7 +8,7 @@ import { eq, and, asc, desc, count, sql, SQL } from "drizzle-orm";
 const CreateUserSchema = z.object({
   name:     z.string().min(2).max(150),
   email:    z.string().email(),
-  phone:    z.string().min(7).max(30),
+  phone:    z.string().regex(/^\d{10,15}$/, "Phone number must be between 10 and 15 digits (numbers only)."),
   role:     z.enum(["customer", "driver", "owner", "admin"]),
   password: z.string().min(8).max(72),
 });

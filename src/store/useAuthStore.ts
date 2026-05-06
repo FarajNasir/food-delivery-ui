@@ -49,9 +49,19 @@ export const useAuthStore = create<AuthState>()(
       refresh: async () => {
         try {
           set({ authError: null });
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await loadProfile(session);
+          // Use getUser() instead of getSession() to force a server-side check
+          // and ensure cookies set by API routes are picked up.
+          const { data: { user }, error } = await supabase.auth.getUser();
+          
+          if (user) {
+            // We need a session object for loadProfile. 
+            // getSession is fine here as getUser already verified the cookie.
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              await loadProfile(session);
+            } else {
+              set({ session: null, user: null, profile: null, role: null, isReady: true, authError: null });
+            }
           } else {
             set({ session: null, user: null, profile: null, role: null, isReady: true, authError: null });
           }

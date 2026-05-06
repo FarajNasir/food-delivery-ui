@@ -9,7 +9,7 @@ import { checkIpRateLimit } from "@/lib/rate-limit";
 const RegisterSchema = z.object({
   name:     z.string().min(2, "Name must be at least 2 characters.").max(150),
   email:    z.string().email("Enter a valid email address."),
-  phone:    z.string().min(7, "Enter a valid phone number.").max(30),
+  phone:    z.string().regex(/^\d{10,15}$/, "Phone number must be between 10 and 15 digits (numbers only)."),
   password: z.string().min(8, "Password must be at least 8 characters.").max(72),
 });
 

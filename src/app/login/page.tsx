@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSite } from "@/context/SiteContext";
 import AuthCard from "@/components/auth/AuthCard";
@@ -33,6 +33,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
 
+  const { session, isReady } = useAuthStore();
   const [form, setForm] = useState({ email: "", password: "", remember: false });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -40,11 +41,22 @@ function LoginContent() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+  useEffect(() => {
+    if (isReady && session) {
+      // Once the client auth store is hydrated, move straight into the app.
+      router.replace(redirectTo);
+    }
+  }, [isReady, session, redirectTo, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!form.email) {
       toast.error("Email is required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      toast.error("Please enter a valid email address.");
       return;
     }
     if (!form.password) {
@@ -61,10 +73,11 @@ function LoginContent() {
       return;
     }
 
-    // Refresh the auth store session/user state
+    // Sync the browser auth store before navigating so the dashboard reads
+    // the new session immediately without needing a manual refresh.
     await useAuthStore.getState().refresh();
-    setLoading(false);
     router.replace(redirectTo);
+    router.refresh();
   };
 
   return (

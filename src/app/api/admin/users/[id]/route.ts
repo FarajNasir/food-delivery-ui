@@ -9,7 +9,7 @@ import type { SessionUser } from "@/lib/auth";
 
 const UpdateUserSchema = z.object({
   name:   z.string().min(2).max(150).optional(),
-  phone:  z.string().min(7).max(30).optional(),
+  phone:  z.string().regex(/^\d{10,15}$/, "Phone number must be between 10 and 15 digits (numbers only).").optional(),
   role:   z.enum(["customer", "driver", "owner", "admin"]).optional(),
   status: z.enum(["active", "banned"]).optional(),
 });

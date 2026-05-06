@@ -78,7 +78,8 @@ export default function CustomerNavbar({ user: serverUser }: { user: SessionUser
 
   const { gradientFrom, gradientTo, accent } = site.theme;
   const isCheckoutPage = pathname.includes("/dashboard/customer/checkout");
-  const canSwitchLocation = !isCheckoutPage;
+  const isRestaurantPage = pathname.includes("/dashboard/customer/restaurant");
+  const canSwitchLocation = !isCheckoutPage && !isRestaurantPage;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/96 backdrop-blur-md shadow-sm border-b border-gray-100">
@@ -100,53 +101,55 @@ export default function CustomerNavbar({ user: serverUser }: { user: SessionUser
             </Link>
 
             {/* Location pill */}
-            {canSwitchLocation && (
-              <div className="relative" ref={locationRef}>
-                <button
-                  onClick={() => setLocationOpen(!locationOpen)}
-                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full border transition-all"
-                  style={{
-                    borderColor: `${gradientFrom}35`,
-                    color: gradientFrom,
-                    background: `${gradientFrom}08`,
-                  }}
-                >
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  <span>{site.location}</span>
+            <div className="relative" ref={locationRef}>
+              <button
+                onClick={() => canSwitchLocation && setLocationOpen(!locationOpen)}
+                className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full border transition-all ${
+                  !canSwitchLocation ? "cursor-default opacity-80" : ""
+                }`}
+                style={{
+                  borderColor: `${gradientFrom}35`,
+                  color: gradientFrom,
+                  background: `${gradientFrom}08`,
+                }}
+              >
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span>{site.location}</span>
+                {canSwitchLocation && (
                   <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-150 ${locationOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {locationOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                    <p className="text-[9px] font-black text-gray-400 px-3 pt-2.5 pb-1 uppercase tracking-widest">
-                      Switch location
-                    </p>
-                    {ALL_SITES.map((s) => {
-                      const active = s.key === site.key;
-                      return (
-                        <button
-                          key={s.key}
-                          onClick={() => { setSite(s.key as SiteKey); setLocationOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 transition-colors"
-                          style={
-                            active
-                              ? { background: `linear-gradient(135deg, ${s.theme.gradientFrom}, ${s.theme.accent})`, color: "#fff" }
-                              : { color: "#374151" }
-                          }
-                        >
-                          <span
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ background: active ? "#fff" : s.theme.gradientFrom }}
-                          />
-                          {s.name}
-                        </button>
-                      );
-                    })}
-                    <div className="h-1.5" />
-                  </div>
                 )}
-              </div>
-            )}
+              </button>
+
+              {canSwitchLocation && locationOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+                  <p className="text-[9px] font-black text-gray-400 px-3 pt-2.5 pb-1 uppercase tracking-widest">
+                    Switch location
+                  </p>
+                  {ALL_SITES.map((s) => {
+                    const active = s.key === site.key;
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => { setSite(s.key as SiteKey); setLocationOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 transition-colors"
+                        style={
+                          active
+                            ? { background: `linear-gradient(135deg, ${s.theme.gradientFrom}, ${s.theme.accent})`, color: "#fff" }
+                            : { color: "#374151" }
+                        }
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: active ? "#fff" : s.theme.gradientFrom }}
+                        />
+                        {s.name}
+                      </button>
+                    );
+                  })}
+                  <div className="h-1.5" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── MIDDLE: Global Search ── */}

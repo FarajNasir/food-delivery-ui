@@ -3,13 +3,27 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Star, Clock, Truck, Sparkles, Store, ArrowRight } from "lucide-react";
+import type { CSSProperties } from "react";
+import { Star, Clock, Sparkles, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RestaurantItem, FeaturedItem } from "@/types/api.types";
 import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
 
+type RestaurantCardData =
+  | RestaurantItem
+  | FeaturedItem
+  | {
+      id: string;
+      name: string;
+      image?: string | null;
+      cuisine?: string | null;
+      rating?: string | number | null;
+      deliveryTime?: string | null;
+      openingHours?: RestaurantItem["openingHours"];
+    };
+
 interface RestaurantCardProps {
-  restaurant: RestaurantItem | FeaturedItem | any; // Keep any for mock compatibility during transition
+  restaurant: RestaurantCardData;
   theme: {
     gradientFrom: string;
     primary: string;
@@ -30,22 +44,22 @@ export default function RestaurantCard({
   // Unified mapping for both API and older Mock data
   const id = "entityId" in restaurant ? restaurant.entityId : restaurant.id;
   const name = restaurant.name;
-  const image = "logoUrl" in restaurant ? restaurant.logoUrl : (restaurant as any).image;
-  const cuisine = (restaurant as any).cuisine || "";
-  const rating = (restaurant as any).rating || null;
-  const deliveryTime = (restaurant as any).deliveryTime || null;
-  const openingHours = (restaurant as any).openingHours;
+  const image = "logoUrl" in restaurant ? restaurant.logoUrl : ("image" in restaurant ? restaurant.image : null);
+  const cuisine = "cuisine" in restaurant ? restaurant.cuisine ?? "" : "";
+  const rating = "rating" in restaurant ? restaurant.rating ?? null : null;
+  const deliveryTime = "deliveryTime" in restaurant ? restaurant.deliveryTime ?? null : null;
+  const openingHours = restaurant.openingHours ?? null;
 
   const isOpen = isRestaurantOpen(openingHours);
+  const titleStyle = { "--group-hover-color": theme.accent } as CSSProperties;
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
       className={cn(
-        "group relative flex flex-col h-full cursor-pointer overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
+        "group relative flex flex-col h-full overflow-hidden rounded-[2rem] border border-border/40 bg-white transition-all duration-500",
         "hover:shadow-elevated shadow-soft",
         !isOpen && "grayscale-[0.8] opacity-90"
       )}
@@ -112,7 +126,7 @@ export default function RestaurantCard({
           <div className="flex items-start justify-between gap-2">
             <h3 
               className="font-heading text-lg font-black leading-tight text-gray-900 line-clamp-1 transition-colors duration-300"
-              style={{ "--group-hover-color": theme.accent } as any}
+              style={titleStyle}
             >
               <span className="group-hover:text-[var(--group-hover-color)] transition-colors duration-300">
                 {name}
@@ -140,20 +154,22 @@ export default function RestaurantCard({
             )}
           </div>
 
-          <motion.div
+          <motion.button
+            type="button"
+            onClick={() => router.push(`/dashboard/customer/restaurant/${id}`)}
             whileHover={{ 
               scale: 1.05, 
               backgroundColor: `${theme.accent}15`,
             }}
             whileTap={{ scale: 0.95 }}
-            className="ml-auto flex items-center justify-center rounded-full px-6 py-2.5 transition-all duration-300"
+            className="ml-auto flex items-center justify-center rounded-full px-6 py-2.5 transition-all duration-300 cursor-pointer"
             style={{ 
               color: theme.accent,
               backgroundColor: `${theme.accent}08`, 
             }}
           >
             <span className="text-[10px] font-black uppercase tracking-widest leading-none">Explore Menu</span>
-          </motion.div>
+          </motion.button>
         </div>
       </div>
     </motion.div>
