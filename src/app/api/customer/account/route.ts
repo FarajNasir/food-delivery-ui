@@ -8,7 +8,7 @@ import { z } from "zod";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(150),
-  phone: z.string().min(7, "Phone number must be at least 7 characters").max(30),
+  phone: z.string().regex(/^\d{10,15}$/, "Phone number must be between 10 and 15 digits (numbers only)."),
 });
 
 /**

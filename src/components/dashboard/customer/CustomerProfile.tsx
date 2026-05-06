@@ -16,12 +16,10 @@ export default function CustomerProfile({ user }: { user: SessionUser }) {
   const [saving, setSaving] = useState(false);
 
   const sanitizePhone = (value: string) => {
-    // Allow digits, spaces, and common international symbols.
-    return value.replace(/[^0-9+\-()\s]/g, "");
+    return value.replace(/\D/g, "");
   };
 
   const isValidPhone = (value: string) => {
-    // Basic international phone validation: starts with + or digit, followed by 7-15 digits
     const normalized = value.replace(/\D/g, "");
     return normalized.length >= 10 && normalized.length <= 15;
   };

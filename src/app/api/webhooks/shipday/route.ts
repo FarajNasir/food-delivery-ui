@@ -4,6 +4,17 @@ import { db } from "@/lib/db";
 import { deliveryJobs, orders, restaurants, notifications, orderItems, menuItems, notificationChannelEnum } from "@/lib/db/schema";
 import { NotificationService } from "@/services/notification.service";
 
+console.log("[Shipday Webhook] Route file loaded");
+
+export async function GET() {
+  console.log("[Shipday Webhook] GET request received (health check)");
+  return NextResponse.json({ 
+    status: "alive", 
+    message: "Shipday Webhook endpoint is active and ready for POST requests.",
+    timestamp: new Date().toISOString()
+  });
+}
+
 type ShipdayWebhookPayload = Record<string, unknown>;
 
 function readObject(value: unknown): Record<string, unknown> | null {
@@ -58,8 +69,10 @@ function mapShipdayStatus(payload: ShipdayWebhookPayload) {
   if (!rawStatus) return null;
   if (
     rawStatus === "DELIVERED" ||
-    rawStatus.includes("ORDER_DELIVERED") ||
-    rawStatus.includes("DELIVERY_COMPLETED")
+    rawStatus === "COMPLETED" ||
+    rawStatus === "COMPLETE" ||
+    rawStatus.includes("DELIVERED") ||
+    rawStatus.includes("COMPLETED")
   ) {
     return "DELIVERED" as const;
   }
@@ -67,7 +80,8 @@ function mapShipdayStatus(payload: ShipdayWebhookPayload) {
     rawStatus.includes("OUT_FOR_DELIVERY") ||
     rawStatus.includes("ON_THE_WAY") ||
     rawStatus.includes("EN_ROUTE") ||
-    rawStatus.includes("PICKED_UP")
+    rawStatus.includes("PICKED_UP") ||
+    rawStatus.includes("STARTED")
   ) {
     return "OUT_FOR_DELIVERY" as const;
   }
@@ -90,7 +104,8 @@ function mapShipdayStatus(payload: ShipdayWebhookPayload) {
 }
 
 export async function POST(req: Request) {
-  console.log("[Shipday Webhook] Received request");
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[Shipday Webhook] [${requestId}] POST request received`);
   try {
     const body = await req.text();
     if (!body) {
@@ -199,7 +214,15 @@ export async function POST(req: Request) {
     }
 
     const mappedStatus = mapShipdayStatus(payload);
-    console.log(`[Shipday Webhook] Raw Status: "${mappedStatus ? (pickFirstString(payload.orderStatus, payload.order_status, payload.status) || "unknown") : "none"}" -> Mapped: "${mappedStatus}"`);
+    const rawStatusLabel = pickFirstString(
+      payload.orderStatus,
+      payload.order_status,
+      payload.status,
+      payload.deliveryStatus,
+      payload.delivery_status
+    ) || "unknown";
+
+    console.log(`[Shipday Webhook] Raw Status: "${rawStatusLabel}" -> Mapped: "${mappedStatus}"`);
 
     const updateDeliveryJob: Record<string, string | Date | null> = {
       providerOrderId: providerOrderId || deliveryJob.providerOrderId,
@@ -254,7 +277,7 @@ export async function POST(req: Request) {
         .limit(1);
 
       const allowedTransitions: Record<string, string[]> = {
-        DELIVERED: ["OUT_FOR_DELIVERY", "DISPATCH_REQUESTED", "PREPARING"],
+        DELIVERED: ["OUT_FOR_DELIVERY", "DISPATCH_REQUESTED", "PREPARING", "PAID", "CONFIRMED"],
         CANCELLED: ["DISPATCH_REQUESTED", "PREPARING", "PAID", "CONFIRMED", "PENDING_CONFIRMATION"],
       };
 

@@ -123,8 +123,14 @@ export default function FeaturedRestaurants() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
+          onTouchMove={(e) => e.preventDefault()}
           className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar pb-3"
-          style={{ scrollSnapType: "x mandatory", msOverflowStyle: "none", scrollbarWidth: "none" }}
+          style={{
+            scrollSnapType: "x mandatory",
+            msOverflowStyle: "none",
+            scrollbarWidth: "none",
+            touchAction: "none",
+          }}
         >
           {loading ? (
             [1, 2, 3, 4].map((n) => (

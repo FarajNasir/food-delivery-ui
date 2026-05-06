@@ -10,10 +10,9 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { toast } from "sonner";
 import {
   ChevronLeft, MapPin, Phone, CreditCard, Loader2,
-  Navigation, Store, ChevronDown, ShieldCheck, CheckCircle2, AlertTriangle,
+  Navigation, Store, ChevronDown, ShieldCheck, AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { getOSRMDistance, calculateDeliveryFee } from "@/lib/delivery";
 import { cn } from "@/lib/utils";
 import { isRestaurantOpen } from "@/lib/utils/restaurantUtils";
@@ -23,7 +22,7 @@ function normalizePhone(value: string) {
 }
 
 export default function CheckoutView() {
-  const { cartItems, currentCartItems, totalPrice, clearCart } = useCart();
+  const { currentCartItems, totalPrice, clearCart } = useCart();
   const { refreshOrders } = useOrders();
   const { site } = useSite();
   const { gradientFrom, accent } = site.theme;
@@ -162,11 +161,16 @@ export default function CheckoutView() {
       return;
     }
 
-    if (!address.trim()) { toast.error("Enter your delivery address"); return; }
+    const trimmedAddress = address.trim();
+    if (!trimmedAddress) { toast.error("Enter your delivery address"); return; }
+    if (trimmedAddress.length < 10 || trimmedAddress.length > 100) {
+      toast.error("Delivery address must be between 10 and 100 characters.");
+      return;
+    }
     if (!phone.trim()) { toast.error("Enter your phone number"); return; }
     const digitsOnlyPhone = normalizePhone(phone);
-    if (digitsOnlyPhone.length < 10) {
-      toast.error("Contact number must contain at least 10 digits.");
+    if (digitsOnlyPhone.length < 10 || digitsOnlyPhone.length > 15) {
+      toast.error("Contact number must be between 10 and 15 digits.");
       return;
     }
     if (site.key === "newcastleeats" && !deliveryArea) { toast.error("Select your delivery area"); return; }
@@ -182,7 +186,7 @@ export default function CheckoutView() {
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
           body: JSON.stringify({
-            deliveryAddress: address,
+            deliveryAddress: trimmedAddress,
             deliveryArea,
             deliveryFee,
             deliveryFeesBreakdown, // Sum-up breakdown
@@ -215,6 +219,15 @@ export default function CheckoutView() {
 
   const uniqueRestosCount = Array.from(new Set(currentCartItems.map(i => i.restaurantId))).length;
   const serviceCharge = (site.serviceCharge ?? 0) * uniqueRestosCount;
+  const hasDeliveryFeeInfo = paysDeliveryAtDoor && (isFixedAreas || isDistSlabs) && deliveryFee > 0;
+  const deliveryAreaRules = (site.deliveryPricing?.rules ?? []) as Array<{ name: string; fee: number }>;
+  const deliveryFeeNote = hasDeliveryFeeInfo
+    ? uniqueRestosCount > 2
+      ? `Your basket includes ${uniqueRestosCount} restaurants, so the delivery fee is calculated separately for each one. The total delivery fee of £${deliveryFee.toFixed(2)} is paid in cash to the driver on arrival.`
+      : uniqueRestosCount > 1
+        ? `Your basket includes ${uniqueRestosCount} restaurants, so the delivery fee is added per restaurant. The total delivery fee of £${deliveryFee.toFixed(2)} is paid in cash to the driver on arrival.`
+        : `The delivery fee of £${deliveryFee.toFixed(2)} is paid in cash to the driver on arrival.`
+    : "";
 
   const grandTotal = totalPrice + (paysDeliveryAtDoor ? 0 : deliveryFee) + serviceCharge;
 
@@ -268,9 +281,14 @@ export default function CheckoutView() {
                 placeholder="House number, street, postcode…"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                minLength={10}
+                maxLength={100}
                 rows={2}
                 className={cn(inputClass, "resize-none")}
               />
+              <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
+                Enter a delivery address between 10 and 100 characters.
+              </p>
             </div>
 
             {/* Phone */}
@@ -326,7 +344,7 @@ export default function CheckoutView() {
                     className={cn(inputClass, "appearance-none pr-10")}
                   >
                     <option value="">Select your area…</option>
-                    {site.deliveryPricing?.rules.map((r: any, idx: number) => (
+                    {deliveryAreaRules.map((r, idx) => (
                       <option key={`${r.name}-${idx}`} value={r.name}>{r.name} — £{r.fee.toFixed(2)}</option>
                     ))}
                   </select>
@@ -447,7 +465,7 @@ export default function CheckoutView() {
                 <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100/50 mt-4">
                   <span className="text-amber-500 text-xs">ⓘ</span>
                   <p className="text-[10px] text-amber-800/80 font-medium leading-relaxed">
-                    The delivery fee of £{deliveryFee.toFixed(2)} is paid directly in cash to the driver upon arrival.
+                    {deliveryFeeNote}
                   </p>
                 </div>
               )}

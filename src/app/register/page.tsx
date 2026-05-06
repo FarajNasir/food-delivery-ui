@@ -83,8 +83,11 @@ export default function RegisterPage() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email.";
     if (!phone) {
       e.phone = "Phone number is required.";
-    } else if (!isValidPhoneNumber(phone)) {
-      e.phone = "Please enter a complete and valid phone number.";
+    } else {
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 15) {
+        e.phone = "Phone number must be between 10 and 15 digits.";
+      }
     }
     if (!form.password) e.password = "Password is required.";
     else if (form.password.length < 8) e.password = "Password must be at least 8 characters.";

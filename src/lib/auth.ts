@@ -56,7 +56,7 @@ if (process.env.NODE_ENV !== "production") {
   globalThis._userCache = userCache;
 }
 
-const CACHE_TTL_MS = 60_000; // 60 seconds
+const CACHE_TTL_MS = 2_000; // 2 seconds (was 60s)
 
 /** Call this whenever a user's role or status is mutated. */
 export function invalidateUserCache(userId: string): void {
